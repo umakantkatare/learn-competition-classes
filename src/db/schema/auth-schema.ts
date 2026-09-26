@@ -12,6 +12,10 @@ export const user = pgTable("user", {
     .defaultNow()
     .$onUpdate(() => /* @__PURE__ */ new Date())
     .notNull(),
+  role: text("role", {
+    enum: ["student", "teacher", "manager", "admin"],
+  }).default("student"),
+  phoneNumber: text("phone_number").notNull().unique(),
 });
 
 export const session = pgTable(
@@ -74,25 +78,18 @@ export const verification = pgTable(
 );
 
 export const relations = defineRelations(
-  {
-    user,
-    session,
-    account,
-    verification,
-  },
+  { user, session, account },
   (r) => ({
     user: {
       sessions: r.many.session(),
       accounts: r.many.account(),
     },
-
     session: {
       user: r.one.user({
         from: r.session.userId,
         to: r.user.id,
       }),
     },
-
     account: {
       user: r.one.user({
         from: r.account.userId,

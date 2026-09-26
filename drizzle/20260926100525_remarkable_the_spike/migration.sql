@@ -32,7 +32,9 @@ CREATE TABLE "user" (
 	"email_verified" boolean DEFAULT false NOT NULL,
 	"image" text,
 	"created_at" timestamp DEFAULT now() NOT NULL,
-	"updated_at" timestamp DEFAULT now() NOT NULL
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	"role" text DEFAULT 'student',
+	"phone_number" text NOT NULL UNIQUE
 );
 --> statement-breakpoint
 CREATE TABLE "verification" (
