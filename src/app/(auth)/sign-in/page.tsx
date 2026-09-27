@@ -1,9 +1,18 @@
+import { SigninForm } from "@/components/signin-form";
+import { Poppins } from "next/font/google";
 
+const poppins = Poppins({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+});
 
-const singIn = () => {
- 
-
-  return <div>singIn</div>;
-};
-
-export default singIn;
+export default function SignIn() {
+  return (
+    <main
+      className={`${poppins.className} flex min-h-screen items-center justify-center bg-amber-50/30 px-4 py-5 sm:px-6 sm:py-6`}
+    >
+      <SigninForm />
+    </main>
+  );
+}
