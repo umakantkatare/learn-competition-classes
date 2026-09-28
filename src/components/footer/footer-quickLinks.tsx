@@ -1,32 +1,8 @@
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
+import { quickLinks } from "@/data/footer.data";
 
-const quickLinks = [
-  {
-    label: "Home",
-    href: "/",
-  },
-  {
-    label: "Courses",
-    href: "/courses",
-  },
-  {
-    label: "Live Classes",
-    href: "/live-classes",
-  },
-  {
-    label: "Test Series",
-    href: "/test-series",
-  },
-  {
-    label: "Study Material",
-    href: "/study-material",
-  },
-  {
-    label: "About Us",
-    href: "/about",
-  },
-];
+
 
 export function FooterQuickLinks() {
   return (

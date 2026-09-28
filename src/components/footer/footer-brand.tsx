@@ -1,43 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Send } from "lucide-react";
-
-import {
-  FaFacebook,
-  FaInstagram,
-  FaYoutube,
-  FaWhatsapp,
-} from "react-icons/fa6";
-
 import { HoverBorderGradient } from "@/components/ui/hover-border-gradient";
-
-const socialLinks = [
-  {
-    name: "Facebook",
-    href: "https://facebook.com",
-    icon: FaFacebook,
-  },
-  {
-    name: "Instagram",
-    href: "https://instagram.com",
-    icon: FaInstagram,
-  },
-  {
-    name: "YouTube",
-    href: "https://youtube.com",
-    icon: FaYoutube,
-  },
-  {
-    name: "Telegram",
-    href: "https://telegram.org",
-    icon: Send,
-  },
-  {
-    name: "WhatsApp",
-    href: "https://whatsapp.com",
-    icon: FaWhatsapp,
-  },
-];
+import { socialLinks } from "@/data/footer.data";
 
 export function FooterBrand() {
   return (

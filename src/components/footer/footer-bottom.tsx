@@ -1,7 +1,5 @@
 import Link from "next/link";
-import { ShieldCheck, LockKeyhole } from "lucide-react";
 
-import { Separator } from "@/components/ui/separator";
 
 const legalLinks = [
   {

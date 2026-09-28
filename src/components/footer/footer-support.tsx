@@ -1,32 +1,8 @@
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
+import { supportLinks } from "@/data/footer.data";
 
-const supportLinks = [
-  {
-    label: "Help Center",
-    href: "/help",
-  },
-  {
-    label: "FAQs",
-    href: "/faqs",
-  },
-  {
-    label: "Contact Support",
-    href: "/contact",
-  },
-  {
-    label: "Privacy Policy",
-    href: "/privacy-policy",
-  },
-  {
-    label: "Terms & Conditions",
-    href: "/terms-and-conditions",
-  },
-  {
-    label: "Refund Policy",
-    href: "/refund-policy",
-  },
-];
+
 
 export function FooterSupport() {
   return (

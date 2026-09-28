@@ -1,36 +1,8 @@
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
+import { popularExams } from "@/data/footer.data";
 
-const popularExams = [
-  {
-    label: "SSC",
-    href: "/courses/ssc",
-  },
-  {
-    label: "Banking",
-    href: "/courses/banking",
-  },
-  {
-    label: "Railway",
-    href: "/courses/railway",
-  },
-  {
-    label: "Patwari",
-    href: "/courses/patwari",
-  },
-  {
-    label: "MP Police",
-    href: "/courses/mp-police",
-  },
-  {
-    label: "MP SI",
-    href: "/courses/mp-si",
-  },
-  {
-    label: "MP TET",
-    href: "/courses/mp-tet",
-  },
-];
+
 
 export function FooterPopularExams() {
   return (

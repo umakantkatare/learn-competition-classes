@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { MapPin, Phone, Mail, Clock } from "lucide-react";
+import { Clock } from "lucide-react";
 
 import {
   Tooltip,
@@ -7,27 +7,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-
-const contactDetails = [
-  {
-    label: "Address",
-    value: "Gurugram, Haryana, India",
-    href: "https://maps.google.com/?q=Gurugram,Haryana",
-    icon: MapPin,
-  },
-  {
-    label: "Phone",
-    value: "+91 98765 43210",
-    href: "tel:+919876543210",
-    icon: Phone,
-  },
-  {
-    label: "Email",
-    value: "support@lccinstitute.com",
-    href: "mailto:support@lccinstitute.com",
-    icon: Mail,
-  },
-];
+import { contactDetails } from "@/data/footer.data";
 
 export function FooterContact() {
   return (
