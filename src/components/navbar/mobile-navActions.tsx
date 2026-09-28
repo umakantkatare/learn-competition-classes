@@ -13,7 +13,7 @@ export default function MobileNavActions({
     <div className="flex flex-col gap-3">
       {/* Login Button */}
       <Link
-        href="/login"
+        href="/sign-in"
         onClick={onNavigate}
         className="flex h-12 w-full items-center
           justify-center gap-2 rounded-full
@@ -27,7 +27,7 @@ export default function MobileNavActions({
 
       {/* Sign Up Button */}
       <Link
-        href="/signup"
+        href="/sign-up"
         onClick={onNavigate}
         className="flex h-12 w-full items-center
           justify-center gap-2 rounded-full

@@ -6,7 +6,7 @@ export default function NavbarActions() {
     <div className="flex shrink-0 items-center gap-3">
       {/* Login Button */}
       <Link
-        href="/login"
+        href="/sign-in"
         className="inline-flex h-12 items-center justify-center
           gap-2 whitespace-nowrap rounded-full
           border-2 border-[#F5A800] px-5
@@ -20,7 +20,7 @@ export default function NavbarActions() {
 
       {/* Sign Up Button */}
       <Link
-        href="/signup"
+        href="/sign-up"
         className="inline-flex h-12 items-center justify-center
           gap-2 whitespace-nowrap rounded-full
           bg-[#F5A800] px-5
