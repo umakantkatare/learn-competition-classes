@@ -11,10 +11,20 @@ import { user } from "@/db/schema/auth-schema";
 console.log("AUTH SCHEMA:", Object.keys(schema));
 
 export const auth = betterAuth({
+  appName: "",
+  basePath: "",
+  secret: "",
+  trustedOrigins: [],
+
   database: drizzleAdapter(db, {
     provider: "pg",
     schema,
   }),
+  advanced: {
+    database: {
+      joins: true, // Enable performance optimization
+    },
+  },
   emailAndPassword: {
     enabled: true,
     autoSignIn: false,
@@ -38,7 +48,6 @@ export const auth = betterAuth({
     },
   },
   plugins: [
-    nextCookies(),
     emailOTP({
       sendVerificationOnSignUp: true,
       overrideDefaultEmailVerification: true,
@@ -71,5 +80,6 @@ export const auth = betterAuth({
       otpLength: 6,
       expiresIn: 300,
     }),
+    nextCookies(),
   ],
 });
