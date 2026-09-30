@@ -7,14 +7,18 @@ import * as schema from "@/db/schema/auth-schema";
 import { sendVerificationEmail } from "@/helper/sendVerificationEmail";
 import { eq } from "drizzle-orm";
 import { user } from "@/db/schema/auth-schema";
+import { USER_ROLES } from "./permissions";
 
 console.log("AUTH SCHEMA:", Object.keys(schema));
 
 export const auth = betterAuth({
-  appName: "",
-  basePath: "",
-  secret: "",
-  trustedOrigins: [],
+  appName: "LCC Institute",
+
+  baseURL: process.env.BETTER_AUTH_URL,
+
+  secret: process.env.BETTER_AUTH_SECRET,
+
+  trustedOrigins: [process.env.NEXT_PUBLIC_APP_URL!],
 
   database: drizzleAdapter(db, {
     provider: "pg",
@@ -34,9 +38,9 @@ export const auth = betterAuth({
   user: {
     additionalFields: {
       role: {
-        type: ["student", "teacher", "manager", "admin"],
+        type: "string",
         required: false,
-        defaultValue: "student",
+        defaultValue: USER_ROLES.STUDENT,
         input: false,
       },
       phoneNumber: {

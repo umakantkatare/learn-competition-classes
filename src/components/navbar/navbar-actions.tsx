@@ -14,7 +14,7 @@ export default function NavbarActions() {
           transition-all duration-200
           hover:bg-amber-50 lg:px-6 lg:text-base"
       >
-        <LogIn size={18} strokeWidth={2} />
+        {/* <LogIn size={18} strokeWidth={2} /> */}
         Login
       </Link>
 
@@ -28,7 +28,7 @@ export default function NavbarActions() {
           shadow-sm transition-all duration-200
           hover:bg-amber-500 lg:px-6 lg:text-base"
       >
-        <UserPlus size={18} strokeWidth={2} />
+        {/* <UserPlus size={18} strokeWidth={2} /> */}
         Sign Up
       </Link>
     </div>
