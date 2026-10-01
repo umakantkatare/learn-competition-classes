@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -37,6 +36,7 @@ import {
   SignInFormOutput,
   signInSchema,
 } from "@/validations/signInValidation";
+import Logo from "./common/logo";
 
 const labelClass =
   "mb-[0.7] block text-[12px] font-medium text-neutral-800 sm:text-[13px]";
@@ -99,14 +99,7 @@ export function SigninForm({ ...props }: React.ComponentProps<typeof Card>) {
     >
       <CardHeader className="mb-4 flex flex-col items-center p-0 text-center">
         <div className="relative mb-2 flex h-14 w-14 items-center justify-center sm:h-16 sm:w-16">
-          <Image
-            src="/images/LCC-logo.jpg"
-            alt="LCC Institute"
-            width={64}
-            height={64}
-            priority
-            className="rounded-full object-contain"
-          />
+          <Logo width={70} height={70} showName={false} />
         </div>
 
         <CardTitle className="text-[22px] font-bold leading-tight tracking-tight text-neutral-900 sm:text-[25px]">

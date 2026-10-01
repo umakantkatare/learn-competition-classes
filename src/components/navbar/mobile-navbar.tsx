@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
-import NavbarLogo from "./navbar-logo";
 import NavbarSearch from "./navbar-search";
 import MobileSidebar from "./mobile-sidebar";
+import Logo from "../common/logo";
 
 export default function MobileNavbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -29,7 +29,7 @@ export default function MobileNavbar() {
 
         {/* Center Logo */}
         <div className="absolute left-1/2 -translate-x-1/2">
-          <NavbarLogo compact />
+          <Logo width={55} height={55} />
         </div>
 
         {/* Search Button */}

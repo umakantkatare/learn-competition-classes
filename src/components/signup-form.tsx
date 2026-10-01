@@ -36,6 +36,7 @@ import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import { signUpSchema } from "@/validations/signUpValidation";
 import { toast } from "sonner";
+import Logo from "./common/logo";
 
 type SignUpFormInput = z.input<typeof signUpSchema>;
 type SignUpFormOutput = z.output<typeof signUpSchema>;
@@ -109,14 +110,7 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
     >
       <CardHeader className="mb-4 flex flex-col items-center p-0 text-center">
         <div className="relative mb-2 flex h-14 w-14 items-center justify-center sm:h-16 sm:w-16">
-          <Image
-            src="/images/LCC-logo.jpg"
-            alt="LCC Institute"
-            width={64}
-            height={64}
-            priority
-            className="rounded-full object-contain"
-          />
+          <Logo width={70} height={70} showName={false} />
         </div>
 
         <CardTitle className="text-[22px] font-bold leading-tight tracking-tight text-neutral-900 sm:text-[25px]">

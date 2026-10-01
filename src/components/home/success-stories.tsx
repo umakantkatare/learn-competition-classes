@@ -5,21 +5,21 @@ const testimonials = [
   {
     name: "Rahul Sharma",
     selection: "SSC CGL",
-    image: "/images/students/pexels-mart-production-8217506.jpg",
+    image: "/images/students/pexels-mart-production-8217506.webp",
     review:
       "The concepts were explained from the basics, and regular mock tests helped me improve my speed and accuracy. The faculty guidance was very helpful throughout my preparation.",
   },
   {
     name: "Priya Verma",
     selection: "MP Patwari",
-    image: "/images/students/pexels-mart-production-8217506.jpg",
+    image: "/images/students/pexels-mart-production-8217506.webp",
     review:
       "The bilingual classes made difficult topics easy to understand. The structured study plan and doubt sessions helped me stay consistent with my preparation.",
   },
   {
     name: "Amit Singh",
     selection: "Railway NTPC",
-    image: "/images/students/pexels-mart-production-8217506.jpg",
+    image: "/images/students/pexels-mart-production-8217506.webp",
     review:
       "The regular practice tests and detailed explanations helped me identify my weak areas. I am thankful to the LCC faculty for their guidance and support.",
   },

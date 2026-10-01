@@ -1,6 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "cn";
 import {
   ArrowRight,
   BookOpen,
@@ -16,45 +18,45 @@ const benefits = [
     icon: BookOpen,
     title: "Concept Clarity",
     description: "From Basics to Advanced",
-    color: "bg-orange-100 text-orange-600",
+    color: "bg-accent text-brand-primary",
   },
   {
     icon: Target,
     title: "Exam Oriented",
     description: "Study Plan & Practice",
-    color: "bg-[#f5a800]/15 text-[#b37b00]",
+    color: "bg-brand-primary/15 text-brand-primary",
   },
   {
     icon: Users,
     title: "Personal Guidance",
     description: "Doubt Support",
-    color: "bg-amber-100 text-amber-700",
+    color: "bg-accent text-brand-dark",
   },
   {
     icon: ChartNoAxesCombined,
     title: "Better Results",
     description: "Proven Track Record",
-    color: "bg-rose-100 text-rose-600",
+    color: "bg-brand-primary-hover/10 text-brand-primary-hover",
   },
 ];
 
 export function HeroSection() {
   return (
-    <section className="relative overflow-hidden bg-[#fffaf0]">
-      <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-8 px-4 py-10 sm:px-6 md:py-14 lg:grid-cols-2 lg:px-8 lg:py-16">
+    <section className="relative overflow-hidden bg-background">
+      <div className="mx-auto grid max-w-content grid-cols-1 items-center gap-8 px-4 py-10 sm:px-6 md:py-14 lg:grid-cols-2 lg:px-8 lg:py-16">
         {/* Left Content */}
         <div className="relative z-10">
-          <p className="mb-4 text-xs font-bold uppercase tracking-[0.15em] text-[#b37b00] sm:text-sm">
+          <p className="mb-4 text-xs font-bold uppercase tracking-[0.15em] text-brand-primary sm:text-sm">
             A Focused Institute for Bilingual Classes
           </p>
 
-          <h1 className="text-4xl font-extrabold leading-[1.12] tracking-tight text-[#171717] sm:text-5xl lg:text-6xl">
+          <h1 className="font-heading text-4xl font-extrabold leading-[1.12] tracking-tight text-text-primary sm:text-5xl lg:text-6xl">
             Your Success in{" "}
-            <span className="text-[#f5a800]">Competitive Exams</span> Starts
+            <span className="text-brand-primary">Competitive Exams</span> Starts
             Here
           </h1>
 
-          <p className="mt-5 max-w-xl text-base leading-7 text-[#24456b] sm:text-lg">
+          <p className="mt-5 max-w-xl text-base leading-7 text-text-secondary sm:text-lg">
             Bilingual Classes (Hindi + English) | Expert Faculty | Structured
             Study Plan | Regular Tests | Personal Guidance
           </p>
@@ -75,11 +77,11 @@ export function HeroSection() {
                     <Icon className="size-6" />
                   </div>
 
-                  <h3 className="mt-2 text-sm font-bold text-[#17375e]">
+                  <h3 className="mt-2 text-sm font-bold text-brand-dark">
                     {benefit.title}
                   </h3>
 
-                  <p className="mt-1 text-xs text-slate-500">
+                  <p className="mt-1 text-xs text-text-secondary">
                     {benefit.description}
                   </p>
                 </div>
@@ -91,7 +93,7 @@ export function HeroSection() {
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link
               href="/courses"
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-[#f5a800] px-6 text-sm font-semibold text-black transition hover:bg-[#e09a00]"
+              className={cn(buttonVariants({ variant: "default", size: "lg" }))}
             >
               Explore Courses
               <ArrowRight className="size-4" />
@@ -99,9 +101,9 @@ export function HeroSection() {
 
             <Link
               href="/demo"
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-[#f5a800] bg-white px-6 text-sm font-semibold text-black transition hover:bg-[#fff4d6]"
+              className={cn(buttonVariants({ variant: "outline", size: "lg" }))}
             >
-              <CirclePlay className="size-5 text-red-600" />
+              <CirclePlay className="size-5 text-brand-primary-hover" />
               Watch Demo
             </Link>
           </div>
@@ -112,19 +114,19 @@ export function HeroSection() {
               {[1, 2, 3, 4].map((item) => (
                 <div
                   key={item}
-                  className="flex size-10 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-slate-200"
+                  className="flex size-10 items-center justify-center overflow-hidden rounded-full border-2 border-surface bg-muted"
                 >
-                  <GraduationCap className="size-5 text-slate-600" />
+                  <GraduationCap className="size-5 text-text-secondary" />
                 </div>
               ))}
             </div>
 
             <div>
-              <p className="text-sm font-bold text-[#17375e]">
+              <p className="text-sm font-bold text-brand-dark">
                 10,000+ Students
               </p>
 
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-text-secondary">
                 on their Government Job Journey
               </p>
             </div>
@@ -134,28 +136,43 @@ export function HeroSection() {
         {/* Right Visual */}
         <div className="relative mx-auto w-full max-w-xl lg:min-h-[530px]">
           {/* Director Background */}
-          <div className="absolute inset-0 rounded-full " />
+          <div
+            className="
+      pointer-events-none
+      absolute
+      left-1/2
+      top-[6%]
+      h-[82%]
+      w-[78%]
+      -translate-x-1/2
+      rounded-full
+      bg-brand-primary/15
+    "
+          />
 
           {/* Director Image */}
           <div className="relative z-10 h-[360px] w-full sm:h-[470px]">
             <Image
-              src="/images/home/director.png"
-              // src="/images/home/doctor.png"
+              src="/images/home/doctor.webp"
               alt="Pawan Sir, Director of LCC Institute"
               fill
               priority
-              sizes="(max-width: 1024px) 50vw, 100vw"
-              className="object-contain"
+              sizes="(max-width: 1024px) 100vw, 36rem"
+              className="object-contain object-bottom"
             />
           </div>
 
           {/* Director Name */}
-          <div className="relative z-20 mx-auto -mt-6 w-fit rounded-2xl border border-[#e9d7a0] bg-[#fff7df] px-8 py-3 text-center shadow-lg">
-            <p className="text-xs text-slate-600">Director</p>
+          <div className="relative z-20 mx-auto -mt-5 w-75 rounded-card border border-border bg-accent px-8 py-3 text-center shadow-lg">
+            <p className="text-xs text-text-secondary">Director</p>
 
-            <h2 className="text-xl font-extrabold text-[#171717]">PAWAN SIR</h2>
+            <h2 className="font-heading text-xl font-extrabold text-text-primary">
+              PAWAN SIR
+            </h2>
 
-            <p className="text-xs text-slate-600">Expert in Math & Reasoning</p>
+            <p className="text-xs text-text-secondary">
+              Expert in Math & Reasoning
+            </p>
           </div>
         </div>
       </div>

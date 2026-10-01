@@ -1,4 +1,3 @@
-
 "use client";
 
 import Image from "next/image";
@@ -68,49 +67,49 @@ export default function NavbarUserMenu({
   return (
     <DropdownMenu>
       {/* Profile Trigger */}
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          aria-label="Open student profile menu"
-          className="flex shrink-0 items-center gap-3
-            rounded-full p-1.5 transition-colors
-            hover:bg-amber-50
-            focus-visible:outline-none
-            focus-visible:ring-2
-            focus-visible:ring-[#F5A800]"
-        >
-          {/* Avatar */}
-          <div className="relative h-12 w-12
-            overflow-hidden rounded-full
-            bg-amber-50 sm:h-14 sm:w-14"
+      <DropdownMenuTrigger
+        render={
+          <button
+            type="button"
+            aria-label="Open student profile menu"
+            className="flex shrink-0 items-center gap-3
+        rounded-full p-1.5 transition-colors
+        hover:bg-amber-50
+        focus-visible:outline-none
+        focus-visible:ring-2
+        focus-visible:ring-[#F5A800]"
           >
-            <Image
-              src={avatar}
-              alt={`${name}'s profile`}
-              fill
-              sizes="56px"
-              className="object-cover"
-            />
-          </div>
+            {/* Avatar */}
+            <div
+              className="relative h-12 w-12
+          overflow-hidden rounded-full
+          bg-amber-50 sm:h-14 sm:w-14"
+            >
+              <Image
+                src={avatar}
+                alt={`${name}'s profile`}
+                fill
+                sizes="56px"
+                className="object-cover"
+              />
+            </div>
 
-          {/* User Details */}
-          <div className="hidden flex-col items-start sm:flex">
-            <span className="max-w-32 truncate
-              text-base font-semibold text-[#171717]">
-              {name}
-            </span>
+            {/* User Details */}
+            <div className="hidden flex-col items-start sm:flex">
+              <span
+                className="max-w-32 truncate
+            text-base font-semibold text-[#171717]"
+              >
+                {name}
+              </span>
 
-            <span className="text-sm text-gray-500">
-              {role}
-            </span>
-          </div>
+              <span className="text-sm text-gray-500">{role}</span>
+            </div>
 
-          <ChevronDown
-            size={18}
-            className="hidden text-gray-500 sm:block"
-          />
-        </button>
-      </DropdownMenuTrigger>
+            <ChevronDown size={18} className="hidden text-gray-500 sm:block" />
+          </button>
+        }
+      />
 
       {/* Dropdown Content */}
       <DropdownMenuContent
@@ -122,13 +121,17 @@ export default function NavbarUserMenu({
         {/* User Info */}
         <DropdownMenuLabel className="px-3 py-3">
           <div className="flex flex-col gap-1">
-            <span className="truncate text-sm
-              font-semibold text-gray-900">
+            <span
+              className="truncate text-sm
+              font-semibold text-gray-900"
+            >
               {name}
             </span>
 
-            <span className="text-xs font-normal
-              text-gray-500">
+            <span
+              className="text-xs font-normal
+              text-gray-500"
+            >
               {role}
             </span>
           </div>

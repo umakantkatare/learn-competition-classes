@@ -14,7 +14,7 @@ export default function NavbarLogo({ compact = false }: NavbarLogoProps) {
     >
       {/* Institute Logo */}
       <Image
-        src="/images/LCC-logo.jpg"
+        src="/images/LCC-logo.webp"
         alt="LCC Institute Logo"
         width={compact ? 56 : 100}
         height={compact ? 56 : 100}

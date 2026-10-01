@@ -33,6 +33,7 @@ import {
 import { authClient } from "@/lib/auth-client";
 import { verifyEmailSchema } from "@/validations/verifyEmailValidation";
 import { useRouter } from "next/navigation";
+import Logo from "./common/logo";
 
 type VerifyEmailInput = z.input<typeof verifyEmailSchema>;
 type VerifyEmailOutput = z.output<typeof verifyEmailSchema>;
@@ -168,14 +169,7 @@ export default function VerifyEmail({ email }: VerifyEmailProps) {
       <Card className="relative z-10 w-full max-w-md gap-0 rounded-2xl border border-amber-300/80 bg-white p-6 shadow-xl shadow-amber-500/5 sm:p-8">
         <CardHeader className="flex flex-col items-center px-0 text-center">
           <div className="relative mb-4 flex h-24 w-24 items-center justify-center">
-            <Image
-              src="/images/LCC-logo.jpg"
-              alt="LCC Institute"
-              width={96}
-              height={96}
-              priority
-              className="rounded-full object-contain"
-            />
+            <Logo width={70} height={70} showName={false} />
           </div>
 
           <CardTitle className="text-2xl font-bold tracking-tight text-neutral-900 sm:text-[26px]">
