@@ -3,6 +3,7 @@ import { Geist_Mono, Inter, Poppins, Roboto } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryProvider } from "@/providers/query-provider";
 
 const poppins = Poppins({
   variable: "--font-poppins",
@@ -31,7 +32,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "LCC Institute",
-  description: "Learn Competition Classes — bilingual coaching for competitive exams.",
+  description:
+    "Learn Competition Classes — bilingual coaching for competitive exams.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -41,8 +43,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${poppins.variable} ${roboto.variable} ${inter.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col bg-background text-text-primary">
-        <Toaster position="top-right" richColors />
-        <TooltipProvider>{children}</TooltipProvider>
+        <QueryProvider>
+          <Toaster position="top-right" richColors />
+          <TooltipProvider>{children}</TooltipProvider>
+        </QueryProvider>
       </body>
     </html>
   );

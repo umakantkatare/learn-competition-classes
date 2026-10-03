@@ -1,4 +1,4 @@
-import { asc, desc, eq } from "drizzle-orm";
+import { asc, desc, eq, count } from "drizzle-orm";
 
 import { db } from "@/db";
 import { course, courseSection } from "@/db/schema/course-schema";
@@ -27,7 +27,22 @@ export async function createCourse(data: CourseCreateInput) {
 }
 
 export async function getCourses() {
-  return db.select().from(course).orderBy(desc(course.createdAt));
+  return db
+    .select({
+      id: course.id,
+      title: course.title,
+      slug: course.slug,
+      description: course.description,
+      thumbnail: course.thumbnail,
+      isActive: course.isActive,
+      createdAt: course.createdAt,
+      updatedAt: course.updatedAt,
+      sections: count(courseSection.id),
+    })
+    .from(course)
+    .leftJoin(courseSection, eq(courseSection.courseId, course.id))
+    .groupBy(course.id)
+    .orderBy(desc(course.createdAt));
 }
 
 export async function getActiveCourses() {
