@@ -22,13 +22,14 @@ import {
 } from "@/validations/course/course-validation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { createCourseAction } from "@/actions/course/create-course";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useCreateCourse } from "@/hooks/course/use-create-course";
 
 export function CourseForm() {
   const router = useRouter();
+  const createCourse = useCreateCourse();
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
   const form = useForm<CourseCreateInput>({
     resolver: zodResolver(courseCreateSchema),
@@ -42,16 +43,13 @@ export function CourseForm() {
   });
 
   const onSubmit = async (values: CourseCreateInput) => {
+    console.log("Submitting course form with values:", values);
     try {
-      console.log("Submitting course form with values:", values);
-      await createCourseAction(values);
+      await createCourse.mutateAsync(values);
 
-      toast.success("Course created successfully.");
-
-      form.reset();
+      toast.success("Course created successfully");
 
       router.push("/dashboard/courses");
-      router.refresh();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to create course.";
@@ -263,10 +261,10 @@ export function CourseForm() {
 
               <Button
                 type="submit"
-                disabled={form.formState.isSubmitting}
+                disabled={createCourse.isPending}
                 className="rounded-button bg-primary text-primary-foreground hover:bg-brand-primary-hover"
               >
-                {form.formState.isSubmitting ? "Creating..." : "Create Course"}
+                {createCourse.isPending ? "Creating..." : "Create Course"}
               </Button>
             </div>
           </CardContent>
