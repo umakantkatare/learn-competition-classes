@@ -1,24 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import {
-  BookOpen,
-  Plus,
-  X,
-} from "lucide-react";
+import { BookOpen, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 
 import type { Subject } from "@/services/academic/subject/types";
 
-
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
@@ -31,25 +21,32 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-import { AssignSubjectDialog } from "./assign-subject-dialog";
 import { removeSubjectFromExamAction } from "@/actions/academic/exam/examId-actions";
+import { AssignSubjectDialog } from "./assign-subject-dialog";
 
 interface ExamSubjectsProps {
   examId: string;
   subjects: Subject[];
+  availableSubjects: AvailableSubject[];
+}
+
+interface AvailableSubject {
+  id: string;
+  name: string;
+  slug: string;
+  isActive: boolean;
 }
 
 export function ExamSubjects({
   examId,
   subjects,
+  availableSubjects,
 }: ExamSubjectsProps) {
   const queryClient = useQueryClient();
 
-  const [removeSubject, setRemoveSubject] =
-    useState<Subject | null>(null);
+  const [removeSubject, setRemoveSubject] = useState<Subject | null>(null);
 
-  const [isRemoving, setIsRemoving] =
-    useState(false);
+  const [isRemoving, setIsRemoving] = useState(false);
 
   async function handleRemove() {
     if (!removeSubject) {
@@ -59,11 +56,10 @@ export function ExamSubjects({
     setIsRemoving(true);
 
     try {
-      const result =
-        await removeSubjectFromExamAction(
-          examId,
-          removeSubject.id,
-        );
+      const result = await removeSubjectFromExamAction(
+        examId,
+        removeSubject.id,
+      );
 
       if (!result.success) {
         toast.error(result.error);
@@ -71,27 +67,16 @@ export function ExamSubjects({
       }
 
       await queryClient.invalidateQueries({
-        queryKey: [
-          "academic",
-          "exam-subjects",
-          examId,
-        ],
+        queryKey: ["academic", "exam-subjects", examId],
       });
 
-      toast.success(
-        `${removeSubject.name} removed from exam.`,
-      );
+      toast.success(`${removeSubject.name} removed from exam.`);
 
       setRemoveSubject(null);
     } catch (error) {
-      console.error(
-        "Remove exam subject error:",
-        error,
-      );
+      console.error("Remove exam subject error:", error);
 
-      toast.error(
-        "Unable to remove subject from exam.",
-      );
+      toast.error("Unable to remove subject from exam.");
     } finally {
       setIsRemoving(false);
     }
@@ -111,9 +96,7 @@ export function ExamSubjects({
 
           <AssignSubjectDialog
             examId={examId}
-            assignedSubjectIds={subjects.map(
-              (subject) => subject.id,
-            )}
+            availableSubjects={availableSubjects}
           />
         </CardHeader>
 
@@ -129,8 +112,7 @@ export function ExamSubjects({
               </h3>
 
               <p className="mt-1 text-sm text-text-secondary">
-                Add subjects to define this examination's
-                academic structure.
+                Add subjects to define this examination's academic structure.
               </p>
             </div>
           ) : (
@@ -150,10 +132,7 @@ export function ExamSubjects({
                         {subject.name}
                       </p>
 
-                      <Badge
-                        variant="secondary"
-                        className="mt-1"
-                      >
+                      <Badge variant="secondary" className="mt-1">
                         {subject.slug}
                       </Badge>
                     </div>
@@ -164,9 +143,7 @@ export function ExamSubjects({
                     size="icon"
                     className="shrink-0"
                     aria-label={`Remove ${subject.name}`}
-                    onClick={() =>
-                      setRemoveSubject(subject)
-                    }
+                    onClick={() => setRemoveSubject(subject)}
                   >
                     <X className="size-4" />
                   </Button>
@@ -187,9 +164,7 @@ export function ExamSubjects({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              Remove subject?
-            </AlertDialogTitle>
+            <AlertDialogTitle>Remove subject?</AlertDialogTitle>
 
             <AlertDialogDescription>
               {removeSubject
@@ -199,17 +174,10 @@ export function ExamSubjects({
           </AlertDialogHeader>
 
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isRemoving}>
-              Cancel
-            </AlertDialogCancel>
+            <AlertDialogCancel disabled={isRemoving}>Cancel</AlertDialogCancel>
 
-            <AlertDialogAction
-              onClick={handleRemove}
-              disabled={isRemoving}
-            >
-              {isRemoving
-                ? "Removing..."
-                : "Remove Subject"}
+            <AlertDialogAction onClick={handleRemove} disabled={isRemoving}>
+              {isRemoving ? "Removing..." : "Remove Subject"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

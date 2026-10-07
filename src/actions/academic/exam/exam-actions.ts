@@ -14,6 +14,7 @@ import {
 } from "@/validations/academic/exam/exam-validation";
 import { requireAcademicWriteAccess } from "@/lib/authorization/academic";
 
+
 function isUniqueConstraintError(error: unknown) {
   if (typeof error !== "object" || error === null || !("code" in error)) {
     return false;
