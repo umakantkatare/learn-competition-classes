@@ -1,219 +1,183 @@
-"use client";
+ "use client";
 
-import { useState } from "react";
 import {
-  BookOpen,
-  Plus,
-  X,
-} from "lucide-react";
-import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
-
-import type { Subject } from "@/services/academic/subject/types";
-
-
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
-import { AssignSubjectDialog } from "./assign-subject-dialog";
-import { removeSubjectFromExamAction } from "@/actions/academic/exam/examId-actions";
+import { useExams } from "@/hooks/academic/exams/use-exams";
+import { ExamActions } from "./exam-actions";
+import { Skeleton } from "@/components/ui/skeleton";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
-interface ExamSubjectsProps {
-  examId: string;
-  subjects: Subject[];
+interface ExamTableFilters {
+  search: string;
+  year: string;
+  status: string;
 }
 
-export function ExamSubjects({
-  examId,
-  subjects,
-}: ExamSubjectsProps) {
-  const queryClient = useQueryClient();
+interface ExamTableProps {
+  filters: ExamTableFilters;
+}
 
-  const [removeSubject, setRemoveSubject] =
-    useState<Subject | null>(null);
+export function ExamTable({ filters }: ExamTableProps) {
+  const {
+    data: exams = [],
+    isLoading,
+    isError,
+    refetch,
+    isFetching,
+  } = useExams();
 
-  const [isRemoving, setIsRemoving] =
-    useState(false);
+  if (isLoading) {
+    return (
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Exam</TableHead>
+              <TableHead>Year</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="w-12" />
+            </TableRow>
+          </TableHeader>
 
-  async function handleRemove() {
-    if (!removeSubject) {
-      return;
-    }
+          <TableBody>
+            {Array.from({ length: 5 }).map((_, index) => (
+              <TableRow key={index}>
+                <TableCell>
+                  <Skeleton className="h-4 w-32" />
+                </TableCell>
 
-    setIsRemoving(true);
+                <TableCell>
+                  <Skeleton className="h-4 w-16" />
+                </TableCell>
 
-    try {
-      const result =
-        await removeSubjectFromExamAction(
-          examId,
-          removeSubject.id,
-        );
+                <TableCell>
+                  <Skeleton className="h-5 w-20 rounded-full" />
+                </TableCell>
 
-      if (!result.success) {
-        toast.error(result.error);
-        return;
-      }
+                <TableCell>
+                  <Skeleton className="size-8 rounded-md" />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    );
+  }
 
-      await queryClient.invalidateQueries({
-        queryKey: [
-          "academic",
-          "exam-subjects",
-          examId,
-        ],
-      });
+  if (isError) {
+    return (
+      <div className="flex min-h-48 flex-col items-center justify-center gap-3 p-6 text-center">
+        <div>
+          <p className="font-medium text-text-primary">Unable to load exams</p>
 
-      toast.success(
-        `${removeSubject.name} removed from exam.`,
-      );
+          <p className="mt-1 text-sm text-text-secondary">
+            Something went wrong while fetching the exam list.
+          </p>
+        </div>
 
-      setRemoveSubject(null);
-    } catch (error) {
-      console.error(
-        "Remove exam subject error:",
-        error,
-      );
+        <Button
+          variant="outline"
+          onClick={() => refetch()}
+          disabled={isFetching}
+        >
+          {isFetching ? "Retrying..." : "Try Again"}
+        </Button>
+      </div>
+    );
+  }
 
-      toast.error(
-        "Unable to remove subject from exam.",
-      );
-    } finally {
-      setIsRemoving(false);
-    }
+  const filteredExams = exams.filter((exam) => {
+    const matchesSearch = exam.name
+      .toLowerCase()
+      .includes(filters.search.toLowerCase());
+
+    const matchesYear =
+      filters.year === "all" || exam.year.toString() === filters.year;
+
+    const matchesStatus =
+      filters.status === "all" ||
+      (filters.status === "active" && exam.isActive) ||
+      (filters.status === "inactive" && !exam.isActive);
+
+    return matchesSearch && matchesYear && matchesStatus;
+  });
+
+  if (exams.length === 0) {
+    return (
+      <div className="flex min-h-56 flex-col items-center justify-center p-8 text-center">
+        <div>
+          <p className="font-medium text-text-primary">No exams yet</p>
+
+          <p className="mt-1 text-sm text-text-secondary">
+            Create your first exam to start managing examinations.
+          </p>
+        </div>
+
+        <Button asChild className="mt-4">
+          <Link href="/academic/exams/create">Create Exam</Link>
+        </Button>
+      </div>
+    );
+  }
+
+  if (filteredExams.length === 0) {
+    return (
+      <div className="flex min-h-56 flex-col items-center justify-center p-8 text-center">
+        <div>
+          <p className="font-medium text-text-primary">No matching exams</p>
+
+          <p className="mt-1 text-sm text-text-secondary">
+            Try changing your search or filters.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <>
-      <Card>
-        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle>Subjects</CardTitle>
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Exam</TableHead>
+            <TableHead>Year</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead className="w-12" />
+          </TableRow>
+        </TableHeader>
 
-            <p className="mt-1 text-sm text-text-secondary">
-              Subjects included in this examination.
-            </p>
-          </div>
+        <TableBody>
+          {filteredExams.map((exam) => (
+            <TableRow key={exam.id}>
+              <TableCell className="font-medium text-text-primary">
+                {exam.name}
+              </TableCell>
 
-          <AssignSubjectDialog
-            examId={examId}
-            assignedSubjectIds={subjects.map(
-              (subject) => subject.id,
-            )}
-          />
-        </CardHeader>
+              <TableCell>{exam.year}</TableCell>
 
-        <CardContent>
-          {subjects.length === 0 ? (
-            <div className="flex min-h-40 flex-col items-center justify-center rounded-lg border border-dashed border-border p-6 text-center">
-              <div className="flex size-10 items-center justify-center rounded-full bg-muted text-text-secondary">
-                <BookOpen className="size-5" />
-              </div>
+              <TableCell>
+                <Badge variant={exam.isActive ? "default" : "secondary"}>
+                  {exam.isActive ? "Active" : "Inactive"}
+                </Badge>
+              </TableCell>
 
-              <h3 className="mt-3 font-medium text-text-primary">
-                No subjects assigned
-              </h3>
-
-              <p className="mt-1 text-sm text-text-secondary">
-                Add subjects to define this examination's
-                academic structure.
-              </p>
-            </div>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {subjects.map((subject) => (
-                <div
-                  key={subject.id}
-                  className="flex items-center justify-between rounded-lg border border-border p-4"
-                >
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-primary/10 text-brand-primary">
-                      <BookOpen className="size-4" />
-                    </div>
-
-                    <div className="min-w-0">
-                      <p className="truncate font-medium text-text-primary">
-                        {subject.name}
-                      </p>
-
-                      <Badge
-                        variant="secondary"
-                        className="mt-1"
-                      >
-                        {subject.slug}
-                      </Badge>
-                    </div>
-                  </div>
-
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="shrink-0"
-                    aria-label={`Remove ${subject.name}`}
-                    onClick={() =>
-                      setRemoveSubject(subject)
-                    }
-                  >
-                    <X className="size-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <AlertDialog
-        open={Boolean(removeSubject)}
-        onOpenChange={(open) => {
-          if (!open && !isRemoving) {
-            setRemoveSubject(null);
-          }
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              Remove subject?
-            </AlertDialogTitle>
-
-            <AlertDialogDescription>
-              {removeSubject
-                ? `${removeSubject.name} will be removed from this examination.`
-                : ""}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isRemoving}>
-              Cancel
-            </AlertDialogCancel>
-
-            <AlertDialogAction
-              onClick={handleRemove}
-              disabled={isRemoving}
-            >
-              {isRemoving
-                ? "Removing..."
-                : "Remove Subject"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+              <TableCell>
+                <ExamActions examId={exam.id} />
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
