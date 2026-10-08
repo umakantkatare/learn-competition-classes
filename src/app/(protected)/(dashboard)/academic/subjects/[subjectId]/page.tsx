@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, BookOpen, Pencil } from "lucide-react";
+import { ArrowLeft, BookOpen, Pencil, Plus } from "lucide-react";
 
 import { getSubjectById } from "@/services/academic/subject/queries";
 import { getExamsBySubjectId } from "@/services/academic/exam-subject/queries";
@@ -8,6 +8,7 @@ import { getExamsBySubjectId } from "@/services/academic/exam-subject/queries";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getTopicsBySubjectId } from "@/services/academic/topic/queries";
 
 interface SubjectDetailPageProps {
   params: Promise<{
@@ -20,9 +21,10 @@ export default async function SubjectDetailPage({
 }: SubjectDetailPageProps) {
   const { subjectId } = await params;
 
-  const [subject, exams] = await Promise.all([
+  const [subject, exams, topics] = await Promise.all([
     getSubjectById(subjectId),
     getExamsBySubjectId(subjectId),
+    getTopicsBySubjectId(subjectId),
   ]);
 
   if (!subject) {
@@ -160,6 +162,67 @@ export default async function SubjectDetailPage({
 
                     <Badge variant={exam.isActive ? "default" : "secondary"}>
                       {exam.isActive ? "Active" : "Inactive"}
+                    </Badge>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <CardTitle>Topics</CardTitle>
+
+            <p className="mt-1 text-sm text-text-secondary">
+              Topics covered under this subject.
+            </p>
+          </div>
+
+          <Button asChild>
+            <Link href={`/academic/topics/create?subjectId=${subject.id}`}>
+              <Plus className="mr-2 size-4" />
+              Add Topic
+            </Link>
+          </Button>
+        </CardHeader>
+
+        <CardContent>
+          {topics.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-border p-6 text-center">
+              <BookOpen className="mx-auto size-5 text-text-secondary" />
+
+              <p className="mt-2 font-medium text-text-primary">
+                No topics assigned
+              </p>
+
+              <p className="mt-1 text-sm text-text-secondary">
+                Add topics to define this subject's academic structure.
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {topics.map((topic) => (
+                <Link
+                  key={topic.id}
+                  href={`/academic/topics/${topic.id}`}
+                  className="group rounded-lg border border-border p-4 transition-colors hover:bg-muted"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-text-primary group-hover:text-brand-primary">
+                        {topic.name}
+                      </p>
+
+                      <p className="mt-1 text-sm text-text-secondary">
+                        {topic.slug}
+                      </p>
+                    </div>
+
+                    <Badge variant={topic.isActive ? "default" : "secondary"}>
+                      {topic.isActive ? "Active" : "Inactive"}
                     </Badge>
                   </div>
                 </Link>
