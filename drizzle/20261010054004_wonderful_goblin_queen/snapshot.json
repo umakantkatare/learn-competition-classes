@@ -1,11 +1,21 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "8a0ce3de-e715-4e82-9804-1a77c4604b22",
+  "id": "cb44c69c-a830-487f-bada-96e3bc618d15",
   "prevIds": [
-    "e24b7644-909a-4644-9cec-6436cd88567f"
+    "00000000-0000-0000-0000-000000000000"
   ],
   "ddl": [
+    {
+      "values": [
+        "VIDEO",
+        "PDF",
+        "TEST"
+      ],
+      "name": "course_content_type",
+      "entityType": "enums",
+      "schema": "public"
+    },
     {
       "isRlsEnabled": false,
       "name": "account",
@@ -32,13 +42,19 @@
     },
     {
       "isRlsEnabled": false,
+      "name": "course_content",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
       "name": "course",
       "entityType": "tables",
       "schema": "public"
     },
     {
       "isRlsEnabled": false,
-      "name": "course_section",
+      "name": "course_subject",
       "entityType": "tables",
       "schema": "public"
     },
@@ -57,6 +73,12 @@
     {
       "isRlsEnabled": false,
       "name": "subject",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "topic",
       "entityType": "tables",
       "schema": "public"
     },
@@ -539,7 +561,46 @@
       "name": "id",
       "entityType": "columns",
       "schema": "public",
-      "table": "course"
+      "table": "course_content"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "course_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "course_content"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "subject_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "course_content"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "topic_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "course_content"
     },
     {
       "type": "text",
@@ -550,6 +611,149 @@
       "generated": null,
       "identity": null,
       "name": "title",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "course_content"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "description",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "course_content"
+    },
+    {
+      "type": "course_content_type",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "type",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "course_content"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "video_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "course_content"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "file_url",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "course_content"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "thumbnail",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "course_content"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "0",
+      "generated": null,
+      "identity": null,
+      "name": "sort_order",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "course_content"
+    },
+    {
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "false",
+      "generated": null,
+      "identity": null,
+      "name": "is_published",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "course_content"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "course_content"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "course_content"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "course"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "name",
       "entityType": "columns",
       "schema": "public",
       "table": "course"
@@ -589,6 +793,45 @@
       "generated": null,
       "identity": null,
       "name": "thumbnail",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "course"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'[]'",
+      "generated": null,
+      "identity": null,
+      "name": "features",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "course"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "price",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "course"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "sale_price",
       "entityType": "columns",
       "schema": "public",
       "table": "course"
@@ -643,7 +886,7 @@
       "name": "id",
       "entityType": "columns",
       "schema": "public",
-      "table": "course_section"
+      "table": "course_subject"
     },
     {
       "type": "text",
@@ -656,7 +899,7 @@
       "name": "course_id",
       "entityType": "columns",
       "schema": "public",
-      "table": "course_section"
+      "table": "course_subject"
     },
     {
       "type": "text",
@@ -666,49 +909,10 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "title",
+      "name": "subject_id",
       "entityType": "columns",
       "schema": "public",
-      "table": "course_section"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "description",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "course_section"
-    },
-    {
-      "type": "integer",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "0",
-      "generated": null,
-      "identity": null,
-      "name": "order",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "course_section"
-    },
-    {
-      "type": "boolean",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "true",
-      "generated": null,
-      "identity": null,
-      "name": "is_active",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "course_section"
+      "table": "course_subject"
     },
     {
       "type": "timestamp with time zone",
@@ -721,20 +925,7 @@
       "name": "created_at",
       "entityType": "columns",
       "schema": "public",
-      "table": "course_section"
-    },
-    {
-      "type": "timestamp with time zone",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "course_section"
+      "table": "course_subject"
     },
     {
       "type": "text",
@@ -958,6 +1149,97 @@
       "table": "subject"
     },
     {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "topic"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "subject_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "topic"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "topic"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "slug",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "topic"
+    },
+    {
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "true",
+      "generated": null,
+      "identity": null,
+      "name": "is_active",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "topic"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "topic"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "topic"
+    },
+    {
       "nameExplicit": true,
       "columns": [
         {
@@ -1024,7 +1306,7 @@
       "nameExplicit": true,
       "columns": [
         {
-          "value": "title",
+          "value": "course_id",
           "isExpression": false,
           "asc": true,
           "nullsFirst": false,
@@ -1036,7 +1318,140 @@
       "with": "",
       "method": "btree",
       "concurrently": false,
-      "name": "course_title_idx",
+      "name": "course_content_course_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "course_content"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "subject_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "course_content_subject_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "course_content"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "topic_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "course_content_topic_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "course_content"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "type",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "course_content_type_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "course_content"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "is_published",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "course_content_published_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "course_content"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "course_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "sort_order",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "course_content_course_order_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "course_content"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "slug",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "course_slug_idx",
       "entityType": "indexes",
       "schema": "public",
       "table": "course"
@@ -1057,7 +1472,7 @@
       "with": "",
       "method": "btree",
       "concurrently": false,
-      "name": "course_active_idx",
+      "name": "course_is_active_idx",
       "entityType": "indexes",
       "schema": "public",
       "table": "course"
@@ -1071,17 +1486,24 @@
           "asc": true,
           "nullsFirst": false,
           "opclass": null
+        },
+        {
+          "value": "subject_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
         }
       ],
-      "isUnique": false,
+      "isUnique": true,
       "where": null,
       "with": "",
       "method": "btree",
       "concurrently": false,
-      "name": "course_section_course_id_idx",
+      "name": "course_subject_unique_idx",
       "entityType": "indexes",
       "schema": "public",
-      "table": "course_section"
+      "table": "course_subject"
     },
     {
       "nameExplicit": true,
@@ -1092,9 +1514,23 @@
           "asc": true,
           "nullsFirst": false,
           "opclass": null
-        },
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "course_subject_course_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "course_subject"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
         {
-          "value": "order",
+          "value": "subject_id",
           "isExpression": false,
           "asc": true,
           "nullsFirst": false,
@@ -1106,10 +1542,10 @@
       "with": "",
       "method": "btree",
       "concurrently": false,
-      "name": "course_section_order_idx",
+      "name": "course_subject_subject_idx",
       "entityType": "indexes",
       "schema": "public",
-      "table": "course_section"
+      "table": "course_subject"
     },
     {
       "nameExplicit": true,
@@ -1294,6 +1730,76 @@
       "table": "subject"
     },
     {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "subject_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "slug",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "topic_subject_slug_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "topic"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "subject_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "topic_subject_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "topic"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "is_active",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "topic_is_active_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "topic"
+    },
+    {
       "nameExplicit": false,
       "columns": [
         "user_id"
@@ -1337,12 +1843,80 @@
       "columnsTo": [
         "id"
       ],
-      "onUpdate": "CASCADE",
+      "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
-      "name": "course_section_course_id_course_id_fkey",
+      "name": "course_content_course_id_course_id_fkey",
       "entityType": "fks",
       "schema": "public",
-      "table": "course_section"
+      "table": "course_content"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "subject_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "subject",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "name": "course_content_subject_id_subject_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "course_content"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "topic_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "topic",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "name": "course_content_topic_id_topic_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "course_content"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "course_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "course",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "course_subject_course_id_course_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "course_subject"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "subject_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "subject",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "course_subject_subject_id_subject_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "course_subject"
     },
     {
       "nameExplicit": false,
@@ -1377,6 +1951,23 @@
       "entityType": "fks",
       "schema": "public",
       "table": "exam_subject"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "subject_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "subject",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "topic_subject_id_subject_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "topic"
     },
     {
       "columns": [
@@ -1423,6 +2014,16 @@
         "id"
       ],
       "nameExplicit": false,
+      "name": "course_content_pkey",
+      "schema": "public",
+      "table": "course_content",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
       "name": "course_pkey",
       "schema": "public",
       "table": "course",
@@ -1433,9 +2034,9 @@
         "id"
       ],
       "nameExplicit": false,
-      "name": "course_section_pkey",
+      "name": "course_subject_pkey",
       "schema": "public",
-      "table": "course_section",
+      "table": "course_subject",
       "entityType": "pks"
     },
     {
@@ -1469,6 +2070,16 @@
       "entityType": "pks"
     },
     {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "topic_pkey",
+      "schema": "public",
+      "table": "topic",
+      "entityType": "pks"
+    },
+    {
       "nameExplicit": false,
       "columns": [
         "token"
@@ -1499,17 +2110,6 @@
       "name": "user_phone_number_key",
       "schema": "public",
       "table": "user",
-      "entityType": "uniques"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "slug"
-      ],
-      "nullsNotDistinct": false,
-      "name": "course_slug_key",
-      "schema": "public",
-      "table": "course",
       "entityType": "uniques"
     }
   ],

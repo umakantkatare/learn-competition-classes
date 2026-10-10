@@ -1,4 +1,4 @@
-import { TopicsContent } from "./components/topics-content";
+import { TopicsContent } from "@/components/academic/topics/topics-content";
 
 export default function TopicsPage() {
   return (
