@@ -2,9 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 
-import { requireAcademicWriteAccess } from "@/lib/authorization/academic";
+import { requireAcademicAccess } from "@/lib/authorization/academic";
 import {
   createCourseContent,
+  deleteCourseContent,
   updateCourseContent,
 } from "@/services/academic/course-content/mutations";
 import {
@@ -12,9 +13,18 @@ import {
   updateCourseContentSchema,
 } from "@/validations/academic/course-content-validation";
 
+const knownErrors = [
+  "Course content not found",
+  "Subject is not assigned to this course",
+  "Topic does not belong to the selected subject",
+  "A subject is required when selecting a topic",
+  "Unauthorized",
+  "Forbidden",
+];
+
 export async function createCourseContentAction(input: unknown) {
   try {
-    await requireAcademicWriteAccess();
+    await requireAcademicAccess();
 
     const parsed = createCourseContentSchema.safeParse(input);
 
@@ -37,12 +47,13 @@ export async function createCourseContentAction(input: unknown) {
   } catch (error) {
     console.error("Create course content failed:", error);
 
+    const message = error instanceof Error ? error.message : "";
+
     return {
       success: false as const,
-      error:
-        error instanceof Error
-          ? error.message
-          : "Failed to create course content",
+      error: knownErrors.includes(message)
+        ? message
+        : "Failed to create course content",
     };
   }
 }
@@ -52,7 +63,7 @@ export async function updateCourseContentAction(
   input: unknown,
 ) {
   try {
-    await requireAcademicWriteAccess();
+    await requireAcademicAccess();
 
     if (!contentId?.trim()) {
       return {
@@ -84,12 +95,50 @@ export async function updateCourseContentAction(
   } catch (error) {
     console.error("Update course content failed:", error);
 
+    const message = error instanceof Error ? error.message : "";
+
     return {
       success: false as const,
-      error:
-        error instanceof Error && error.message === "Course content not found"
-          ? error.message
-          : "Failed to update course content",
+      error: knownErrors.includes(message)
+        ? message
+        : "Failed to update course content",
+    };
+  }
+}
+
+export async function deleteCourseContentAction(
+  courseId: string,
+  contentId: string,
+) {
+  try {
+    await requireAcademicAccess();
+
+    if (!courseId.trim() || !contentId.trim()) {
+      return {
+        success: false as const,
+        error: "Course ID and content ID are required",
+      };
+    }
+
+    const deletedContent = await deleteCourseContent(courseId, contentId);
+
+    revalidatePath(`/academic/courses/${courseId}`);
+    revalidatePath(`/academic/courses/${courseId}/content/${contentId}/edit`);
+
+    return {
+      success: true as const,
+      data: deletedContent,
+    };
+  } catch (error) {
+    console.error("Delete course content failed:", error);
+
+    const message = error instanceof Error ? error.message : "";
+
+    return {
+      success: false as const,
+      error: knownErrors.includes(message)
+        ? message
+        : "Failed to delete course content",
     };
   }
 }

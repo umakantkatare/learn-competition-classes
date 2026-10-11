@@ -16,6 +16,47 @@ import type {
   CreateCourseContentInput,
 } from "@/validations/academic/course-content-validation";
 
+async function validateContentRelationships(input: {
+  courseId: string;
+  subjectId: string | null;
+  topicId: string | null;
+}) {
+  if (input.subjectId) {
+    const [courseSubjectMatch] = await db
+      .select({ courseId: courseSubject.courseId })
+      .from(courseSubject)
+      .where(
+        and(
+          eq(courseSubject.courseId, input.courseId),
+          eq(courseSubject.subjectId, input.subjectId),
+        ),
+      )
+      .limit(1);
+
+    if (!courseSubjectMatch) {
+      throw new Error("Subject is not assigned to this course");
+    }
+  }
+
+  if (input.topicId) {
+    if (!input.subjectId) {
+      throw new Error("A subject is required when selecting a topic");
+    }
+
+    const [topicMatch] = await db
+      .select({ id: topic.id })
+      .from(topic)
+      .where(
+        and(eq(topic.id, input.topicId), eq(topic.subjectId, input.subjectId)),
+      )
+      .limit(1);
+
+    if (!topicMatch) {
+      throw new Error("Topic does not belong to the selected subject");
+    }
+  }
+}
+
 export async function createCourseContent(input: CreateCourseContentInput) {
   const parsed = createCourseContentSchema.safeParse(input);
 
@@ -38,38 +79,11 @@ export async function createCourseContent(input: CreateCourseContentInput) {
     throw new Error("Course not found");
   }
 
-  // 2. Verify that the selected subject belongs to this course.
-  if (data.subjectId) {
-    const [assignment] = await db
-      .select({ courseId: courseSubject.courseId })
-      .from(courseSubject)
-      .where(
-        and(
-          eq(courseSubject.courseId, data.courseId),
-          eq(courseSubject.subjectId, data.subjectId),
-        ),
-      )
-      .limit(1);
-
-    if (!assignment) {
-      throw new Error("The selected subject is not assigned to this course");
-    }
-
-    // 3. Verify that the topic belongs to the selected subject.
-    if (data.topicId) {
-      const [existingTopic] = await db
-        .select({ id: topic.id })
-        .from(topic)
-        .where(
-          and(eq(topic.id, data.topicId), eq(topic.subjectId, data.subjectId)),
-        )
-        .limit(1);
-
-      if (!existingTopic) {
-        throw new Error("The selected topic does not belong to this subject");
-      }
-    }
-  }
+  await validateContentRelationships({
+    courseId: data.courseId,
+    subjectId: data.subjectId,
+    topicId: data.topicId,
+  });
 
   // 4. Insert the content record.
   const [createdContent] = await db
@@ -106,6 +120,10 @@ export async function updateCourseContent(
     );
   }
 
+  if (!contentId.trim()) {
+    throw new Error("Content ID is required");
+  }
+
   const data = parsed.data;
 
   // Verify that the content exists in the specified course.
@@ -126,6 +144,12 @@ export async function updateCourseContent(
   if (!existingContent) {
     throw new Error("Course content not found");
   }
+
+  await validateContentRelationships({
+    courseId: data.courseId,
+    subjectId: data.subjectId,
+    topicId: data.topicId,
+  });
 
   const [updatedContent] = await db
     .update(courseContent)

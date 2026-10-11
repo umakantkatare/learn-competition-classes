@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { requireAcademicWriteAccess } from "@/lib/authorization/academic";
+import { requireAcademicAccess } from "@/lib/authorization/academic";
 
 import {
   assignSubjectToExam,
@@ -20,7 +20,7 @@ const examSubjectSchema = z.object({
 });
 
 export async function assignSubjectToExamAction(input: unknown) {
-  await requireAcademicWriteAccess();
+  await requireAcademicAccess();
 
   const parsed = examSubjectSchema.safeParse(input);
 
@@ -86,7 +86,7 @@ export async function removeSubjectFromExamAction(
   examId: string,
   subjectId: string,
 ) {
-  await requireAcademicWriteAccess();
+  await requireAcademicAccess();
 
   const parsed = examSubjectSchema.safeParse({
     examId,

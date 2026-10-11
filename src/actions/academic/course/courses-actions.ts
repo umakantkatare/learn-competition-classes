@@ -12,7 +12,7 @@ import {
   createCourseSchema,
   updateCourseSchema,
 } from "@/validations/academic/course/course-validation";
-import { requireAcademicWriteAccess } from "@/lib/authorization/academic";
+import { requireAcademicAccess } from "@/lib/authorization/academic";
 
 function getErrorMessage(error: unknown) {
   if (
@@ -29,7 +29,7 @@ function getErrorMessage(error: unknown) {
 
 export async function createCourseAction(input: unknown) {
   try {
-    await requireAcademicWriteAccess();
+    await requireAcademicAccess();
 
     const parsed = createCourseSchema.safeParse(input);
 
@@ -60,7 +60,7 @@ export async function createCourseAction(input: unknown) {
 
 export async function updateCourseAction(id: string, input: unknown) {
   try {
-    await requireAcademicWriteAccess();
+    await requireAcademicAccess();
 
     if (!id.trim()) {
       return {
@@ -107,7 +107,7 @@ export async function updateCourseAction(id: string, input: unknown) {
 
 export async function setCourseStatusAction(id: string, isActive: boolean) {
   try {
-    await requireAcademicWriteAccess();
+    await requireAcademicAccess();
 
     if (!id.trim()) {
       return {

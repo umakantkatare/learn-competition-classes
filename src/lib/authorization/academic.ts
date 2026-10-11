@@ -1,8 +1,8 @@
 import { auth } from "@/lib/auth";
 
-const ACADEMIC_WRITE_ROLES = ["manager", "admin", "super_admin"] as const;
+const ACADEMIC_ROLES = ["manager", "admin", "super_admin"] as const;
 
-export async function requireAcademicWriteAccess() {
+export async function requireAcademicAccess() {
   const session = await auth.api.getSession();
 
   if (!session?.user) {
@@ -11,13 +11,11 @@ export async function requireAcademicWriteAccess() {
 
   const role = session.user.role;
 
-  if (
-    !ACADEMIC_WRITE_ROLES.includes(
-      role as (typeof ACADEMIC_WRITE_ROLES)[number],
-    )
-  ) {
+  if (!ACADEMIC_ROLES.includes(role as (typeof ACADEMIC_ROLES)[number])) {
     throw new Error("Forbidden");
   }
 
   return session;
 }
+
+

@@ -12,7 +12,7 @@ import {
   createExamSchema,
   updateExamSchema,
 } from "@/validations/academic/exam/exam-validation";
-import { requireAcademicWriteAccess } from "@/lib/authorization/academic";
+import { requireAcademicAccess } from "@/lib/authorization/academic";
 
 
 function isUniqueConstraintError(error: unknown) {
@@ -24,7 +24,7 @@ function isUniqueConstraintError(error: unknown) {
 }
 
 export async function createExamAction(input: unknown) {
-  await requireAcademicWriteAccess();
+  await requireAcademicAccess();
 
   const parsed = createExamSchema.safeParse(input);
 
@@ -66,7 +66,7 @@ export async function createExamAction(input: unknown) {
 }
 
 export async function updateExamAction(id: string, input: unknown) {
-  await requireAcademicWriteAccess();
+  await requireAcademicAccess();
 
   const parsed = updateExamSchema.safeParse(input);
 
@@ -116,7 +116,7 @@ export async function updateExamAction(id: string, input: unknown) {
 }
 
 export async function setExamStatusAction(id: string, isActive: boolean) {
-  await requireAcademicWriteAccess();
+  await requireAcademicAccess();
 
   try {
     const exam = await setExamStatus(id, isActive);

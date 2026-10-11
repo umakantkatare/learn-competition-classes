@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getCourseContentByCourseId } from "@/services/academic/course-content/queries";
+import { requireAcademicAccess } from "@/lib/authorization/academic";
 
 interface RouteContext {
   params: Promise<{
@@ -10,9 +11,11 @@ interface RouteContext {
 
 export async function GET(_request: Request, { params }: RouteContext) {
   try {
+    await requireAcademicAccess();
+
     const { courseId } = await params;
 
-    if (!courseId) {
+    if (!courseId?.trim()) {
       return NextResponse.json(
         {
           success: false,
@@ -29,6 +32,20 @@ export async function GET(_request: Request, { params }: RouteContext) {
       data: content,
     });
   } catch (error) {
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
+      );
+    }
+
+    if (error instanceof Error && error.message === "Forbidden") {
+      return NextResponse.json(
+        { success: false, error: "Forbidden" },
+        { status: 403 },
+      );
+    }
+
     console.error("Failed to fetch course content:", error);
 
     return NextResponse.json(

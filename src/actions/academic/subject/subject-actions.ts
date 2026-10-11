@@ -8,7 +8,7 @@ import {
   updateSubject,
 } from "@/services/academic/subject/mutations";
 
-import { requireAcademicWriteAccess } from "@/lib/authorization/academic";
+import { requireAcademicAccess } from "@/lib/authorization/academic";
 
 import {
   createSubjectSchema,
@@ -24,7 +24,7 @@ function isUniqueConstraintError(error: unknown) {
 }
 
 export async function createSubjectAction(input: unknown) {
-  await requireAcademicWriteAccess();
+  await requireAcademicAccess();
 
   const parsed = createSubjectSchema.safeParse(input);
 
@@ -66,7 +66,7 @@ export async function createSubjectAction(input: unknown) {
 }
 
 export async function updateSubjectAction(id: string, input: unknown) {
-  await requireAcademicWriteAccess();
+  await requireAcademicAccess();
 
   const parsed = updateSubjectSchema.safeParse(input);
 
@@ -116,7 +116,7 @@ export async function updateSubjectAction(id: string, input: unknown) {
 }
 
 export async function setSubjectStatusAction(id: string, isActive: boolean) {
-  await requireAcademicWriteAccess();
+  await requireAcademicAccess();
 
   try {
     const subject = await setSubjectStatus(id, isActive);

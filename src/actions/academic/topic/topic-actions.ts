@@ -14,11 +14,11 @@ import {
   createTopicSchema,
   updateTopicSchema,
 } from "@/validations/academic/topic/topic-validation";
-import { requireAcademicWriteAccess } from "@/lib/authorization/academic";
+import { requireAcademicAccess } from "@/lib/authorization/academic";
 
 export async function createTopicAction(input: unknown) {
   try {
-    await requireAcademicWriteAccess();
+    await requireAcademicAccess();
 
     const parsed = createTopicSchema.safeParse(input);
 
@@ -71,7 +71,7 @@ export async function createTopicAction(input: unknown) {
 
 export async function updateTopicAction(id: string, input: unknown) {
   try {
-    await requireAcademicWriteAccess();
+    await requireAcademicAccess();
 
     const parsed = updateTopicSchema.safeParse(input);
 
@@ -132,7 +132,7 @@ export async function updateTopicAction(id: string, input: unknown) {
 
 export async function setTopicStatusAction(id: string, isActive: boolean) {
   try {
-    await requireAcademicWriteAccess();
+    await requireAcademicAccess();
 
     const updatedTopic = await setTopicStatus(id, isActive);
 

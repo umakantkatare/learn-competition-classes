@@ -7,7 +7,7 @@ import {
   assignSubjectToCourse,
   removeSubjectFromCourse,
 } from "@/services/academic/course-subject/mutations";
-import { requireAcademicWriteAccess } from "@/lib/authorization/academic";
+import { requireAcademicAccess } from "@/lib/authorization/academic";
 import { deleteCourseContent } from "@/services/academic/course-content/mutations";
 
 const assignmentSchema = z.object({
@@ -31,7 +31,7 @@ function getErrorMessage(error: unknown) {
 
 export async function assignSubjectToCourseAction(input: unknown) {
   try {
-    await requireAcademicWriteAccess();
+    await requireAcademicAccess();
 
     const parsed = assignmentSchema.safeParse(input);
 
@@ -70,7 +70,7 @@ export async function removeSubjectFromCourseAction(
   subjectId: string,
 ) {
   try {
-    await requireAcademicWriteAccess();
+    await requireAcademicAccess();
 
     const parsed = assignmentSchema.safeParse({ courseId, subjectId });
 
@@ -116,7 +116,7 @@ export async function deleteCourseContentAction(
   contentId: string,
 ) {
   try {
-    await requireAcademicWriteAccess();
+    await requireAcademicAccess();
 
     if (!courseId.trim() || !contentId.trim()) {
       return {
