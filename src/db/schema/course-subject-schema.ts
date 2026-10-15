@@ -1,4 +1,5 @@
 import {
+  boolean,
   index,
   pgTable,
   text,
@@ -7,10 +8,10 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { course } from "./course-schema";
-import { subject } from "./subject-schema";
+import { user } from "./auth-schema";
 
-export const courseSubject = pgTable(
-  "course_subject",
+export const courseSubjects = pgTable(
+  "course_subjects",
   {
     id: text("id").primaryKey(),
 
@@ -20,26 +21,35 @@ export const courseSubject = pgTable(
         onDelete: "cascade",
       }),
 
-    subjectId: text("subject_id")
-      .notNull()
-      .references(() => subject.id, {
-        onDelete: "cascade",
-      }),
+    teacherId: text("teacher_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+
+    name: text("name").notNull(),
+
+    isPublished: boolean("is_published").notNull().default(false),
 
     createdAt: timestamp("created_at", {
       withTimezone: true,
     })
       .notNull()
       .defaultNow(),
+
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
   },
   (table) => [
-    uniqueIndex("course_subject_unique_idx").on(
+    index("course_subjects_course_id_idx").on(table.courseId),
+
+    index("course_subjects_teacher_id_idx").on(table.teacherId),
+
+    uniqueIndex("course_subjects_course_name_idx").on(
       table.courseId,
-      table.subjectId,
+      table.name,
     ),
-
-    index("course_subject_course_idx").on(table.courseId),
-
-    index("course_subject_subject_idx").on(table.subjectId),
   ],
 );

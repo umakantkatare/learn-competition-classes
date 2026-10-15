@@ -28,6 +28,14 @@ export const course = pgTable(
 
     salePrice: integer("sale_price"),
 
+    startDate: timestamp("start_date", {
+      withTimezone: true,
+    }),
+
+    endDate: timestamp("end_date", {
+      withTimezone: true,
+    }),
+
     isActive: boolean("is_active").notNull().default(true),
 
     createdAt: timestamp("created_at", {
@@ -44,7 +52,6 @@ export const course = pgTable(
   },
   (table) => [
     uniqueIndex("course_slug_idx").on(table.slug),
-
     index("course_is_active_idx").on(table.isActive),
   ],
 );

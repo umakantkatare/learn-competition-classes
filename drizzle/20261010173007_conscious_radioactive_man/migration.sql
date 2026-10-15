@@ -1,1 +1,0 @@
-ALTER TABLE "course_content" ADD COLUMN "is_preview" boolean DEFAULT false NOT NULL;
