@@ -1,33 +1,48 @@
-import { integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import {
+  integer,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  check,
+} from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 import { user } from "./auth-schema";
 
-export const teacherProfiles = pgTable("teacher_profiles", {
-  userId: text("user_id")
-    .primaryKey()
-    .references(() => user.id, { onDelete: "cascade" }),
+export const teacherProfiles = pgTable(
+  "teacher_profiles",
+  {
+    userId: text("user_id")
+      .primaryKey()
+      .references(() => user.id, { onDelete: "cascade" }),
 
-  avatar: text("avatar"),
-  bio: text("bio"),
-  qualification: text("qualification"),
-  experienceYears: integer("experience_years"),
+    bio: text("bio"),
+    qualification: text("qualification"),
 
-  specializations: jsonb("specializations")
-    .$type<string[]>()
-    .notNull()
-    .default([]),
+    experienceYears: integer("experience_years").notNull().default(0),
 
-  languages: jsonb("languages").$type<string[]>().notNull().default([]),
+    specializations: jsonb("specializations")
+      .$type<string[]>()
+      .notNull()
+      .default([]),
 
-  createdAt: timestamp("created_at", {
-    withTimezone: true,
-  })
-    .notNull()
-    .defaultNow(),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
 
-  updatedAt: timestamp("updated_at", {
-    withTimezone: true,
-  })
-    .notNull()
-    .defaultNow(),
-});
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    check(
+      "teacher_profiles_experience_nonnegative",
+      sql`${table.experienceYears} >= 0`,
+    ),
+  ],
+);
