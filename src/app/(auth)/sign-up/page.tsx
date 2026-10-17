@@ -1,4 +1,4 @@
-import { SignupForm } from "@/components/signup-form";
+import { SignupForm } from "@/components/auth/signup-form";
 import { Poppins } from "next/font/google";
 
 const poppins = Poppins({

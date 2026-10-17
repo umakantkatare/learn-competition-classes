@@ -6,16 +6,17 @@ export const user = pgTable("user", {
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").default(false).notNull(),
-  image: text("image"),
+  image: text("avatar"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()
     .$onUpdate(() => /* @__PURE__ */ new Date())
     .notNull(),
-  role: text("role", {
-    enum: ["student", "teacher", "manager", "admin"],
-  }).default("student"),
-  phoneNumber: text("phone_number").notNull().unique(),
+  role: text("role"),
+  banned: boolean("banned").default(false),
+  banReason: text("ban_reason"),
+  banExpires: timestamp("ban_expires"),
+  phoneNumber: text("phone_number").unique(),
 });
 
 export const session = pgTable(
@@ -33,6 +34,7 @@ export const session = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+    impersonatedBy: text("impersonated_by"),
   },
   (table) => [index("session_userId_idx").on(table.userId)],
 );
@@ -77,24 +79,31 @@ export const verification = pgTable(
   (table) => [index("verification_identifier_idx").on(table.identifier)],
 );
 
-export const relations = defineRelations(
-  { user, session, account },
-  (r) => ({
-    user: {
-      sessions: r.many.session(),
-      accounts: r.many.account(),
-    },
-    session: {
-      user: r.one.user({
-        from: r.session.userId,
-        to: r.user.id,
-      }),
-    },
-    account: {
-      user: r.one.user({
-        from: r.account.userId,
-        to: r.user.id,
-      }),
-    },
-  }),
-);
+export const jwks = pgTable("jwks", {
+  id: text("id").primaryKey(),
+  publicKey: text("public_key").notNull(),
+  privateKey: text("private_key").notNull(),
+  createdAt: timestamp("created_at").notNull(),
+  expiresAt: timestamp("expires_at"),
+  alg: text("alg"),
+  crv: text("crv"),
+});
+
+export const relations = defineRelations({ user, session, account }, (r) => ({
+  user: {
+    sessions: r.many.session(),
+    accounts: r.many.account(),
+  },
+  session: {
+    user: r.one.user({
+      from: r.session.userId,
+      to: r.user.id,
+    }),
+  },
+  account: {
+    user: r.one.user({
+      from: r.account.userId,
+      to: r.user.id,
+    }),
+  },
+}));

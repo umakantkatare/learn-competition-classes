@@ -9,11 +9,23 @@ import type {
   CreateTeacherProfileInput,
   UpdateTeacherProfileInput,
 } from "@/validations/teacher-profile-validation";
+import { user } from "@/db/schema/auth-schema";
 
 export async function findAllTeacherProfiles() {
   return db
-    .select()
+    .select({
+      userId: teacherProfiles.userId,
+      name: user.name,
+      email: user.email,
+      bio: teacherProfiles.bio,
+      qualification: teacherProfiles.qualification,
+      experienceYears: teacherProfiles.experienceYears,
+      specializations: teacherProfiles.specializations,
+      createdAt: teacherProfiles.createdAt,
+      updatedAt: teacherProfiles.updatedAt,
+    })
     .from(teacherProfiles)
+    .innerJoin(user, eq(teacherProfiles.userId, user.id))
     .orderBy(desc(teacherProfiles.createdAt));
 }
 

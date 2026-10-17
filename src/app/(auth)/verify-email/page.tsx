@@ -1,7 +1,7 @@
 "use client";
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import VerifyEmail from "@/components/verify-email";
+import VerifyEmail from "@/components/auth/verify-email";
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();

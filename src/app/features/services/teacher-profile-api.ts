@@ -9,6 +9,7 @@ export type TeacherProfile = {
 };
 
 export type CreateTeacherProfileInput = {
+  userId: string;
   bio?: string | null;
   qualification?: string | null;
   experienceYears?: number;

@@ -33,7 +33,7 @@ import {
 import { authClient } from "@/lib/auth-client";
 import { verifyEmailSchema } from "@/validations/verifyEmailValidation";
 import { useRouter } from "next/navigation";
-import Logo from "./common/logo";
+import Logo from "../common/logo";
 
 type VerifyEmailInput = z.input<typeof verifyEmailSchema>;
 type VerifyEmailOutput = z.output<typeof verifyEmailSchema>;

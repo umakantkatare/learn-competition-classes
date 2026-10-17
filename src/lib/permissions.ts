@@ -1,71 +1,46 @@
-export const USER_ROLES = {
-  STUDENT: "STUDENT",
-  TEACHER: "TEACHER",
-  MANAGER: "MANAGER",
-  ADMIN: "ADMIN",
+import { createAccessControl } from "better-auth/plugins/access";
+import { adminAc, defaultStatements } from "better-auth/plugins/admin/access";
+
+export const USER_ROLES = ["student", "teacher", "manager", "admin"] as const;
+
+export type UserRole = (typeof USER_ROLES)[number];
+
+export const DEFAULT_USER_ROLE: UserRole = "student";
+
+const statement = {
+  ...defaultStatements,
+  teacherProfile: ["create", "read", "update", "delete"],
+  batch: ["create", "read", "update", "delete"],
+  liveClass: ["create", "read", "update", "delete"],
+  enrollment: ["create", "read", "update"],
 } as const;
 
-export type UserRole = (typeof USER_ROLES)[keyof typeof USER_ROLES];
+export const ac = createAccessControl(statement);
 
-export const PERMISSIONS = {
-  COURSE_VIEW: "course:view",
-  COURSE_CREATE: "course:create",
-  COURSE_UPDATE: "course:update",
+export const adminRole = ac.newRole({
+  ...adminAc.statements,
+  teacherProfile: ["create", "read", "update", "delete"],
+  batch: ["create", "read", "update", "delete"],
+  liveClass: ["create", "read", "update", "delete"],
+  enrollment: ["create", "read", "update"],
+});
 
-  BATCH_VIEW: "batch:view",
-  BATCH_CREATE: "batch:create",
-  BATCH_UPDATE: "batch:update",
+export const managerRole = ac.newRole({
+  teacherProfile: ["create", "read", "update"],
+  batch: ["create", "read", "update", "delete"],
+  liveClass: ["read"],
+  enrollment: ["read"],
+});
 
-  STUDENT_VIEW: "student:view",
-  STUDENT_MANAGE: "student:manage",
+export const teacherRole = ac.newRole({
+  teacherProfile: ["read"],
+  batch: ["read"],
+  liveClass: ["create", "read", "update"],
+  enrollment: ["read"],
+});
 
-  TEST_VIEW: "test:view",
-  TEST_CREATE: "test:create",
-  TEST_ATTEMPT: "test:attempt",
-  TEST_RESULT_VIEW: "test-result:view",
-
-  USER_MANAGE: "user:manage",
-  SYSTEM_MANAGE: "system:manage",
-} as const;
-
-export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
-
-
-
-export const ROLE_PERMISSIONS: Record<
-  UserRole,
-  readonly Permission[]
-> = {
-  STUDENT: [
-    PERMISSIONS.COURSE_VIEW,
-    PERMISSIONS.BATCH_VIEW,
-    PERMISSIONS.TEST_VIEW,
-    PERMISSIONS.TEST_ATTEMPT,
-    PERMISSIONS.TEST_RESULT_VIEW,
-  ],
-
-  TEACHER: [
-    PERMISSIONS.COURSE_VIEW,
-    PERMISSIONS.BATCH_VIEW,
-    PERMISSIONS.STUDENT_VIEW,
-    PERMISSIONS.TEST_VIEW,
-    PERMISSIONS.TEST_CREATE,
-    PERMISSIONS.TEST_RESULT_VIEW,
-  ],
-
-  MANAGER: [
-    PERMISSIONS.COURSE_VIEW,
-    PERMISSIONS.COURSE_CREATE,
-    PERMISSIONS.COURSE_UPDATE,
-    PERMISSIONS.BATCH_VIEW,
-    PERMISSIONS.BATCH_CREATE,
-    PERMISSIONS.BATCH_UPDATE,
-    PERMISSIONS.STUDENT_VIEW,
-    PERMISSIONS.STUDENT_MANAGE,
-    PERMISSIONS.TEST_VIEW,
-    PERMISSIONS.TEST_RESULT_VIEW,
-  ],
-
-  ADMIN: Object.values(PERMISSIONS),
-
-};
+export const studentRole = ac.newRole({
+  batch: ["read"],
+  liveClass: ["read"],
+  enrollment: ["create", "read"],
+});
