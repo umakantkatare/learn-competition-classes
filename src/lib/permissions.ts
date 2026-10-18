@@ -42,5 +42,5 @@ export const teacherRole = ac.newRole({
 export const studentRole = ac.newRole({
   batch: ["read"],
   liveClass: ["read"],
-  enrollment: ["create", "read"],
+  enrollment: ["read"],
 });

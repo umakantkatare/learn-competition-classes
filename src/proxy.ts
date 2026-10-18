@@ -1,33 +1,37 @@
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-import { auth } from "./lib/auth";
+import { NextResponse, type NextRequest } from "next/server";
 
-export async function proxy(request: NextRequest) {
-  const session = await auth.api.getSession({
-    headers: request.headers,
-  });
+const protectedPrefixes = ["/admin", "/manager", "/teacher", "/student"];
+
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  const isAuthPage =
-    pathname.startsWith("/sign-in") ||
-    pathname.startsWith("/sign-up") ||
-    pathname.startsWith("/verify-email");
+  const isDashboardRoute = protectedPrefixes.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
 
-  const isDashboard = pathname.startsWith("/dashboard");
-
-  if (session && isAuthPage) {
-    return NextResponse.redirect(new URL("/", request.url));
+  if (!isDashboardRoute) {
+    return NextResponse.next();
   }
 
-  if (!session && isDashboard) {
-    return NextResponse.redirect(new URL("/sign-in", request.url));
+  const hasSessionCookie =
+    request.cookies.has("better-auth.session_token") ||
+    request.cookies.has("__Secure-better-auth.session_token");
+
+  if (!hasSessionCookie) {
+    const loginUrl = new URL("/sign-in", request.url);
+    loginUrl.searchParams.set("callbackUrl", pathname);
+
+    return NextResponse.redirect(loginUrl);
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/", "/sign-in", "/sign-up", "/verify-email/:path*", "/dashboard/:path*"],
+  matcher: [
+    "/admin/:path*",
+    "/manager/:path*",
+    "/teacher/:path*",
+    "/student/:path*",
+  ],
 };
-
-

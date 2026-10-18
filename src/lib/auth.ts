@@ -20,11 +20,8 @@ import { sendPasswordResetEmail } from "@/helper/sendPasswordResetEmail";
 
 export const auth = betterAuth({
   appName: process.env.NEXT_PUBLIC_APP_NAME!,
-
   baseURL: process.env.BETTER_AUTH_URL,
-
   secret: process.env.BETTER_AUTH_SECRET,
-
   trustedOrigins: [process.env.NEXT_PUBLIC_APP_URL!],
 
   database: drizzleAdapter(db, {
@@ -36,6 +33,10 @@ export const auth = betterAuth({
     database: {
       joins: true,
     },
+  },
+  session: {
+    expiresIn: 60 * 60 * 24 * 7,
+    updateAge: 60 * 60 * 24,
   },
 
   emailAndPassword: {
@@ -95,7 +96,7 @@ export const auth = betterAuth({
       },
       defaultRole: DEFAULT_USER_ROLE,
     }),
-    jwt(),
+    jwt({}),
 
     emailOTP({
       sendVerificationOnSignUp: true,

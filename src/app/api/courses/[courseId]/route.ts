@@ -9,13 +9,13 @@ import {
 import { updateCourseSchema } from "@/validations/courses/course-validation";
 
 type RouteContext = {
-  params: Promise<{ id: string }>;
+  params: Promise<{ courseId: string }>;
 };
 
 export async function GET(_request: Request, { params }: RouteContext) {
   try {
-    const { id } = await params;
-    const course = await getCourseById(id);
+    const { courseId } = await params;
+    const course = await getCourseById(courseId);
 
     if (!course) {
       return NextResponse.json(
@@ -37,7 +37,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
 
 export async function PATCH(request: Request, { params }: RouteContext) {
   try {
-    const { id } = await params;
+    const { courseId } = await params;
     const body: unknown = await request.json();
 
     const parsed = updateCourseSchema.safeParse(body);
@@ -53,7 +53,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       );
     }
 
-    const course = await updateCourse(id, parsed.data);
+    const course = await updateCourse(courseId, parsed.data);
 
     return NextResponse.json({ success: true, data: course }, { status: 200 });
   } catch (error) {
@@ -78,9 +78,9 @@ export async function PATCH(request: Request, { params }: RouteContext) {
 
 export async function DELETE(_request: Request, { params }: RouteContext) {
   try {
-    const { id } = await params;
+    const { courseId } = await params;
 
-    const course = await deleteCourse(id);
+    const course = await deleteCourse(courseId);
 
     if (!course) {
       return NextResponse.json(

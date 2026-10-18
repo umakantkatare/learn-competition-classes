@@ -25,11 +25,11 @@ const navLinks = [
     label: "Live Classes",
     href: "/live-classes",
   },
-  {
-    label: "Test Series",
-    href: "/test-series",
-    dropdown: true,
-  },
+  // {
+  //   label: "Test Series",
+  //   href: "/test-series",
+  //   dropdown: true,
+  // },
   {
     label: "About",
     href: "/about",
