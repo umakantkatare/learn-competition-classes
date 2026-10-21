@@ -347,6 +347,7 @@ export const enrollment = pgTable(
     status: enrollmentStatusEnum("status").default("ACTIVE").notNull(),
     enrolledAt: timestamp("enrolled_at").defaultNow().notNull(),
     expiresAt: timestamp("expires_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [
     uniqueIndex("user_batch_unique_idx").on(t.userId, t.batchId),
