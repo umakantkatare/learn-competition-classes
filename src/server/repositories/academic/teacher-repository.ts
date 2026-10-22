@@ -5,7 +5,9 @@ import { eq } from "drizzle-orm";
 export type TeacherProfile = typeof teacherProfiles.$inferSelect;
 export type NewTeacherProfile = typeof teacherProfiles.$inferInsert;
 
-export type UpdateTeacherProfile = Partial<Omit<NewTeacherProfile, "id">>;
+export type UpdateTeacherProfile = Partial<
+  Omit<NewTeacherProfile, "id" | "userId">
+>;
 
 export class TeacherRepository {
   // Create teacher profile

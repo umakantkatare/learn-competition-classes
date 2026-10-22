@@ -67,7 +67,17 @@ export class ExaminationRepository {
     return result;
   }
 
-  async deactivate(id: string): Promise<Examination | undefined> {
+  async findBySlug(slug: string) {
+    const [result] = await db
+      .select()
+      .from(examination)
+      .where(eq(examination.slug, slug))
+      .limit(1);
+
+    return result;
+  }
+
+  async deactivate(id: string) {
     const [result] = await db
       .update(examination)
       .set({ isActive: false })
