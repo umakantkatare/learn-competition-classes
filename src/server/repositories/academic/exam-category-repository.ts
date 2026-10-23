@@ -41,6 +41,11 @@ export class ExamCategoryRepository {
     return result;
   }
 
+  // Find all categories
+  async findAllCategories(): Promise<ExamCategory[]> {
+    return db.select().from(examCategory);
+  }
+
   // Find all active categories
   async findAllActive(): Promise<ExamCategory[]> {
     return db

@@ -200,4 +200,49 @@ export class EnrollmentService {
 
     return updated;
   }
+
+  async updateEnrollment(
+    enrollmentId: string,
+    data: {
+      status?: "ACTIVE" | "EXPIRED" | "REFUNDED";
+      expiresAt?: Date | null;
+      orderId?: string | null;
+    },
+  ) {
+    if (!enrollmentId?.trim()) {
+      throw new Error("Enrollment ID is required.");
+    }
+
+    const enrollment = await this.enrollmentRepo.findById(enrollmentId);
+
+    if (!enrollment) {
+      throw new Error("Enrollment record not found.");
+    }
+
+    if (Object.keys(data).length === 0) {
+      throw new Error("At least one field is required to update enrollment.");
+    }
+
+    // Prevent accidental reactivation of refunded enrollments.
+    if (enrollment.status === "REFUNDED" && data.status === "ACTIVE") {
+      throw new Error("A refunded enrollment cannot be reactivated.");
+    }
+
+    if (
+      data.expiresAt !== undefined &&
+      data.expiresAt !== null &&
+      (!(data.expiresAt instanceof Date) ||
+        Number.isNaN(data.expiresAt.getTime()))
+    ) {
+      throw new Error("Invalid enrollment expiry date.");
+    }
+
+    const updated = await this.enrollmentRepo.update(enrollmentId, data);
+
+    if (!updated) {
+      throw new Error("Failed to update enrollment.");
+    }
+
+    return updated;
+  }
 }

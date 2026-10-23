@@ -44,6 +44,11 @@ export class ExamCategoryService {
     return category;
   }
 
+  // Get all categories (active and inactive)
+  async getAllCategories() {
+    return this.categoryRepo.findAllCategories();
+  }
+
   // Get active categories for public pages
   async getActiveCategories() {
     return this.categoryRepo.findAllActive();
