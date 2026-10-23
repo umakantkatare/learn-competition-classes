@@ -201,14 +201,8 @@ export class EnrollmentService {
     return updated;
   }
 
-  async updateEnrollment(
-    enrollmentId: string,
-    data: {
-      status?: "ACTIVE" | "EXPIRED" | "REFUNDED";
-      expiresAt?: Date | null;
-      orderId?: string | null;
-    },
-  ) {
+  // 6. Update an existing enrollment
+  async updateEnrollment(enrollmentId: string, input: Partial<NewEnrollment>) {
     if (!enrollmentId?.trim()) {
       throw new Error("Enrollment ID is required.");
     }
@@ -219,25 +213,12 @@ export class EnrollmentService {
       throw new Error("Enrollment record not found.");
     }
 
-    if (Object.keys(data).length === 0) {
-      throw new Error("At least one field is required to update enrollment.");
+    // Prevent changes to refunded enrollments.
+    if (enrollment.status === "REFUNDED") {
+      throw new Error("A refunded enrollment cannot be updated.");
     }
 
-    // Prevent accidental reactivation of refunded enrollments.
-    if (enrollment.status === "REFUNDED" && data.status === "ACTIVE") {
-      throw new Error("A refunded enrollment cannot be reactivated.");
-    }
-
-    if (
-      data.expiresAt !== undefined &&
-      data.expiresAt !== null &&
-      (!(data.expiresAt instanceof Date) ||
-        Number.isNaN(data.expiresAt.getTime()))
-    ) {
-      throw new Error("Invalid enrollment expiry date.");
-    }
-
-    const updated = await this.enrollmentRepo.update(enrollmentId, data);
+    const updated = await this.enrollmentRepo.update(enrollmentId, input);
 
     if (!updated) {
       throw new Error("Failed to update enrollment.");
