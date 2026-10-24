@@ -1,17 +1,7 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
-
-import {
-  ChevronDown,
-  UserRound,
-  BookOpen,
-  FileText,
-  CalendarDays,
-  Settings,
-  LogOut,
-} from "lucide-react";
+import { ChevronDown, UserRound, BookOpen } from "lucide-react";
 
 import {
   DropdownMenu,
@@ -23,10 +13,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+import { UserAvatar } from "@/components/common/user-avatar";
+import { SignOutButton } from "../auth/sign-out-button";
+
 interface NavbarUserMenuProps {
   name?: string;
   role?: string;
-  avatar?: string;
+  avatar?: string | null;
   onLogout?: () => void;
 }
 
@@ -37,24 +30,9 @@ const profileLinks = [
     icon: UserRound,
   },
   {
-    label: "My Enrollments",
+    label: "My Courses",
     href: "/student/enrollments",
     icon: BookOpen,
-  },
-  {
-    label: "My Test Series",
-    href: "/student/test-series",
-    icon: FileText,
-  },
-  {
-    label: "Live Class Schedule",
-    href: "/student/live-classes",
-    icon: CalendarDays,
-  },
-  {
-    label: "Settings",
-    href: "/student/settings",
-    icon: Settings,
   },
 ];
 
@@ -66,40 +44,21 @@ export default function NavbarUserMenu({
 }: NavbarUserMenuProps) {
   return (
     <DropdownMenu>
-      {/* Profile Trigger */}
       <DropdownMenuTrigger
         render={
           <button
             type="button"
             aria-label="Open student profile menu"
-            className="flex shrink-0 items-center gap-3
-        rounded-full p-1.5 transition-colors
-        hover:bg-amber-50
-        focus-visible:outline-none
-        focus-visible:ring-2
-        focus-visible:ring-[#F5A800]"
+            className="flex shrink-0 items-center gap-3 rounded-full p-1.5 transition-colors hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F5A800]"
           >
-            {/* Avatar */}
-            <div
-              className="relative h-12 w-12
-          overflow-hidden rounded-full
-          bg-amber-50 sm:h-14 sm:w-14"
-            >
-              <Image
-                src={avatar}
-                alt={`${name}'s profile`}
-                fill
-                sizes="56px"
-                className="object-cover"
-              />
-            </div>
+            <UserAvatar
+              name={name}
+              image={avatar}
+              className="size-12 bg-amber-50 sm:size-14"
+            />
 
-            {/* User Details */}
             <div className="hidden flex-col items-start sm:flex">
-              <span
-                className="max-w-32 truncate
-            text-base font-semibold text-[#171717]"
-              >
+              <span className="max-w-32 truncate text-base font-semibold text-[#171717]">
                 {name}
               </span>
 
@@ -111,35 +70,25 @@ export default function NavbarUserMenu({
         }
       />
 
-      {/* Dropdown Content */}
       <DropdownMenuContent
         align="end"
         sideOffset={12}
-        className="w-64 rounded-xl border
-          border-gray-100 bg-white p-2 shadow-xl"
+        className="w-64 rounded-xl border border-gray-100 bg-white p-2 shadow-xl"
       >
-        {/* User Info */}
-        <DropdownMenuLabel className="px-3 py-3">
-          <div className="flex flex-col gap-1">
-            <span
-              className="truncate text-sm
-              font-semibold text-gray-900"
-            >
-              {name}
-            </span>
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="px-3 py-3">
+            <div className="flex flex-col gap-1">
+              <span className="truncate text-sm font-semibold text-gray-900">
+                {name}
+              </span>
 
-            <span
-              className="text-xs font-normal
-              text-gray-500"
-            >
-              {role}
-            </span>
-          </div>
-        </DropdownMenuLabel>
+              <span className="text-xs font-normal text-gray-500">{role}</span>
+            </div>
+          </DropdownMenuLabel>
+        </DropdownMenuGroup>
 
         <DropdownMenuSeparator />
 
-        {/* Profile Links */}
         <DropdownMenuGroup>
           {profileLinks.map((item) => {
             const Icon = item.icon;
@@ -147,12 +96,9 @@ export default function NavbarUserMenu({
             return (
               <DropdownMenuItem
                 key={item.href}
-                // asChild
-                className="cursor-pointer rounded-lg
-                  px-3 py-2.5 focus:bg-amber-50
-                  focus:text-[#B77900]"
+                className="cursor-pointer rounded-lg px-3 py-2.5 focus:bg-amber-50 focus:text-[#B77900]"
               >
-                <Link href={item.href}>
+                <Link href={item.href} className="flex w-full items-center">
                   <Icon className="mr-2 h-4 w-4" />
                   <span>{item.label}</span>
                 </Link>
@@ -163,15 +109,11 @@ export default function NavbarUserMenu({
 
         <DropdownMenuSeparator />
 
-        {/* Logout */}
         <DropdownMenuItem
-          onSelect={() => onLogout?.()}
-          className="cursor-pointer rounded-lg
-            px-3 py-2.5 text-red-600
-            focus:bg-red-50 focus:text-red-600"
+          onSelect={(e) => e.preventDefault()}
+          className="flex cursor-pointer items-center rounded-lg px-3 py-2.5 text-red-600 focus:bg-red-50 focus:text-red-600"
         >
-          <LogOut className="mr-2 h-4 w-4" />
-          <span>Logout</span>
+          <SignOutButton />
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

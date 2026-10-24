@@ -1,46 +1,26 @@
-
 import { NextRequest, NextResponse } from "next/server";
-import { verifyJWT } from "@/lib/verify-jwt";
+import { auth } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
-  const authorization = request.headers.get("authorization");
-
-  if (!authorization?.startsWith("Bearer ")) {
-    return NextResponse.json(
-      { error: "Unauthorized" },
-      { status: 401 },
-    );
-  }
-
-  const token = authorization.slice("Bearer ".length).trim();
-
-  if (!token) {
-    return NextResponse.json(
-      { error: "Unauthorized" },
-      { status: 401 },
-    );
-  }
-
   try {
-    const { payload } = await verifyJWT(token);
+    const session = await auth.api.getSession({
+      headers: request.headers,
+    });
 
-    if (typeof payload.sub !== "string") {
-      return NextResponse.json(
-        { error: "Invalid token claims" },
-        { status: 401 },
-      );
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     return NextResponse.json({
-      id: payload.sub,
-      name: payload.name,
-      email: payload.email,
-      role: payload.role,
+      id: session.user.id,
+      name: session.user.name,
+      email: session.user.email,
+      role: session.user.role,
     });
   } catch {
     return NextResponse.json(
-      { error: "Invalid or expired token" },
-      { status: 401 },
+      { error: "Internal server error" },
+      { status: 500 },
     );
   }
 }

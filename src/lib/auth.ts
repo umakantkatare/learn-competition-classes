@@ -2,7 +2,7 @@ import { db } from "@/db";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
-import { admin, emailOTP, jwt } from "better-auth/plugins";
+import { admin, emailOTP } from "better-auth/plugins";
 import * as schema from "@/db/schema/auth-schema";
 import { sendVerificationEmail } from "@/helper/sendVerificationEmail";
 import { eq } from "drizzle-orm";
@@ -101,7 +101,6 @@ export const auth = betterAuth({
       },
       defaultRole: DEFAULT_USER_ROLE,
     }),
-    jwt({}),
 
     emailOTP({
       sendVerificationOnSignUp: true,

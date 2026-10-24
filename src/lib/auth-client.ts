@@ -4,7 +4,6 @@ import {
   phoneNumberClient,
   adminClient,
   emailOTPClient,
-  jwtClient,
 } from "better-auth/client/plugins";
 
 import { auth } from "./auth";
@@ -32,6 +31,5 @@ export const authClient = createAuthClient({
 
     emailOTPClient(),
     phoneNumberClient(),
-    jwtClient(),
   ],
 });
