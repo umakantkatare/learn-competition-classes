@@ -22,7 +22,6 @@ export async function getCurrentUser(): Promise<AuthorizedUser | null> {
   }
 
   const role = session.user.role;
-
   if (
     role !== "student" &&
     role !== "teacher" &&
@@ -52,4 +51,19 @@ export async function requireRole({
   }
 
   return user;
+}
+
+export async function requireAdminOrManager() {
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
+  if (!session?.user?.id) {
+    return { authorized: false, status: 401 as const };
+  }
+
+  if (!["admin", "manager"].includes(session.user.role ?? "")) {
+    return { authorized: false, status: 403 as const };
+  }
+
+  return { authorized: true, status: 200 as const };
 }

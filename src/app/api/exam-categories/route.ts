@@ -1,28 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { z } from "zod";
 
-import { auth } from "@/lib/auth";
 import { ExamCategoryService } from "@/server/services/academic/exam-category-service";
 import { createExamCategorySchema } from "@/validations/academic/academic-validations";
+import { requireAdminOrManager } from "@/lib/authorize";
 
 const examCategoryService = new ExamCategoryService();
-
-async function requireAdminOrManager() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-
-  if (!session?.user?.id) {
-    return { authorized: false, status: 401 as const };
-  }
-
-  if (!["ADMIN", "MANAGER"].includes(session.user.role ?? "")) {
-    return { authorized: false, status: 403 as const };
-  }
-
-  return { authorized: true, status: 200 as const };
-}
 
 // GET /api/exam-categories?activeOnly=true
 export async function GET(req: NextRequest) {
@@ -74,6 +56,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const access = await requireAdminOrManager();
+    console.log("access-role", access);
 
     if (!access.authorized) {
       return NextResponse.json(
