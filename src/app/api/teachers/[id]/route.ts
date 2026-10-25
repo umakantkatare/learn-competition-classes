@@ -15,9 +15,9 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
   try {
     const { id } = await params;
 
-    if (!id) {
+    if (!id?.trim()) {
       return NextResponse.json(
-        { success: false, error: "ID is required" },
+        { success: false, error: "Teacher id is required" },
         { status: 400 },
       );
     }
@@ -31,8 +31,18 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
       );
     }
 
-    return NextResponse.json({ success: true, data: profile }, { status: 200 });
+    return NextResponse.json(
+      {
+        success: true,
+        message: "Teacher profile fetched successfully",
+        data: profile,
+      },
+      { status: 200 },
+    );
   } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error(error.message);
+    }
     console.error("GET /api/teachers/[id] error:", error);
 
     return NextResponse.json(
@@ -48,14 +58,20 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
     const access = await requireAdminOrManager();
 
     if (!access.authorized) {
-      return NextResponse.json({ success: false }, { status: access.status });
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Unauthorized: Admin or Manager access required",
+        },
+        { status: access.status },
+      );
     }
 
     const { id } = await params;
 
-    if (!id) {
+    if (!id?.trim()) {
       return NextResponse.json(
-        { success: false, error: "ID is required" },
+        { success: false, error: "Teacher id is required" },
         { status: 400 },
       );
     }
@@ -106,6 +122,9 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
       { status: 200 },
     );
   } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error(error.message);
+    }
     console.error("PATCH /api/teachers/[id] error:", error);
 
     return NextResponse.json(
@@ -122,17 +141,32 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
 
     if (!access.authorized) {
       return NextResponse.json(
-        { success: false, },
+        {
+          success: false,
+          error: "Unauthorized: Admin or Manager access required",
+        },
         { status: access.status },
       );
     }
 
     const { id } = await params;
 
-    if (!id) {
+    if (!id?.trim()) {
       return NextResponse.json(
-        { success: false, error: "ID is required" },
+        { success: false, error: "Teacher id is required" },
         { status: 400 },
+      );
+    }
+
+    const existingProfile = await teacherService.getProfileById(id);
+
+    if (!existingProfile) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Teacher profile not found",
+        },
+        { status: 404 },
       );
     }
 
@@ -146,6 +180,9 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
       { status: 200 },
     );
   } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error(error.message);
+    }
     console.error("DELETE /api/teachers/[id] error:", error);
 
     return NextResponse.json(
