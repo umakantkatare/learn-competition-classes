@@ -31,6 +31,13 @@ export class TeacherService {
     return this.teacherRepo.create(data);
   }
 
+  // Get all teacher profiles
+  async getAllTeachers() {
+    const teachers = await this.teacherRepo.findAll();
+
+    return teachers;
+  }
+
   // Get profile by profile ID
   async getProfileById(id: string) {
     const profile = await this.teacherRepo.findById(id);
@@ -80,5 +87,21 @@ export class TeacherService {
     }
 
     return updatedProfile;
+  }
+
+  async deleteProfile(id: string) {
+    const existingProfile = await this.teacherRepo.findById(id);
+
+    if (!existingProfile) {
+      throw new Error("Teacher profile not found.");
+    }
+
+    const deletedProfile = await this.teacherRepo.delete(id);
+
+    if (!deletedProfile) {
+      throw new Error("Failed to delete teacher profile.");
+    }
+
+    return deletedProfile;
   }
 }

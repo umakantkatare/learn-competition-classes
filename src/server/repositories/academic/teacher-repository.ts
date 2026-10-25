@@ -21,6 +21,11 @@ export class TeacherRepository {
     return result;
   }
 
+  // Get all teacher profiles
+  async findAll(): Promise<TeacherProfile[]> {
+    return await db.select().from(teacherProfiles);
+  }
+
   // Find teacher by profile ID
   async findById(id: string): Promise<TeacherProfile | undefined> {
     const [result] = await db
@@ -57,6 +62,15 @@ export class TeacherRepository {
     const [result] = await db
       .update(teacherProfiles)
       .set(data)
+      .where(eq(teacherProfiles.id, id))
+      .returning();
+
+    return result;
+  }
+
+  async delete(id: string): Promise<TeacherProfile | undefined> {
+    const [result] = await db
+      .delete(teacherProfiles)
       .where(eq(teacherProfiles.id, id))
       .returning();
 
