@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { chapter } from "@/db/schema/academic-schema";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, max, sql } from "drizzle-orm";
 
 export type Chapter = typeof chapter.$inferSelect;
 export type NewChapter = typeof chapter.$inferInsert;
@@ -10,13 +10,28 @@ export type UpdateChapter = Partial<Omit<NewChapter, "id">>;
 export class ChapterRepository {
   // Create chapter
   async create(data: NewChapter): Promise<Chapter> {
-    const [result] = await db.insert(chapter).values(data).returning();
+    const [result] = await db
+      .select({
+        maxSortOrder: max(chapter.sortOrder),
+      })
+      .from(chapter)
+      .where(eq(chapter.subjectId, data.subjectId));
 
-    if (!result) {
+    const nextSortOrder = (result.maxSortOrder ?? 0) + 1;
+
+    const [createdChapter] = await db
+      .insert(chapter)
+      .values({
+        ...data,
+        sortOrder: nextSortOrder,
+      })
+      .returning();
+
+    if (!createdChapter) {
       throw new Error("Failed to create chapter");
     }
 
-    return result;
+    return createdChapter;
   }
 
   // Find chapter by ID
@@ -56,11 +71,40 @@ export class ChapterRepository {
 
   // Delete chapter
   async delete(id: string): Promise<Chapter | undefined> {
-    const [result] = await db
+    // Find chapter before deleting
+    const [existingChapter] = await db
+      .select()
+      .from(chapter)
+      .where(eq(chapter.id, id))
+      .limit(1);
+
+    if (!existingChapter) {
+      return undefined;
+    }
+
+    // Delete the chapter
+    const [deletedChapter] = await db
       .delete(chapter)
       .where(eq(chapter.id, id))
       .returning();
 
-    return result;
+    if (!deletedChapter) {
+      throw new Error("Failed to delete chapter");
+    }
+
+    // Decrement sortOrder for subsequent chapters
+    await db
+      .update(chapter)
+      .set({
+        sortOrder: sql`${chapter.sortOrder} - 1`,
+      })
+      .where(
+        and(
+          eq(chapter.subjectId, existingChapter.subjectId),
+          sql`${chapter.sortOrder} > ${existingChapter.sortOrder}`,
+        ),
+      );
+
+    return deletedChapter;
   }
 }
