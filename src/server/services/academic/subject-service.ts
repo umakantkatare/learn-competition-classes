@@ -73,4 +73,21 @@ export class SubjectService {
 
     return updatedSubject;
   }
+
+  // Delete subject
+  async deleteSubject(id: string) {
+    const existingSubject = await this.subjectRepo.findById(id);
+
+    if (!existingSubject) {
+      throw new Error("Subject not found.");
+    }
+
+    const deletedSubject = await this.subjectRepo.delete(id);
+
+    if (!deletedSubject) {
+      throw new Error("Failed to delete subject.");
+    }
+
+    return deletedSubject;
+  }
 }

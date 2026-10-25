@@ -49,4 +49,15 @@ export class SubjectRepository {
 
     return result;
   }
+
+  // Delete subject by ID
+  async delete(id: string): Promise<Subject | undefined> {
+    const [result] = await db
+      .delete(subject)
+      .where(eq(subject.id, id))
+      .returning();
+
+    return result;
+  }
 }
+
