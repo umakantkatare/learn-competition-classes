@@ -20,7 +20,6 @@ export class BatchTeacherService {
     if (!batch) {
       throw new Error("Batch not found.");
     }
-
     const teacher = await this.teacherRepo.findById(teacherId);
 
     if (!teacher) {

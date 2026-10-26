@@ -33,7 +33,6 @@ export class TeacherRepository {
       .from(teacherProfiles)
       .where(eq(teacherProfiles.id, id))
       .limit(1);
-
     return result;
   }
 

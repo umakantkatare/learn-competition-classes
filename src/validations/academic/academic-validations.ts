@@ -169,7 +169,7 @@ export const updateSubjectSchema = createSubjectSchema
   .refine((data) => Object.keys(data).length > 0, {
     message: "At least one field must be provided",
   });
-  
+
 export const createChapterSchema = z.object({
   subjectId: idSchema,
   title: z.string().trim().min(2, "Chapter title is required").max(150),
