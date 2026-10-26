@@ -17,15 +17,17 @@ export const orderStatusSchema = z.enum(orderStatusEnum.enumValues);
 export const paymentStatusSchema = z.enum(paymentStatusEnum.enumValues);
 export const enrollmentStatusSchema = z.enum(enrollmentStatusEnum.enumValues);
 
-const idSchema = z.string().min(1, "ID is required");
+const idSchema = z.string().trim().min(1, "ID is required");
 
-const slugSchema = z
+export const slugSchema = z
   .string()
+  .trim()
+  .toLowerCase()
   .min(2, "Slug must be at least 2 characters")
-  .max(120, "Slug is too long")
+  .max(120, "Slug must not exceed 120 characters")
   .regex(
     /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
-    "Slug must be lowercase alphanumeric with hyphens only",
+    "Slug must contain lowercase letters, numbers, and single hyphens only",
   );
 
 const decimalSchema = z
@@ -159,10 +161,15 @@ export const updateBatchSchema = baseBatchSchema
 
 export const createSubjectSchema = z.object({
   name: z.string().trim().min(2, "Subject name is required").max(100),
+  batchId: z.string().trim().min(1, "Batch ID is required"),
 });
 
-export const updateSubjectSchema = createSubjectSchema.partial();
-
+export const updateSubjectSchema = createSubjectSchema
+  .partial()
+  .refine((data) => Object.keys(data).length > 0, {
+    message: "At least one field must be provided",
+  });
+  
 export const createChapterSchema = z.object({
   subjectId: idSchema,
   title: z.string().trim().min(2, "Chapter title is required").max(150),

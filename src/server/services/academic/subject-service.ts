@@ -1,7 +1,7 @@
 import {
   SubjectRepository,
-  NewSubject,
-  UpdateSubject,
+  type NewSubject,
+  type UpdateSubject,
 } from "@/server/repositories/academic/subject-repository";
 
 export class SubjectService {
@@ -27,13 +27,17 @@ export class SubjectService {
 
   // Get subject by ID
   async getSubjectById(id: string) {
-    const subject = await this.subjectRepo.findById(id);
+    if (!id?.trim()) {
+      throw new Error("Subject ID is required.");
+    }
 
-    if (!subject) {
+    const existingSubject = await this.subjectRepo.findById(id);
+
+    if (!existingSubject) {
       throw new Error("Subject not found.");
     }
 
-    return subject;
+    return existingSubject;
   }
 
   // Get all subjects
@@ -41,8 +45,21 @@ export class SubjectService {
     return this.subjectRepo.findAll();
   }
 
+  // Get subjects by batch ID
+  async getSubjectsByBatchId(batchId: string) {
+    if (!batchId?.trim()) {
+      throw new Error("Batch ID is required.");
+    }
+
+    return this.subjectRepo.findByBatchId(batchId);
+  }
+
   // Update subject
   async updateSubject(id: string, data: UpdateSubject) {
+    if (!id?.trim()) {
+      throw new Error("Subject ID is required.");
+    }
+
     const existingSubject = await this.subjectRepo.findById(id);
 
     if (!existingSubject) {
@@ -55,6 +72,7 @@ export class SubjectService {
 
     const updateData: UpdateSubject = { ...data };
 
+    // Validate subject name
     if (data.name !== undefined) {
       const name = data.name.trim();
 
@@ -63,6 +81,11 @@ export class SubjectService {
       }
 
       updateData.name = name;
+    }
+
+    // Validate batch ID
+    if (data.batchId !== undefined && !data.batchId.trim()) {
+      throw new Error("Batch ID cannot be empty.");
     }
 
     const updatedSubject = await this.subjectRepo.update(id, updateData);
@@ -76,6 +99,10 @@ export class SubjectService {
 
   // Delete subject
   async deleteSubject(id: string) {
+    if (!id?.trim()) {
+      throw new Error("Subject ID is required.");
+    }
+
     const existingSubject = await this.subjectRepo.findById(id);
 
     if (!existingSubject) {

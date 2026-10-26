@@ -24,7 +24,7 @@ export async function GET(_req: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: "Failed to fetch subjects",
+        error: "Failed to fetch subjects.",
       },
       { status: 500 },
     );
@@ -34,17 +34,20 @@ export async function GET(_req: NextRequest) {
 // POST: Create a subject
 export async function POST(req: NextRequest) {
   try {
+    // Authorization
     const access = await requireAdminOrManager();
 
     if (!access.authorized) {
       return NextResponse.json(
         {
           success: false,
+          error: "You are not authorized to perform this action.",
         },
         { status: access.status },
       );
     }
 
+    // Parse request body
     let body: unknown;
 
     try {
@@ -53,12 +56,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "Invalid JSON request body",
+          error: "Invalid JSON request body.",
         },
         { status: 400 },
       );
     }
 
+    // Validate request body
     const validationResult = createSubjectSchema.safeParse(body);
 
     if (!validationResult.success) {
@@ -66,12 +70,14 @@ export async function POST(req: NextRequest) {
         {
           success: false,
           error:
-            validationResult.error.issues[0]?.message ?? "Invalid subject data",
+            validationResult.error.issues[0]?.message ??
+            "Invalid subject data.",
         },
         { status: 400 },
       );
     }
 
+    // Create subject
     const newSubject = await subjectService.createSubject(
       validationResult.data,
     );
@@ -79,7 +85,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        message: "Subject created successfully",
+        message: "Subject created successfully.",
         data: newSubject,
       },
       { status: 201 },
@@ -90,7 +96,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: "Failed to create subject",
+        error: "Failed to create subject.",
       },
       { status: 500 },
     );

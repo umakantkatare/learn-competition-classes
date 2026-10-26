@@ -192,6 +192,11 @@ export const subject = pgTable("subject", {
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
+  batchId: text("batch_id")
+    .notNull()
+    .references(() => batch.id, {
+      onDelete: "cascade",
+    }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

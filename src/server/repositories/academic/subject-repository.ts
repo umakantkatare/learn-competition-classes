@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 export type Subject = typeof subject.$inferSelect;
 export type NewSubject = typeof subject.$inferInsert;
 
-export type UpdateSubject = Partial<Omit<NewSubject, "id">>;
+export type UpdateSubject = Partial<Pick<NewSubject, "name" | "batchId">>;
 
 export class SubjectRepository {
   // Create subject
@@ -35,6 +35,11 @@ export class SubjectRepository {
     return db.select().from(subject);
   }
 
+  // Find subjects by batch ID
+  async findByBatchId(batchId: string): Promise<Subject[]> {
+    return db.select().from(subject).where(eq(subject.batchId, batchId));
+  }
+
   // Update subject
   async update(id: string, data: UpdateSubject): Promise<Subject | undefined> {
     if (Object.keys(data).length === 0) {
@@ -60,4 +65,3 @@ export class SubjectRepository {
     return result;
   }
 }
-
