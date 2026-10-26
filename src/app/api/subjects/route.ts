@@ -6,10 +6,15 @@ import { requireAdminOrManager } from "@/lib/authorize";
 
 const subjectService = new SubjectService();
 
-// GET: Fetch all subjects
-export async function GET(_req: NextRequest) {
+// GET: Fetch subjects, optionally filtered by batchId
+export async function GET(req: NextRequest) {
   try {
-    const subjects = await subjectService.getAllSubjects();
+    const { searchParams } = new URL(req.url);
+    const batchId = searchParams.get("batchId");
+
+    const subjects = batchId
+      ? await subjectService.getSubjectsByBatchId(batchId)
+      : await subjectService.getAllSubjects();
 
     return NextResponse.json(
       {
@@ -20,21 +25,23 @@ export async function GET(_req: NextRequest) {
     );
   } catch (error: unknown) {
     console.error("GET /api/subjects error:", error);
+    if (error instanceof Error && error.message === "Batch ID is required.") {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 400 },
+      );
+    }
 
     return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to fetch subjects.",
-      },
+      { success: false, error: "Failed to fetch subjects." },
       { status: 500 },
     );
   }
 }
 
-// POST: Create a subject
+// POST: Create a subject for a specific batch
 export async function POST(req: NextRequest) {
   try {
-    // Authorization
     const access = await requireAdminOrManager();
 
     if (!access.authorized) {
@@ -47,7 +54,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Parse request body
     let body: unknown;
 
     try {
@@ -62,7 +68,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validate request body
     const validationResult = createSubjectSchema.safeParse(body);
 
     if (!validationResult.success) {
@@ -77,7 +82,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Create subject
     const newSubject = await subjectService.createSubject(
       validationResult.data,
     );
