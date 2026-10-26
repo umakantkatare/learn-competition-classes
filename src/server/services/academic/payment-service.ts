@@ -78,11 +78,15 @@ export class PaymentService {
     orderId: string,
     razorpayPaymentId: string,
     razorpaySignature: string,
+    userId: string,
   ) {
     const order = await this.orderRepo.findById(orderId);
 
     if (!order) {
       throw new Error("Order not found.");
+    }
+    if (order.userId !== userId) {
+      throw new Error("You are not authorized to access this order.");
     }
 
     if (!order.razorpayOrderId) {
@@ -165,11 +169,18 @@ export class PaymentService {
   }
 
   // 3. Record a failed payment attempt
-  async handleFailedPayment(orderId: string, errorReason?: string) {
+  async handleFailedPayment(
+    orderId: string,
+    userId: string,
+    errorReason: string | undefined,
+  ) {
     const order = await this.orderRepo.findById(orderId);
 
     if (!order) {
       throw new Error("Order not found.");
+    }
+    if (order.userId !== userId) {
+      throw new Error("You are not authorized to access this order.");
     }
 
     if (order.status === "PAID") {
