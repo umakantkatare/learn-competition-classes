@@ -77,4 +77,31 @@ export class PaymentRepository {
 
     return result;
   }
+
+  // Find all payment attempts for an order, newest first.
+  async findAllByOrderId(orderId: string): Promise<Payment[]> {
+    return db
+      .select()
+      .from(payments)
+      .where(eq(payments.orderId, orderId))
+      .orderBy(desc(payments.createdAt));
+  }
+
+  // Update a payment using its Razorpay payment ID.
+  async updateByRazorpayPaymentId(
+    razorpayPaymentId: string,
+    data: UpdatePayment,
+  ): Promise<Payment | undefined> {
+    if (Object.keys(data).length === 0) {
+      throw new Error("At least one field is required to update a payment");
+    }
+
+    const [result] = await db
+      .update(payments)
+      .set(data)
+      .where(eq(payments.razorpayPaymentId, razorpayPaymentId))
+      .returning();
+
+    return result;
+  }
 }

@@ -1,11 +1,30 @@
+import "server-only";
+
 import {
   OrderRepository,
-  NewOrder,
+  type NewOrder,
 } from "@/server/repositories/academic/order-repository";
 import { BatchRepository } from "@/server/repositories/academic/batch-repository";
 import { EnrollmentRepository } from "@/server/repositories/academic/enrollment-repository";
 
-type OrderStatus = "PENDING" | "PAID" | "FAILED" | "CANCELLED";
+import { razorpay, razorpayKeyId } from "@/lib/razorpay";
+
+import {
+  createOrderSchema,
+  OrderStatus,
+} from "@/validations/academic/order-validation";
+type CreateOrderParams = {
+  userId: string;
+  batchId: string;
+};
+
+type CreateOrderResult = {
+  id: string;
+  amount: string;
+  currency: "INR";
+  razorpayOrderId: string;
+  keyId: string;
+};
 
 export class OrderService {
   private readonly orderRepo: OrderRepository;
@@ -18,13 +37,14 @@ export class OrderService {
     this.enrollmentRepo = new EnrollmentRepository();
   }
 
-  // 1. Create a pending order
-  async createOrder(data: NewOrder) {
-    if (!data.userId || !data.batchId) {
+  async createOrder(data: CreateOrderParams): Promise<CreateOrderResult> {
+    const { userId, batchId } = data;
+
+    if (!userId || !batchId) {
       throw new Error("User ID and batch ID are required.");
     }
 
-    const batch = await this.batchRepo.findById(data.batchId);
+    const batch = await this.batchRepo.findById(batchId);
 
     if (!batch) {
       throw new Error("Batch not found.");
@@ -34,38 +54,111 @@ export class OrderService {
       throw new Error("This batch is not available for purchase.");
     }
 
-    const existingEnrollment = await this.enrollmentRepo.checkEnrollment(
-      data.userId,
-      data.batchId,
+    const enrollment = await this.enrollmentRepo.checkEnrollment(
+      userId,
+      batchId,
     );
 
-    if (existingEnrollment?.status === "ACTIVE") {
+    if (enrollment?.status === "ACTIVE") {
       throw new Error("User is already enrolled in this batch.");
     }
 
-    // Never trust the amount submitted by the client.
-    const expectedAmount = Number(batch.discountPrice);
+    const originalPrice = Number(batch.originalPrice);
 
-    if (!Number.isFinite(expectedAmount) || expectedAmount < 0) {
-      throw new Error("Batch price is invalid.");
+    if (!Number.isFinite(originalPrice) || originalPrice <= 0) {
+      throw new Error("Original batch price is invalid.");
     }
 
-    // Free purchases should use a separate enrollment flow.
-    if (expectedAmount === 0) {
-      throw new Error("This batch is free. Use the free enrollment flow.");
+    const discountPrice =
+      batch.discountPrice == null ? null : Number(batch.discountPrice);
+
+    if (
+      discountPrice !== null &&
+      (!Number.isFinite(discountPrice) ||
+        discountPrice <= 0 ||
+        discountPrice > originalPrice)
+    ) {
+      throw new Error("Discount batch price is invalid.");
     }
 
-    // Override the client-provided amount and status.
-    const orderData = {
-      ...data,
-      amount: String(expectedAmount),
+    const amount = discountPrice ?? originalPrice;
+
+    const amountInPaise = Math.round(amount * 100);
+    console.log("type of amout-paise", typeof(amountInPaise));
+
+    if (!Number.isSafeInteger(amountInPaise) || amountInPaise <= 0) {
+      throw new Error("Batch price cannot be processed.");
+    }
+
+    if (Math.abs(amount * 100 - amountInPaise) > 1e-7) {
+      throw new Error("Batch price must have at most two decimal places.");
+    }
+
+    const validatedOrder = createOrderSchema.parse({
+      userId,
+      batchId,
+      amount: amount.toFixed(2),
       status: "PENDING",
-    } as NewOrder;
+    });
 
-    return this.orderRepo.create(orderData);
+    const localOrder = await this.orderRepo.create({
+      userId: validatedOrder.userId,
+      batchId: validatedOrder.batchId,
+      amount: validatedOrder.amount,
+      status: validatedOrder.status,
+    } satisfies NewOrder);
+
+    let razorpayOrderCreated = false;
+
+    try {
+      const razorpayOrder = await razorpay.orders.create({
+        amount: amountInPaise,
+        currency: "INR",
+        receipt: `order_${localOrder.id}`,
+        notes: {
+          internalOrderId: localOrder.id,
+          userId,
+          batchId,
+        },
+      });
+
+      razorpayOrderCreated = true;
+
+      const updatedOrder = await this.orderRepo.update(localOrder.id, {
+        razorpayOrderId: razorpayOrder.id,
+      });
+
+      if (!updatedOrder) {
+        throw new Error(
+          "Razorpay order was created, but local order synchronization failed.",
+        );
+      }
+
+      return {
+        id: updatedOrder.id,
+        amount: amount.toFixed(2),
+        currency: "INR",
+        razorpayOrderId: razorpayOrder.id,
+        keyId: razorpayKeyId,
+      };
+    } catch (error) {
+      console.error(
+        razorpayOrderCreated
+          ? "Razorpay order created, but local synchronization failed."
+          : "Razorpay order creation failed or its outcome is uncertain.",
+        {
+          localOrderId: localOrder.id,
+          error,
+        },
+      );
+
+      throw error;
+    }
   }
 
-  // 2. Get an order by internal database ID
+  /**
+   * Retrieve an order by its internal ID.
+   */
   async getOrderById(id: string) {
     if (!id) {
       throw new Error("Order ID is required.");
@@ -80,7 +173,9 @@ export class OrderService {
     return order;
   }
 
-  // 3. Get a user's order history
+  /**
+   * Retrieve all orders for a user.
+   */
   async getUserOrders(userId: string) {
     if (!userId) {
       throw new Error("User ID is required.");
@@ -89,7 +184,9 @@ export class OrderService {
     return this.orderRepo.findByUserId(userId);
   }
 
-  // 4. Find an order using Razorpay's order ID
+  /**
+   * Retrieve an order using its Razorpay order ID.
+   */
   async getOrderByRazorpayId(razorpayOrderId: string) {
     if (!razorpayOrderId) {
       throw new Error("Razorpay order ID is required.");
@@ -104,27 +201,36 @@ export class OrderService {
     return order;
   }
 
-  // 5. Update order status with transition checks
+  /**
+   * Update an order's status.
+   *
+   * This method must only be called by trusted server-side workflows.
+   * PAID must require verified payment evidence.
+   */
   async updateOrderStatus(id: string, status: OrderStatus) {
+    if (!id) {
+      throw new Error("Order ID is required.");
+    }
+
     const existingOrder = await this.orderRepo.findById(id);
 
     if (!existingOrder) {
       throw new Error("Order not found.");
     }
 
-    // Idempotent repeat of the current status.
     if (existingOrder.status === status) {
       return existingOrder;
     }
 
-    // Terminal states cannot be changed through this method.
     if (existingOrder.status !== "PENDING") {
       throw new Error(
         `Cannot change order status from ${existingOrder.status} to ${status}.`,
       );
     }
 
-    const updatedOrder = await this.orderRepo.update(id, { status });
+    const updatedOrder = await this.orderRepo.update(id, {
+      status,
+    });
 
     if (!updatedOrder) {
       throw new Error("Failed to update order status.");

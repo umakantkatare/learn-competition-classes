@@ -1,13 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
+import { ZodError } from "zod";
 
 import { auth } from "@/lib/auth";
 import { OrderService } from "@/server/services/academic/order-service";
-import { createOrderSchema } from "@/validations/academic/academic-validations";
+import { createOrderRequestSchema } from "@/validations/academic/order-validation";
 
 const orderService = new OrderService();
 
-// GET: Fetch the authenticated user's orders
+const ADMIN_ROLES = new Set(["admin", "manager"]);
+
+function jsonError(message: string, status: number) {
+  return NextResponse.json(
+    {
+      success: false,
+      error: message,
+    },
+    { status },
+  );
+}
+
+function handleError(error: unknown, operation: string) {
+  console.error(`${operation} failed:`, error);
+
+  if (error instanceof ZodError) {
+    return jsonError(error.issues[0]?.message ?? "Invalid request data.", 400);
+  }
+
+  return jsonError("An unexpected error occurred.", 500);
+}
+
+// GET /api/orders
 export async function GET(req: NextRequest) {
   try {
     const session = await auth.api.getSession({
@@ -15,49 +38,39 @@ export async function GET(req: NextRequest) {
     });
 
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, error: "Authentication required." },
-        { status: 401 },
-      );
+      return jsonError("Authentication required.", 401);
     }
 
-    const { searchParams } = new URL(req.url);
-    const requestedUserId = searchParams.get("userId");
+    const requestedUserId = req.nextUrl.searchParams.get("userId");
 
-    // Users cannot fetch another user's orders.
-    // ADMIN/MANAGER may query another user if explicitly requested.
     const role = session.user.role ?? "";
-    const isAdminOrManager = ["admin", "manager"].includes(role);
+    const isAdminOrManager = ADMIN_ROLES.has(role);
 
     if (
       requestedUserId &&
       requestedUserId !== session.user.id &&
       !isAdminOrManager
     ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "You are not authorized to view these orders.",
-        },
-        { status: 403 },
-      );
+      return jsonError("You are not authorized to view these orders.", 403);
     }
 
     const userId = requestedUserId || session.user.id;
+
     const orders = await orderService.getUserOrders(userId);
 
-    return NextResponse.json({ success: true, data: orders }, { status: 200 });
-  } catch (error: unknown) {
-    console.error("GET /api/orders error:", error);
-
     return NextResponse.json(
-      { success: false, error: "Failed to fetch orders." },
-      { status: 500 },
+      {
+        success: true,
+        data: orders,
+      },
+      { status: 200 },
     );
+  } catch (error: unknown) {
+    return handleError(error, "GET /api/orders");
   }
 }
 
-// POST: Create a pending order for the authenticated user
+// POST /api/orders
 export async function POST(req: NextRequest) {
   try {
     const session = await auth.api.getSession({
@@ -65,10 +78,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, error: "Authentication required." },
-        { status: 401 },
-      );
+      return jsonError("Authentication required.", 401);
     }
 
     let body: unknown;
@@ -76,46 +86,32 @@ export async function POST(req: NextRequest) {
     try {
       body = await req.json();
     } catch {
-      return NextResponse.json(
-        { success: false, error: "Invalid JSON request body." },
-        { status: 400 },
+      return jsonError("Invalid JSON request body.", 400);
+    }
+
+    const validation = createOrderRequestSchema.safeParse(body);
+
+    if (!validation.success) {
+      return jsonError(
+        validation.error.issues[0]?.message ?? "Invalid order data.",
+        400,
       );
     }
 
-    const validationResult = createOrderSchema.safeParse(body);
-
-    if (!validationResult.success) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            validationResult.error.issues[0]?.message ?? "Invalid order data.",
-        },
-        { status: 400 },
-      );
-    }
-
-    // Use the authenticated user's ID rather than trusting a client-supplied userId.
-    // This assumes createOrder accepts an input containing userId.
-    const newOrder = await orderService.createOrder({
-      ...validationResult.data,
+    const order = await orderService.createOrder({
       userId: session.user.id,
+      batchId: validation.data.batchId,
     });
 
     return NextResponse.json(
       {
         success: true,
         message: "Order created successfully.",
-        data: newOrder,
+        data: order,
       },
       { status: 201 },
     );
   } catch (error: unknown) {
-    console.error("POST /api/orders error:", error);
-
-    return NextResponse.json(
-      { success: false, error: "Failed to create order." },
-      { status: 500 },
-    );
+    return handleError(error, "POST /api/orders");
   }
 }

@@ -4,7 +4,6 @@ import {
   batchStatusEnum,
   lectureTypeEnum,
   lectureStatusEnum,
-  orderStatusEnum,
   paymentStatusEnum,
   enrollmentStatusEnum,
 } from "@/db/schema/academic-enums";
@@ -13,7 +12,6 @@ export const batchMediumSchema = z.enum(batchMediumEnum.enumValues);
 export const batchStatusSchema = z.enum(batchStatusEnum.enumValues);
 export const lectureTypeSchema = z.enum(lectureTypeEnum.enumValues);
 export const lectureStatusSchema = z.enum(lectureStatusEnum.enumValues);
-export const orderStatusSchema = z.enum(orderStatusEnum.enumValues);
 export const paymentStatusSchema = z.enum(paymentStatusEnum.enumValues);
 export const enrollmentStatusSchema = z.enum(enrollmentStatusEnum.enumValues);
 
@@ -243,19 +241,6 @@ export const batchLectureSchema = z.object({
   lectureId: idSchema,
 });
 
-export const createOrderSchema = z.object({
-  userId: idSchema,
-  batchId: idSchema,
-  amount: decimalSchema,
-  status: orderStatusSchema.default("PENDING"),
-  razorpayOrderId: z.string().trim().optional().nullable(),
-});
-
-export const updateOrderStatusSchema = z.object({
-  status: orderStatusSchema,
-  razorpayOrderId: z.string().trim().optional(),
-});
-
 export const createPaymentSchema = z.object({
   orderId: idSchema,
   userId: idSchema,
@@ -302,7 +287,6 @@ export type CreateSubjectInput = z.infer<typeof createSubjectSchema>;
 export type CreateChapterInput = z.infer<typeof createChapterSchema>;
 export type CreateLectureInput = z.infer<typeof createLectureSchema>;
 export type UpdateLectureInput = z.infer<typeof updateLectureSchema>;
-export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 export type CreatePaymentInput = z.infer<typeof createPaymentSchema>;
 export type VerifyRazorpayPaymentInput = z.infer<
   typeof verifyRazorpayPaymentSchema
