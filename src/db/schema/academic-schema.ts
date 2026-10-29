@@ -331,6 +331,7 @@ export const payments = pgTable(
   (table) => [
     index("payments_orderId_idx").on(table.orderId),
     index("payments_userId_idx").on(table.userId),
+    index("payments_status_idx").on(table.status),
   ],
 );
 

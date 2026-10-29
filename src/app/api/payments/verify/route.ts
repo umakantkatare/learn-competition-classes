@@ -3,17 +3,69 @@ import { headers } from "next/headers";
 
 import { auth } from "@/lib/auth";
 import { PaymentService } from "@/server/services/academic/payment-service";
-import { verifyRazorpayPaymentSchema } from "@/validations/academic/academic-validations";
+import { verifyRazorpayPaymentSchema } from "@/validations/academic/payment-validation";
 
 const paymentService = new PaymentService();
 
-function jsonError(message: string, status: number) {
+const NO_STORE_HEADERS = {
+  "Cache-Control": "no-store",
+};
+
+type ErrorResponse = {
+  success: false;
+  error: string;
+  code?: string;
+};
+
+class PaymentRouteError extends Error {
+  constructor(
+    message: string,
+    public readonly statusCode: number,
+    public readonly code: string,
+  ) {
+    super(message);
+    this.name = "PaymentRouteError";
+  }
+}
+
+function jsonError(message: string, status: number, code?: string) {
+  const body: ErrorResponse = {
+    success: false,
+    error: message,
+    ...(code ? { code } : {}),
+  };
+
+  return NextResponse.json(body, {
+    status,
+    headers: NO_STORE_HEADERS,
+  });
+}
+
+function jsonSuccess<T>(data: T, message: string) {
   return NextResponse.json(
-    { success: false, error: message },
     {
-      status,
-      headers: { "Cache-Control": "no-store" },
+      success: true,
+      message,
+      data,
     },
+    {
+      status: 200,
+      headers: NO_STORE_HEADERS,
+    },
+  );
+}
+
+function handleRouteError(error: unknown) {
+  if (error instanceof PaymentRouteError) {
+    return jsonError(error.message, error.statusCode, error.code);
+  }
+
+  console.error("[POST /api/payments/verify] Unexpected error:", error);
+
+  return jsonError(
+    "Payment verification failed. Please try again.",
+    500,
+    "PAYMENT_VERIFICATION_FAILED",
   );
 }
 
@@ -25,35 +77,33 @@ export async function POST(req: NextRequest) {
     });
 
     if (!session) {
-      return jsonError("Authentication required.", 401);
+      return jsonError("Authentication required.", 401, "UNAUTHENTICATED");
     }
 
-    // 2. Parse JSON safely.
+    // 2. Parse the request body.
     let body: unknown;
 
     try {
       body = await req.json();
     } catch {
-      return jsonError("Invalid JSON request body.", 400);
+      return jsonError("Invalid JSON request body.", 400, "INVALID_JSON");
     }
 
-    // 3. Validate the Razorpay verification payload.
-    const validationResult = verifyRazorpayPaymentSchema.safeParse(body);
+    // 3. Validate request data.
+    const validation = verifyRazorpayPaymentSchema.safeParse(body);
 
-    if (!validationResult.success) {
+    if (!validation.success) {
       return jsonError(
-        validationResult.error.issues[0]?.message ??
+        validation.error.issues[0]?.message ??
           "Invalid payment verification data.",
         400,
+        "VALIDATION_ERROR",
       );
     }
 
-    const { orderId, razorpayPaymentId, razorpaySignature } =
-      validationResult.data;
+    const { orderId, razorpayPaymentId, razorpaySignature } = validation.data;
 
-    // 4. Verify the payment and process enrollment.
-    // The service MUST verify order ownership, the Razorpay signature,
-    // payment status, amount, currency, and duplicate processing.
+    // 4. Verify payment and process enrollment.
     const result = await paymentService.verifyAndProcessPayment(
       orderId,
       razorpayPaymentId,
@@ -61,46 +111,9 @@ export async function POST(req: NextRequest) {
       session.user.id,
     );
 
-    return NextResponse.json(
-      {
-        success: true,
-        message: result.message,
-        data: result.payment,
-      },
-      {
-        status: 200,
-        headers: { "Cache-Control": "no-store" },
-      },
-    );
+    // 5. Return a consistent success response.
+    return jsonSuccess(result.payment, result.message);
   } catch (error) {
-    // Keep internal errors in server logs only.
-    console.error(
-      "[POST /api/payments/verify] Payment verification failed.",
-      error,
-    );
-
-    // Map known business errors to client responses.
-    // Adapt these patterns to the actual service error messages.
-    const message = error instanceof Error ? error.message : "";
-
-    if (/invalid signature|invalid payment signature/i.test(message)) {
-      return jsonError("Payment signature verification failed.", 400);
-    }
-
-    if (/order not found|payment not found/i.test(message)) {
-      return jsonError("Order or payment not found.", 404);
-    }
-
-    if (/does not belong|unauthorized order|order ownership/i.test(message)) {
-      return jsonError("You are not authorized to verify this order.", 403);
-    }
-
-    if (
-      /amount mismatch|currency mismatch|payment not captured/i.test(message)
-    ) {
-      return jsonError("Payment details could not be verified.", 400);
-    }
-
-    return jsonError("Payment verification failed. Please try again.", 500);
+    return handleRouteError(error);
   }
 }

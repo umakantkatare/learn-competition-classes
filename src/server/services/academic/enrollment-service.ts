@@ -1,5 +1,8 @@
+import "server-only";
+
 import {
   EnrollmentRepository,
+  type Enrollment,
   type NewEnrollment,
 } from "@/server/repositories/academic/enrollment-repository";
 
@@ -22,65 +25,66 @@ export class EnrollmentService {
   private static readonly MAX_ID_LENGTH = 128;
 
   constructor(
-    private readonly enrollmentRepo: EnrollmentRepository = new EnrollmentRepository(),
-    private readonly batchRepo: BatchRepository = new BatchRepository(),
+    private readonly enrollmentRepo = new EnrollmentRepository(),
+    private readonly batchRepo = new BatchRepository(),
   ) {}
 
-  // 1. Common validation helpers
+  // ─────────────────────────────────────────────
+  // Validation helpers
+  // ─────────────────────────────────────────────
 
-  private validateId(value: string, fieldName: string): string {
-    if (typeof value !== "string") {
-      throw new EnrollmentError(`${fieldName} must be a string.`, 400);
+  private validateId(value: string, fieldName: string): void {
+    if (
+      typeof value !== "string" ||
+      value.trim().length === 0 ||
+      value.length > EnrollmentService.MAX_ID_LENGTH
+    ) {
+      throw new EnrollmentError(`Invalid ${fieldName}.`, 400);
     }
-
-    const id = value.trim();
-
-    if (id.length === 0 || id.length > EnrollmentService.MAX_ID_LENGTH) {
-      throw new EnrollmentError(
-        `${fieldName} is required and must be valid.`,
-        400,
-      );
-    }
-
-    return id;
   }
 
-  private validateDate(value: unknown, fieldName: string): Date {
-    if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
-      throw new EnrollmentError(`${fieldName} must be a valid Date.`, 400);
+  private validateDate(
+    value: Date | null | undefined,
+    fieldName: string,
+  ): void {
+    if (
+      value != null &&
+      (!(value instanceof Date) || Number.isNaN(value.getTime()))
+    ) {
+      throw new EnrollmentError(`Invalid ${fieldName}.`, 400);
     }
-
-    return value;
   }
 
   private validatePositiveInteger(
     value: number,
     fieldName: string,
     max?: number,
-  ): number {
+  ): void {
     if (
-      !Number.isInteger(value) ||
-      value < 1 ||
+      !Number.isSafeInteger(value) ||
+      value <= 0 ||
       (max !== undefined && value > max)
     ) {
-      const message =
-        max === undefined
-          ? `${fieldName} must be a positive integer.`
-          : `${fieldName} must be between 1 and ${max}.`;
-
-      throw new EnrollmentError(message, 400);
+      throw new EnrollmentError(
+        max
+          ? `${fieldName} must be between 1 and ${max}.`
+          : `${fieldName} must be a positive integer.`,
+        400,
+      );
     }
-
-    return value;
   }
 
-  // 2. Expiry date calculation
+  // ─────────────────────────────────────────────
+  // Expiry helpers
+  // ─────────────────────────────────────────────
 
+  /**
+   * Add calendar months without allowing JavaScript's
+   * date overflow to move into an unexpected month.
+   *
+   * Example: January 31 + 1 month = February 28/29.
+   */
   private addMonths(date: Date, months: number): Date {
-    this.validateDate(date, "Start date");
-
-    this.validatePositiveInteger(months, "Months");
-
     const result = new Date(date);
     const originalDay = result.getDate();
 
@@ -100,84 +104,103 @@ export class EnrollmentService {
 
   private calculateExpiryDate(
     startDate: Date,
-    validityMonths: number | null,
+    validityMonths: number,
   ): Date | null {
-    this.validateDate(startDate, "Start date");
-
-    if (validityMonths === null) {
+    if (validityMonths === 0) {
       return null;
     }
 
     this.validatePositiveInteger(validityMonths, "Batch validity");
 
-    return this.addMonths(startDate, validityMonths);
-  }
+    const expiryDate = this.addMonths(startDate, validityMonths);
 
-  private isExpired(
-    enrollment: { expiresAt: Date | null },
-    now: Date = new Date(),
-  ): boolean {
-    if (enrollment.expiresAt === null) {
-      return false;
+    if (Number.isNaN(expiryDate.getTime())) {
+      throw new EnrollmentError("Failed to calculate enrollment expiry.", 500);
     }
 
-    this.validateDate(enrollment.expiresAt, "Enrollment expiry");
-
-    return enrollment.expiresAt.getTime() <= now.getTime();
+    return expiryDate;
   }
 
-  // 3. Enroll a student
+  private isExpired(expiresAt: Date | null, now = new Date()): boolean {
+    return expiresAt !== null && expiresAt.getTime() <= now.getTime();
+  }
 
-  async enrollStudent(userId: string, batchId: string, orderId?: string) {
-    const validUserId = this.validateId(userId, "User ID");
+  private assertEnrollmentCanBeModified(enrollmentRecord: Enrollment): void {
+    if (enrollmentRecord.status === "REFUNDED") {
+      throw new EnrollmentError("Refunded enrollment cannot be modified.", 409);
+    }
+  }
 
-    const validBatchId = this.validateId(batchId, "Batch ID");
+  private async requireEnrollment(enrollmentId: string): Promise<Enrollment> {
+    this.validateId(enrollmentId, "enrollment ID");
 
-    const validOrderId =
-      orderId === undefined ? undefined : this.validateId(orderId, "Order ID");
+    const record = await this.enrollmentRepo.findById(enrollmentId);
 
-    const batch = await this.batchRepo.findById(validBatchId);
+    if (!record) {
+      throw new EnrollmentError("Enrollment not found.", 404);
+    }
+
+    return record;
+  }
+
+  // ─────────────────────────────────────────────
+  // Create / Reactivate enrollment
+  // ─────────────────────────────────────────────
+
+  async enrollStudent(
+    userId: string,
+    batchId: string,
+    orderId?: string,
+  ): Promise<Enrollment> {
+    this.validateId(userId, "user ID");
+    this.validateId(batchId, "batch ID");
+
+    if (orderId !== undefined) {
+      this.validateId(orderId, "order ID");
+    }
+
+    const batch = await this.batchRepo.findById(batchId);
 
     if (!batch) {
-      throw new EnrollmentError("Batch does not exist.", 404);
+      throw new EnrollmentError("Batch not found.", 404);
     }
 
-    const existingEnrollment = await this.enrollmentRepo.checkEnrollment(
-      validUserId,
-      validBatchId,
-    );
+    const existing = await this.enrollmentRepo.checkEnrollment(userId, batchId);
 
     const now = new Date();
+    const expiresAt = this.calculateExpiryDate(now, batch.validityMonths!);
 
-    if (existingEnrollment) {
-      if (existingEnrollment.status === "REFUNDED") {
+    if (existing) {
+      this.assertEnrollmentCanBeModified(existing);
+
+      const isActiveAndValid =
+        existing.status === "ACTIVE" &&
+        !this.isExpired(existing.expiresAt, now);
+
+      if (isActiveAndValid) {
         throw new EnrollmentError(
-          "Re-enrollment after a refund requires an explicit policy.",
+          "Student is already enrolled in this batch.",
           409,
         );
       }
 
-      if (existingEnrollment.status === "ACTIVE") {
-        if (!this.isExpired(existingEnrollment, now)) {
-          throw new EnrollmentError(
-            "Student is already actively enrolled in this batch.",
-            409,
-          );
-        }
-      } else if (existingEnrollment.status !== "EXPIRED") {
+      if (existing.status !== "EXPIRED") {
         throw new EnrollmentError(
-          "Enrollment cannot be reactivated from its current status.",
+          "Enrollment cannot be reactivated in its current state.",
           409,
         );
       }
 
-      const expiresAt = this.calculateExpiryDate(now, batch.validityMonths);
-
-      const updated = await this.enrollmentRepo.update(existingEnrollment.id, {
+      const updateData: Partial<NewEnrollment> = {
         status: "ACTIVE",
         expiresAt,
-        ...(validOrderId !== undefined ? { orderId: validOrderId } : {}),
-      });
+      };
+
+      if (orderId !== undefined) {
+        updateData.orderId = orderId;
+      }
+
+      const updated = await this.enrollmentRepo.update(existing.id, updateData);
 
       if (!updated) {
         throw new EnrollmentError("Failed to reactivate enrollment.", 500);
@@ -186,12 +209,10 @@ export class EnrollmentService {
       return updated;
     }
 
-    const expiresAt = this.calculateExpiryDate(now, batch.validityMonths);
-
     const enrollmentData: NewEnrollment = {
-      userId: validUserId,
-      batchId: validBatchId,
-      ...(validOrderId !== undefined ? { orderId: validOrderId } : {}),
+      userId,
+      batchId,
+      orderId: orderId ?? null,
       status: "ACTIVE",
       expiresAt,
     };
@@ -199,56 +220,47 @@ export class EnrollmentService {
     return this.enrollmentRepo.create(enrollmentData);
   }
 
-  // 4. Check student access
+  // ─────────────────────────────────────────────
+  // Access validation
+  // ─────────────────────────────────────────────
 
   async hasValidAccess(userId: string, batchId: string): Promise<boolean> {
-    const validUserId = this.validateId(userId, "User ID");
+    this.validateId(userId, "user ID");
+    this.validateId(batchId, "batch ID");
 
-    const validBatchId = this.validateId(batchId, "Batch ID");
+    const record = await this.enrollmentRepo.checkEnrollment(userId, batchId);
 
-    const enrollment = await this.enrollmentRepo.checkEnrollment(
-      validUserId,
-      validBatchId,
-    );
-
-    if (!enrollment || enrollment.status !== "ACTIVE") {
+    if (!record || record.status !== "ACTIVE") {
       return false;
     }
 
-    return !this.isExpired(enrollment);
+    return !this.isExpired(record.expiresAt);
   }
 
-  // 5. Get all enrollments for a student
+  // ─────────────────────────────────────────────
+  // Read operations
+  // ─────────────────────────────────────────────
 
-  async getUserEnrollments(userId: string) {
-    const validUserId = this.validateId(userId, "User ID");
+  async getUserEnrollments(userId: string): Promise<Enrollment[]> {
+    this.validateId(userId, "user ID");
 
-    return this.enrollmentRepo.findUserEnrollments(validUserId);
+    return this.enrollmentRepo.findUserEnrollments(userId);
   }
 
-  // 6. Revoke enrollment
+  // ─────────────────────────────────────────────
+  // Revoke enrollment
+  // ─────────────────────────────────────────────
 
-  async revokeEnrollment(enrollmentId: string) {
-    const validEnrollmentId = this.validateId(enrollmentId, "Enrollment ID");
+  async revokeEnrollment(enrollmentId: string): Promise<Enrollment> {
+    const record = await this.requireEnrollment(enrollmentId);
 
-    const enrollment = await this.enrollmentRepo.findById(validEnrollmentId);
+    this.assertEnrollmentCanBeModified(record);
 
-    if (!enrollment) {
-      throw new EnrollmentError("Enrollment record not found.", 404);
+    if (record.status === "EXPIRED") {
+      return record;
     }
 
-    if (enrollment.status === "REFUNDED") {
-      throw new EnrollmentError(
-        "A refunded enrollment cannot be revoked.",
-        409,
-      );
-    }
-
-    if (enrollment.status === "EXPIRED") {
-      return enrollment;
-    }
-
-    const updated = await this.enrollmentRepo.update(validEnrollmentId, {
+    const updated = await this.enrollmentRepo.update(record.id, {
       status: "EXPIRED",
     });
 
@@ -259,37 +271,41 @@ export class EnrollmentService {
     return updated;
   }
 
-  // 7. Extend enrollment validity
+  // ─────────────────────────────────────────────
+  // Extend enrollment validity
+  // ─────────────────────────────────────────────
 
-  async extendValidity(enrollmentId: string, extraMonths: number) {
-    const validEnrollmentId = this.validateId(enrollmentId, "Enrollment ID");
-
+  async extendValidity(
+    enrollmentId: string,
+    extraMonths: number,
+  ): Promise<Enrollment> {
     this.validatePositiveInteger(
       extraMonths,
-      "Extension",
+      "Extension duration",
       EnrollmentService.MAX_EXTENSION_MONTHS,
     );
 
-    const enrollment = await this.enrollmentRepo.findById(validEnrollmentId);
+    const record = await this.requireEnrollment(enrollmentId);
 
-    if (!enrollment) {
-      throw new EnrollmentError("Enrollment record not found.", 404);
-    }
-
-    if (enrollment.status === "REFUNDED") {
-      throw new EnrollmentError("Cannot extend a refunded enrollment.", 409);
-    }
+    this.assertEnrollmentCanBeModified(record);
 
     const now = new Date();
 
-    const currentExpiry =
-      enrollment.expiresAt !== null && !this.isExpired(enrollment, now)
-        ? enrollment.expiresAt
+    const baseDate =
+      record.expiresAt && !this.isExpired(record.expiresAt, now)
+        ? record.expiresAt
         : now;
 
-    const expiresAt = this.addMonths(currentExpiry, extraMonths);
+    const expiresAt = this.addMonths(baseDate, extraMonths);
 
-    const updated = await this.enrollmentRepo.update(validEnrollmentId, {
+    if (Number.isNaN(expiresAt.getTime())) {
+      throw new EnrollmentError(
+        "Failed to calculate extended expiry date.",
+        500,
+      );
+    }
+
+    const updated = await this.enrollmentRepo.update(record.id, {
       expiresAt,
       status: "ACTIVE",
     });
@@ -301,44 +317,37 @@ export class EnrollmentService {
     return updated;
   }
 
-  // 8. Update expiry date only
+  // ─────────────────────────────────────────────
+  // Restricted enrollment update
+  // ─────────────────────────────────────────────
 
-  async updateEnrollment(enrollmentId: string, input: EnrollmentExpiryUpdate) {
-    const validEnrollmentId = this.validateId(enrollmentId, "Enrollment ID");
+  async updateEnrollment(
+    enrollmentId: string,
+    input: EnrollmentExpiryUpdate,
+  ): Promise<Enrollment> {
+    const record = await this.requireEnrollment(enrollmentId);
 
-    if (!input || typeof input !== "object" || Array.isArray(input)) {
-      throw new EnrollmentError("A valid update payload is required.", 400);
-    }
+    this.assertEnrollmentCanBeModified(record);
 
     const keys = Object.keys(input);
 
-    if (keys.length === 0 || keys.some((key) => key !== "expiresAt")) {
+    if (keys.length === 0) {
       throw new EnrollmentError(
-        "Only the enrollment expiry date can be updated.",
+        "At least one field is required to update enrollment.",
         400,
       );
     }
 
-    if (input.expiresAt !== undefined) {
-      if (input.expiresAt !== null) {
-        this.validateDate(input.expiresAt, "Expiry date");
-      }
-    }
-
-    const enrollment = await this.enrollmentRepo.findById(validEnrollmentId);
-
-    if (!enrollment) {
-      throw new EnrollmentError("Enrollment record not found.", 404);
-    }
-
-    if (enrollment.status === "REFUNDED") {
+    if (keys.some((key) => key !== "expiresAt")) {
       throw new EnrollmentError(
-        "A refunded enrollment cannot be updated.",
-        409,
+        "Only expiresAt can be updated through this operation.",
+        400,
       );
     }
 
-    const updated = await this.enrollmentRepo.update(validEnrollmentId, input);
+    this.validateDate(input.expiresAt, "expiry date");
+
+    const updated = await this.enrollmentRepo.update(record.id, input);
 
     if (!updated) {
       throw new EnrollmentError("Failed to update enrollment.", 500);

@@ -1,22 +1,83 @@
+import "server-only";
+
 import { createHmac, timingSafeEqual } from "node:crypto";
+
+import { razorpay } from "@/lib/razorpay";
 
 import {
   PaymentRepository,
-  NewPayment,
+  type NewPayment,
+  type Payment,
 } from "@/server/repositories/academic/payment-repository";
+
 import { OrderRepository } from "@/server/repositories/academic/order-repository";
 import { EnrollmentService } from "@/server/services/academic/enrollment-service";
 
-export class PaymentService {
-  private readonly paymentRepo: PaymentRepository;
-  private readonly orderRepo: OrderRepository;
-  private readonly enrollmentService: EnrollmentService;
+// ─────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────
 
-  constructor() {
-    this.paymentRepo = new PaymentRepository();
-    this.orderRepo = new OrderRepository();
-    this.enrollmentService = new EnrollmentService();
+type VerifyPaymentResult = {
+  success: true;
+  message: string;
+  payment: Payment;
+};
+
+type FailedPaymentResult = {
+  success: true;
+  message: string;
+  payment: Payment;
+};
+
+// ─────────────────────────────────────────────
+// Service
+// ─────────────────────────────────────────────
+
+export class PaymentService {
+  constructor(
+    private readonly paymentRepo = new PaymentRepository(),
+    private readonly orderRepo = new OrderRepository(),
+    private readonly enrollmentService = new EnrollmentService(),
+  ) {}
+
+  // ───────────────────────────────────────────
+  // Validation helpers
+  // ───────────────────────────────────────────
+
+  private validateRequiredString(value: string, fieldName: string): void {
+    if (typeof value !== "string" || value.trim().length === 0) {
+      throw new Error(`${fieldName} is required.`);
+    }
   }
+
+  /**
+   * Convert a decimal INR amount to paise without
+   * relying on floating-point multiplication.
+   *
+   * Examples:
+   * "100.00" -> 10000
+   * "99.50"  -> 9950
+   */
+  private toPaise(amount: string | number): number {
+    const value = String(amount).trim();
+
+    if (!/^\d+(?:\.\d{1,2})?$/.test(value)) {
+      throw new Error("Invalid payment amount.");
+    }
+
+    const [rupees, fraction = ""] = value.split(".");
+    const paise = Number(`${rupees}${fraction.padEnd(2, "0")}`);
+
+    if (!Number.isSafeInteger(paise) || paise <= 0) {
+      throw new Error("Payment amount must be positive.");
+    }
+
+    return paise;
+  }
+
+  // ───────────────────────────────────────────
+  // Razorpay signature verification
+  // ───────────────────────────────────────────
 
   private verifyRazorpaySignature(
     razorpayOrderId: string,
@@ -29,62 +90,83 @@ export class PaymentService {
       throw new Error("Razorpay secret is not configured.");
     }
 
-    if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
+    if (
+      !razorpayOrderId ||
+      !razorpayPaymentId ||
+      !/^[a-fA-F0-9]{64}$/.test(razorpaySignature)
+    ) {
       return false;
     }
 
     const expectedSignature = createHmac("sha256", secret)
       .update(`${razorpayOrderId}|${razorpayPaymentId}`)
-      .digest("hex");
+      .digest();
 
-    // timingSafeEqual throws when buffer lengths differ.
-    const expected = Buffer.from(expectedSignature, "hex");
-    const received = Buffer.from(razorpaySignature, "hex");
+    const receivedSignature = Buffer.from(razorpaySignature, "hex");
 
     return (
-      expected.length === received.length && timingSafeEqual(expected, received)
+      receivedSignature.length === expectedSignature.length &&
+      timingSafeEqual(expectedSignature, receivedSignature)
     );
   }
 
-  // 1. Create a payment-attempt record
-  async createPayment(data: NewPayment) {
+  // ───────────────────────────────────────────
+  // Create pending payment record
+  // ───────────────────────────────────────────
+
+  async createPayment(data: NewPayment): Promise<Payment> {
+    this.validateRequiredString(data.orderId, "Order ID");
+    this.validateRequiredString(data.userId, "User ID");
+
     const order = await this.orderRepo.findById(data.orderId);
 
     if (!order) {
       throw new Error("Order not found.");
     }
 
+    if (order.userId !== data.userId) {
+      throw new Error("Payment user does not match the order owner.");
+    }
+
     if (order.status !== "PENDING") {
       throw new Error("Only pending orders can be paid.");
     }
 
-    if (Number(data.amount) !== Number(order.amount)) {
+    if (this.toPaise(data.amount) !== this.toPaise(order.amount)) {
       throw new Error("Payment amount does not match the order amount.");
     }
 
-    // Never trust client-provided userId or payment status.
-    const paymentData = {
-      ...data,
+    return this.paymentRepo.create({
+      orderId: order.id,
       userId: order.userId,
       amount: order.amount,
       status: "PENDING",
-    } as NewPayment;
-
-    return this.paymentRepo.create(paymentData);
+      razorpayPaymentId: null,
+      razorpaySignature: null,
+    });
   }
 
-  // 2. Verify payment and enroll the student
+  // ───────────────────────────────────────────
+  // Verify and process successful payment
+  // ───────────────────────────────────────────
+
   async verifyAndProcessPayment(
     orderId: string,
     razorpayPaymentId: string,
     razorpaySignature: string,
     userId: string,
-  ) {
+  ): Promise<VerifyPaymentResult> {
+    this.validateRequiredString(orderId, "Order ID");
+    this.validateRequiredString(razorpayPaymentId, "Razorpay Payment ID");
+    this.validateRequiredString(razorpaySignature, "Razorpay Signature");
+    this.validateRequiredString(userId, "User ID");
+
     const order = await this.orderRepo.findById(orderId);
 
     if (!order) {
       throw new Error("Order not found.");
     }
+
     if (order.userId !== userId) {
       throw new Error("You are not authorized to access this order.");
     }
@@ -103,63 +185,109 @@ export class PaymentService {
       throw new Error("Invalid Razorpay payment signature.");
     }
 
-    // A verified signature alone does not prove payment capture.
-    // Confirm captured/paid status with Razorpay on the server
-    // or process a verified payment.captured webhook before marking PAID.
+    const razorpayPayment = await razorpay.payments.fetch(razorpayPaymentId);
+
+    if (razorpayPayment.order_id !== order.razorpayOrderId) {
+      throw new Error("Payment does not belong to this order.");
+    }
+
+    if (razorpayPayment.currency !== "INR") {
+      throw new Error("Payment currency does not match INR.");
+    }
+
+    const expectedAmount = this.toPaise(order.amount);
+
+    if (razorpayPayment.amount !== expectedAmount) {
+      throw new Error("Payment amount does not match the order amount.");
+    }
+
+    if (
+      razorpayPayment.status !== "captured" ||
+      razorpayPayment.captured !== true
+    ) {
+      throw new Error("Payment has not been captured successfully.");
+    }
 
     const existingPayment =
       await this.paymentRepo.findByRazorpayPaymentId(razorpayPaymentId);
 
-    if (existingPayment?.status === "SUCCESS") {
-      if (order.status === "PAID") {
+    if (existingPayment) {
+      if (
+        existingPayment.orderId !== order.id ||
+        existingPayment.userId !== order.userId
+      ) {
+        throw new Error("Payment record does not match the order.");
+      }
+
+      if (existingPayment.status === "SUCCESS") {
+        if (order.status !== "PAID") {
+          throw new Error(
+            "Payment is successful but the order needs reconciliation.",
+          );
+        }
+
         return {
           success: true,
           message: "Payment was already processed.",
           payment: existingPayment,
         };
       }
-
-      throw new Error(
-        "Payment is recorded as successful, but the order needs reconciliation.",
-      );
     }
 
     if (order.status === "PAID") {
-      throw new Error("Order is already paid.");
+      throw new Error(
+        "Order is already paid, but the payment record needs reconciliation.",
+      );
     }
 
     if (order.status !== "PENDING") {
       throw new Error("Order is not eligible for payment processing.");
     }
 
-    // TODO: Before changing the order, fetch payment details from
-    // Razorpay and verify the payment is captured and its amount,
-    // currency, and order ID match the database order.
+    const payment = existingPayment
+      ? await this.paymentRepo.update(existingPayment.id, {
+          razorpaySignature,
+          razorpayPaymentId,
+          amount: order.amount,
+          status: "SUCCESS",
+        })
+      : await this.paymentRepo.create({
+          orderId: order.id,
+          userId: order.userId,
+          razorpayPaymentId,
+          razorpaySignature,
+          amount: order.amount,
+          status: "SUCCESS",
+        });
 
-    const payment = await this.paymentRepo.create({
-      orderId: order.id,
-      userId: order.userId,
-      razorpayPaymentId,
-      razorpaySignature,
-      amount: order.amount,
-      status: "SUCCESS",
-    });
+    if (!payment) {
+      throw new Error("Failed to save the verified payment.");
+    }
 
     const updatedOrder = await this.orderRepo.update(order.id, {
       status: "PAID",
     });
 
     if (!updatedOrder) {
+      console.error("Payment succeeded, but order update failed.", {
+        orderId: order.id,
+        paymentId: razorpayPaymentId,
+      });
+
       throw new Error(
-        "Payment was recorded, but updating the order failed. Reconciliation is required.",
+        "Payment succeeded, but order processing needs reconciliation.",
       );
     }
 
-    await this.enrollmentService.enrollStudent(
+    const enrollment = await this.enrollmentService.enrollStudent(
       order.userId,
       order.batchId,
       order.id,
     );
+
+    if (!enrollment) {
+      throw new Error("Payment succeeded, but enrollment processing failed.");
+    }
 
     return {
       success: true,
@@ -168,17 +296,24 @@ export class PaymentService {
     };
   }
 
-  // 3. Record a failed payment attempt
+  // ───────────────────────────────────────────
+  // Handle failed payment
+  // ───────────────────────────────────────────
+
   async handleFailedPayment(
     orderId: string,
     userId: string,
-    errorReason: string | undefined,
-  ) {
+    _errorReason?: string,
+  ): Promise<FailedPaymentResult> {
+    this.validateRequiredString(orderId, "Order ID");
+    this.validateRequiredString(userId, "User ID");
+
     const order = await this.orderRepo.findById(orderId);
 
     if (!order) {
       throw new Error("Order not found.");
     }
+
     if (order.userId !== userId) {
       throw new Error("You are not authorized to access this order.");
     }
@@ -191,20 +326,29 @@ export class PaymentService {
       throw new Error("Order is not eligible for payment retries.");
     }
 
-    // Record the failed attempt without prematurely failing the order.
-    // errorReason can be logged server-side, but don't trust client text.
-    void errorReason;
-
-    return this.paymentRepo.create({
+    const payment = await this.paymentRepo.create({
       orderId: order.id,
       userId: order.userId,
       amount: order.amount,
       status: "FAILED",
+      razorpayPaymentId: null,
+      razorpaySignature: null,
     });
+
+    return {
+      success: true,
+      message: "Failed payment attempt recorded.",
+      payment,
+    };
   }
 
-  // 4. Get payment details by order ID
-  async getPaymentByOrderId(orderId: string) {
+  // ───────────────────────────────────────────
+  // Get payment by order ID
+  // ───────────────────────────────────────────
+
+  async getPaymentByOrderId(orderId: string): Promise<Payment> {
+    this.validateRequiredString(orderId, "Order ID");
+
     const payment = await this.paymentRepo.findByOrderId(orderId);
 
     if (!payment) {

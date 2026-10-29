@@ -1,3 +1,5 @@
+import "server-only";
+
 import { db } from "@/db";
 import { enrollment } from "@/db/schema/academic-schema";
 import { and, desc, eq } from "drizzle-orm";
@@ -8,18 +10,16 @@ export type NewEnrollment = typeof enrollment.$inferInsert;
 export type UpdateEnrollment = Partial<Omit<NewEnrollment, "id">>;
 
 export class EnrollmentRepository {
-  // Create enrollment
   async create(data: NewEnrollment): Promise<Enrollment> {
     const [result] = await db.insert(enrollment).values(data).returning();
 
     if (!result) {
-      throw new Error("Failed to create enrollment");
+      throw new Error("Failed to create enrollment.");
     }
 
     return result;
   }
 
-  // Find enrollment by ID
   async findById(id: string): Promise<Enrollment | undefined> {
     const [result] = await db
       .select()
@@ -30,7 +30,6 @@ export class EnrollmentRepository {
     return result;
   }
 
-  // Get all enrollments for a user, newest first
   async findUserEnrollments(userId: string): Promise<Enrollment[]> {
     return db
       .select()
@@ -39,7 +38,6 @@ export class EnrollmentRepository {
       .orderBy(desc(enrollment.createdAt));
   }
 
-  // Find enrollment for a specific user and batch
   async checkEnrollment(
     userId: string,
     batchId: string,
@@ -55,7 +53,6 @@ export class EnrollmentRepository {
     return result;
   }
 
-  // Find active enrollment for a user and batch
   async findActiveEnrollment(
     userId: string,
     batchId: string,
@@ -75,14 +72,11 @@ export class EnrollmentRepository {
     return result;
   }
 
-  // Update enrollment
   async update(
     id: string,
     data: UpdateEnrollment,
   ): Promise<Enrollment | undefined> {
-    if (Object.keys(data).length === 0) {
-      throw new Error("At least one field is required to update an enrollment");
-    }
+    this.validateUpdateData(data);
 
     const [result] = await db
       .update(enrollment)
@@ -91,5 +85,13 @@ export class EnrollmentRepository {
       .returning();
 
     return result;
+  }
+
+  private validateUpdateData(data: UpdateEnrollment): void {
+    if (Object.keys(data).length === 0) {
+      throw new Error(
+        "At least one field is required to update an enrollment.",
+      );
+    }
   }
 }
