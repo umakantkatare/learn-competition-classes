@@ -1,13 +1,14 @@
 "use server";
 
-import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { auth } from "@/lib/auth";
+import { AuthorizationError, getCurrentUser } from "@/lib/authorize";
+
 import { OrderService } from "@/server/services/academic/order-service";
 import { PaymentService } from "@/server/services/academic/payment-service";
-import { verifyRazorpayPaymentSchema } from "@/validations/academic/academic-validations";
+
+import { verifyRazorpayPaymentSchema } from "@/validations/academic/payment-validation";
 
 const paymentService = new PaymentService();
 const orderService = new OrderService();
@@ -24,6 +25,10 @@ function getErrorMessage(error: unknown): string {
     return error.issues[0]?.message ?? "Invalid input.";
   }
 
+  if (error instanceof AuthorizationError) {
+    return error.message;
+  }
+
   if (error instanceof Error) {
     return error.message;
   }
@@ -31,20 +36,10 @@ function getErrorMessage(error: unknown): string {
   return "An unexpected error occurred.";
 }
 
-async function getSession() {
-  return auth.api.getSession({
-    headers: await headers(),
-  });
-}
-
-async function requireAdminOrManager(): Promise<boolean> {
-  const session = await getSession();
-
-  return ["ADMIN", "MANAGER"].includes(session?.user?.role ?? "");
-}
-
-// 1. Payment records should be created by the trusted payment
-// processing service, not from arbitrary client-provided data.
+/**
+ * Payment records must only be created through
+ * verified payment processing or webhook handling.
+ */
 export async function createPaymentAction(): Promise<ActionResult> {
   return {
     success: false,
@@ -53,22 +48,27 @@ export async function createPaymentAction(): Promise<ActionResult> {
   };
 }
 
-// 2. Verify a Razorpay payment for an order owned by the user.
+/**
+ * Verify Razorpay payment and process enrollment.
+ */
 export async function verifyRazorpayPaymentAction(
   input: z.infer<typeof verifyRazorpayPaymentSchema>,
 ): Promise<ActionResult> {
   try {
-    const session = await getSession();
+    // 1. Authenticate the current user.
+    const user = await getCurrentUser();
 
-    if (!session?.user?.id) {
+    if (!user) {
       return {
         success: false,
         error: "You must be logged in to verify this payment.",
       };
     }
 
+    // 2. Validate client input.
     const validatedData = verifyRazorpayPaymentSchema.parse(input);
 
+    // 3. Fetch the order.
     const order = await orderService.getOrderById(validatedData.orderId);
 
     if (!order) {
@@ -78,32 +78,33 @@ export async function verifyRazorpayPaymentAction(
       };
     }
 
-    const isOwner = order.userId === session.user.id;
-    const isPrivileged = await requireAdminOrManager();
-
-    if (!isOwner && !isPrivileged) {
+    // 4. Verify order ownership.
+    // Only the order owner can initiate payment verification.
+    // Privileged support access should be implemented separately
+    // if explicitly required by your business rules.
+    if (order.userId !== user.id) {
       return {
         success: false,
         error: "You are not allowed to verify this order.",
       };
     }
 
-    // The service must verify the Razorpay signature AND confirm
-    // the actual payment status, amount, currency, and order ID
-    // with Razorpay before updating records or creating enrollment.
+    // 5. Verify the Razorpay payment and process enrollment.
     const result = await paymentService.verifyAndProcessPayment(
       validatedData.orderId,
       validatedData.razorpayPaymentId,
       validatedData.razorpaySignature,
+      user.id,
     );
 
+    // 6. Revalidate relevant dashboard pages.
     revalidatePath("/dashboard/my-courses");
     revalidatePath("/dashboard/purchases");
 
     return {
       success: true,
       data: result.payment,
-      message: "Payment verification completed.",
+      message: result.message,
     };
   } catch (error: unknown) {
     return {
@@ -113,9 +114,11 @@ export async function verifyRazorpayPaymentAction(
   }
 }
 
-// 3. Do not let the browser decide that a payment failed.
-// Failed/cancelled payments should be reconciled by a trusted
-// server-side verification flow or Razorpay webhook.
+/**
+ * The browser cannot independently declare a payment failed.
+ * Failure processing must use trusted server-side verification
+ * or a verified webhook.
+ */
 export async function handleFailedPaymentAction(): Promise<ActionResult> {
   return {
     success: false,
@@ -124,12 +127,14 @@ export async function handleFailedPaymentAction(): Promise<ActionResult> {
   };
 }
 
-// 4. Fetch payment details only for the order owner or an
-// authorized admin/manager.
+/**
+ * Retrieve payment details for the order owner.
+ */
 export async function getPaymentByOrderIdAction(
   orderId: string,
 ): Promise<ActionResult> {
   try {
+    // 1. Validate order ID.
     if (!orderId?.trim()) {
       return {
         success: false,
@@ -137,15 +142,17 @@ export async function getPaymentByOrderIdAction(
       };
     }
 
-    const session = await getSession();
+    // 2. Authenticate the current user.
+    const user = await getCurrentUser();
 
-    if (!session?.user?.id) {
+    if (!user) {
       return {
         success: false,
         error: "You must be logged in.",
       };
     }
 
+    // 3. Fetch the order.
     const order = await orderService.getOrderById(orderId);
 
     if (!order) {
@@ -155,16 +162,15 @@ export async function getPaymentByOrderIdAction(
       };
     }
 
-    const isOwner = order.userId === session.user.id;
-    const isPrivileged = await requireAdminOrManager();
-
-    if (!isOwner && !isPrivileged) {
+    // 4. Authorize access.
+    if (order.userId !== user.id) {
       return {
         success: false,
         error: "You are not allowed to access this payment.",
       };
     }
 
+    // 5. Fetch the payment.
     const payment = await paymentService.getPaymentByOrderId(orderId);
 
     return {

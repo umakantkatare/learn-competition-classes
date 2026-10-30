@@ -1,11 +1,11 @@
 "use server";
 
-import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { auth } from "@/lib/auth";
 import { ExamCategoryService } from "@/server/services/academic/exam-category-service";
+import { requireAdminOrManager } from "@/lib/authorize";
+
 import {
   createExamCategorySchema,
   updateExamCategorySchema,
@@ -18,6 +18,7 @@ type ActionResult<T> = {
   data?: T;
   message?: string;
   error?: string;
+  status?: number;
 };
 
 function getErrorMessage(error: unknown): string {
@@ -32,133 +33,241 @@ function getErrorMessage(error: unknown): string {
   return "An unexpected error occurred.";
 }
 
-async function requireAdmin(): Promise<boolean> {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+function parseExamCategoryFormData(formData: FormData) {
+  const rawData = Object.fromEntries(formData.entries());
+  const rawIsActive = rawData.isActive;
 
-  // Assumes your Better Auth user schema exposes a role field.
-  return session?.user?.role === "ADMIN";
+  return {
+    ...rawData,
+    isActive:
+      rawIsActive === "true"
+        ? true
+        : rawIsActive === "false"
+          ? false
+          : rawIsActive,
+  };
 }
 
-// 1. Create category
+/**
+ * Revalidate category pages used by both Admin and Manager.
+ */
+function revalidateExamCategoryPaths() {
+  revalidatePath("/admin/exam-categories");
+  revalidatePath("/manager/exam-categories");
+}
+
+/**
+ * Create an exam category.
+ * Accessible to Admin and Manager.
+ */
 export async function createExamCategoryAction(
-  formData: z.infer<typeof createExamCategorySchema>,
+  formData: FormData,
 ): Promise<ActionResult<unknown>> {
   try {
-    if (!(await requireAdmin())) {
-      return { success: false, error: "Unauthorized." };
+    const authorization = await requireAdminOrManager();
+
+    if (!authorization.authorized) {
+      return {
+        success: false,
+        error: authorization.error ?? "Authorization failed.",
+        message: authorization.message,
+        status: authorization.status,
+      };
     }
 
-    const parsed = createExamCategorySchema.safeParse(formData);
+    // Convert FormData values before validation.
+    const rawData = parseExamCategoryFormData(formData);
+
+    const parsed = createExamCategorySchema.safeParse(rawData);
 
     if (!parsed.success) {
       return {
         success: false,
         error: parsed.error.issues[0]?.message ?? "Invalid input.",
+        status: 400,
       };
     }
 
     const category = await examCategoryService.createCategory(parsed.data);
 
-    revalidatePath("/admin/exam-categories");
+    revalidateExamCategoryPaths();
 
     return {
       success: true,
       data: category,
       message: "Exam category created successfully.",
+      status: 201,
     };
   } catch (error: unknown) {
-    return { success: false, error: getErrorMessage(error) };
+    return {
+      success: false,
+      error: getErrorMessage(error),
+      status: 500,
+    };
   }
 }
 
-// 2. Update category
+/**
+ * Update an exam category.
+ * Accessible to Admin and Manager.
+ */
 export async function updateExamCategoryAction(
   id: string,
-  formData: z.infer<typeof updateExamCategorySchema>,
+  formData: FormData,
 ): Promise<ActionResult<unknown>> {
   try {
-    if (!(await requireAdmin())) {
-      return { success: false, error: "Unauthorized." };
+    const authorization = await requireAdminOrManager();
+
+    if (!authorization.authorized) {
+      return {
+        success: false,
+        error: authorization.error ?? "Authorization failed.",
+        message: authorization.message,
+        status: authorization.status,
+      };
     }
 
     if (!id?.trim()) {
-      return { success: false, error: "Category ID is required." };
+      return {
+        success: false,
+        error: "Exam category ID is required.",
+        status: 400,
+      };
     }
 
-    const parsed = updateExamCategorySchema.safeParse(formData);
+    // Convert FormData values before validation.
+    const rawData = parseExamCategoryFormData(formData);
+
+    const parsed = updateExamCategorySchema.safeParse(rawData);
 
     if (!parsed.success) {
       return {
         success: false,
         error: parsed.error.issues[0]?.message ?? "Invalid input.",
+        status: 400,
       };
     }
 
     const category = await examCategoryService.updateCategory(id, parsed.data);
 
-    revalidatePath("/admin/exam-categories");
+    revalidateExamCategoryPaths();
+
+    // Revalidate detail pages if these routes exist.
     revalidatePath(`/admin/exam-categories/${id}`);
+    revalidatePath(`/manager/exam-categories/${id}`);
 
     return {
       success: true,
       data: category,
       message: "Exam category updated successfully.",
+      status: 200,
     };
   } catch (error: unknown) {
-    return { success: false, error: getErrorMessage(error) };
+    return {
+      success: false,
+      error: getErrorMessage(error),
+      status: 500,
+    };
   }
 }
 
-// 3. Get categories
+/**
+ * Get exam categories.
+ *
+ * onlyActive = true:
+ * Returns active categories.
+ *
+ * onlyActive = false:
+ * Returns all categories and requires Admin or Manager authorization.
+ */
 export async function getExamCategoriesAction(
   onlyActive = true,
-): Promise<ActionResult<unknown[]>> {
+): Promise<ActionResult<unknown>> {
   try {
     if (typeof onlyActive !== "boolean") {
-      return { success: false, error: "Invalid filter." };
+      return {
+        success: false,
+        error: "Invalid onlyActive value.",
+        status: 400,
+      };
     }
 
-    // Inactive categories are admin-only.
-    if (!onlyActive && !(await requireAdmin())) {
-      return { success: false, error: "Unauthorized." };
+    if (!onlyActive) {
+      const authorization = await requireAdminOrManager();
+
+      if (!authorization.authorized) {
+        return {
+          success: false,
+          error: authorization.error ?? "Authorization failed.",
+          message: authorization.message,
+          status: authorization.status,
+        };
+      }
     }
 
     const categories = onlyActive
       ? await examCategoryService.getActiveCategories()
       : await examCategoryService.getAllCategories();
 
-    return { success: true, data: categories };
+    return {
+      success: true,
+      data: categories,
+      status: 200,
+    };
   } catch (error: unknown) {
-    return { success: false, error: getErrorMessage(error) };
+    return {
+      success: false,
+      error: getErrorMessage(error),
+      status: 500,
+    };
   }
 }
 
-// 4. Deactivate category
+/**
+ * Deactivate an exam category.
+ * Accessible to Admin and Manager.
+ */
 export async function deactivateExamCategoryAction(
   id: string,
 ): Promise<ActionResult<unknown>> {
   try {
-    if (!(await requireAdmin())) {
-      return { success: false, error: "Unauthorized." };
+    const authorization = await requireAdminOrManager();
+
+    if (!authorization.authorized) {
+      return {
+        success: false,
+        error: authorization.error ?? "Authorization failed.",
+        message: authorization.message,
+        status: authorization.status,
+      };
     }
 
     if (!id?.trim()) {
-      return { success: false, error: "Category ID is required." };
+      return {
+        success: false,
+        error: "Exam category ID is required.",
+        status: 400,
+      };
     }
 
-    const category = await examCategoryService.deactivateCategory(id);
+    const result = await examCategoryService.deactivateCategory(id);
 
-    revalidatePath("/admin/exam-categories");
+    revalidateExamCategoryPaths();
+
+    // Revalidate the homepage if it displays exam categories.
     revalidatePath("/");
 
     return {
       success: true,
-      data: category,
+      data: result,
       message: "Exam category deactivated successfully.",
+      status: 200,
     };
   } catch (error: unknown) {
-    return { success: false, error: getErrorMessage(error) };
+    return {
+      success: false,
+      error: getErrorMessage(error),
+      status: 500,
+    };
   }
 }

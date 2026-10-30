@@ -1,12 +1,11 @@
 "use server";
 
 import { headers } from "next/headers";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { auth } from "@/lib/auth";
 import { OrderService } from "@/server/services/academic/order-service";
-import { createOrderSchema } from "@/validations/academic/academic-validations";
+import { createOrderSchema } from "@/validations/academic/order-validation";
 
 const orderService = new OrderService();
 

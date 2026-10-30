@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
-import { Geist_Mono, Inter, Poppins, Roboto } from "next/font/google";
+import { Geist_Mono, Inter, Poppins, Roboto, Geist } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryProvider } from "@/providers/query-provider";
+import { cn } from "@/lib/utils";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 const poppins = Poppins({
   variable: "--font-poppins",
@@ -40,7 +43,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${poppins.variable} ${roboto.variable} ${inter.variable} ${geistMono.variable} h-full antialiased`}
+      className={cn("h-full", "antialiased", poppins.variable, roboto.variable, inter.variable, geistMono.variable, "font-sans", geist.variable)}
     >
       <body className="flex min-h-full flex-col bg-background text-text-primary">
         <QueryProvider>
