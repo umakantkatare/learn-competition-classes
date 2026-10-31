@@ -226,20 +226,53 @@ export function ExamCategoryTable({
 
                         <TableCell>
                           {category.iconUrl ? (
-                            <a
-                              href={category.iconUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
-                              aria-label={`Open icon for ${category.name}`}
-                            >
-                              View icon
-                              <ExternalLink className="size-3.5" />
-                            </a>
+                            <div className="flex items-center gap-3">
+                              {/* Icon preview */}
+                              <a
+                                href={category.iconUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted"
+                                aria-label={`Open icon for ${category.name}`}
+                              >
+                                <img
+                                  src={category.iconUrl}
+                                  alt={`${category.name} icon`}
+                                  className="size-full object-contain p-1"
+                                  loading="lazy"
+                                  onError={(event) => {
+                                    event.currentTarget.style.display = "none";
+                                  }}
+                                />
+                              </a>
+
+                              {/* Icon link */}
+                              <div className="min-w-0">
+                                <p className="max-w-32 truncate text-sm font-medium">
+                                  {category.name}
+                                </p>
+
+                                <a
+                                  href={category.iconUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary hover:underline"
+                                >
+                                  View original
+                                  <ExternalLink className="size-3" />
+                                </a>
+                              </div>
+                            </div>
                           ) : (
-                            <span className="text-sm text-muted-foreground">
-                              Not set
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <div className="flex size-12 items-center justify-center rounded-lg border border-dashed bg-muted">
+                                <Tags className="size-5 text-muted-foreground" />
+                              </div>
+
+                              <span className="text-sm text-muted-foreground">
+                                No icon
+                              </span>
+                            </div>
                           )}
                         </TableCell>
 

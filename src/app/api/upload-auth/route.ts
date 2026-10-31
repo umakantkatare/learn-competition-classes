@@ -3,46 +3,33 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
-    const publicKey = process.env.IMAGEKIT_PUBLIC_KEY;
     const privateKey = process.env.IMAGEKIT_PRIVATE_KEY;
+    const publicKey = process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY;
 
-    if (!publicKey || !privateKey) {
+    if (!privateKey || !publicKey) {
+      console.error("ImageKit environment variables are missing.");
+
       return NextResponse.json(
-        { message: "ImageKit is not configured" },
+        { error: "ImageKit is not configured." },
         { status: 500 },
       );
     }
 
     const authParams = getUploadAuthParams({
-      publicKey,
       privateKey,
+      publicKey,
     });
 
     return NextResponse.json({
       ...authParams,
       publicKey,
     });
-  } catch (error) {
-  //  if (error instanceof Error && error.message === "UNAUTHORIZED") {
-  //     return NextResponse.json(
-  //       { message: "Authentication required" },
-  //       { status: 401 },
-  //     );
-  //   }
-
-  //   if (error instanceof Error && error.message === "FORBIDDEN") {
-  //     return NextResponse.json(
-  //       { message: "Admin access required" },
-  //       { status: 403 },
-  //     );
-  //   }
-
-    console.error("ImageKit upload auth error:", error);
+  } catch (error: unknown) {
+    console.error("ImageKit upload authentication error:", error);
 
     return NextResponse.json(
-      { message: "Unable to authorize upload" },
+      { error: "Authentication for ImageKit failed." },
       { status: 500 },
     );
-  
   }
 }

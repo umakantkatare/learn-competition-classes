@@ -21,6 +21,13 @@ type ActionResult<T> = {
   status?: number;
 };
 
+export type ExamCategoryPayload = {
+  name: string;
+  slug: string;
+  isActive: boolean;
+  iconUrl: string | null;
+};
+
 function getErrorMessage(error: unknown): string {
   if (error instanceof z.ZodError) {
     return error.issues[0]?.message ?? "Invalid input.";
@@ -31,21 +38,6 @@ function getErrorMessage(error: unknown): string {
   }
 
   return "An unexpected error occurred.";
-}
-
-function parseExamCategoryFormData(formData: FormData) {
-  const rawData = Object.fromEntries(formData.entries());
-  const rawIsActive = rawData.isActive;
-
-  return {
-    ...rawData,
-    isActive:
-      rawIsActive === "true"
-        ? true
-        : rawIsActive === "false"
-          ? false
-          : rawIsActive,
-  };
 }
 
 /**
@@ -61,7 +53,7 @@ function revalidateExamCategoryPaths() {
  * Accessible to Admin and Manager.
  */
 export async function createExamCategoryAction(
-  formData: FormData,
+  payload: ExamCategoryPayload,
 ): Promise<ActionResult<unknown>> {
   try {
     const authorization = await requireAdminOrManager();
@@ -75,10 +67,8 @@ export async function createExamCategoryAction(
       };
     }
 
-    // Convert FormData values before validation.
-    const rawData = parseExamCategoryFormData(formData);
-
-    const parsed = createExamCategorySchema.safeParse(rawData);
+    // Validate the JSON payload directly.
+    const parsed = createExamCategorySchema.safeParse(payload);
 
     if (!parsed.success) {
       return {
@@ -113,7 +103,7 @@ export async function createExamCategoryAction(
  */
 export async function updateExamCategoryAction(
   id: string,
-  formData: FormData,
+  payload: ExamCategoryPayload,
 ): Promise<ActionResult<unknown>> {
   try {
     const authorization = await requireAdminOrManager();
@@ -135,10 +125,8 @@ export async function updateExamCategoryAction(
       };
     }
 
-    // Convert FormData values before validation.
-    const rawData = parseExamCategoryFormData(formData);
-
-    const parsed = updateExamCategorySchema.safeParse(rawData);
+    // Validate the JSON payload directly.
+    const parsed = updateExamCategorySchema.safeParse(payload);
 
     if (!parsed.success) {
       return {

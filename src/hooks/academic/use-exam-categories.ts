@@ -10,6 +10,13 @@ import {
 } from "@/actions/academic/exam-category-actions";
 import { ExamCategory } from "@/types/exam-category";
 
+export type ExamCategoryPayload = {
+  name: string;
+  slug: string;
+  isActive: boolean;
+  iconUrl: string | null;
+};
+
 // ─── Query Keys ─────────────────────────────────────────────────
 
 export const examCategoryKeys = {
@@ -47,9 +54,9 @@ export function useCreateExamCategory() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (formData: FormData) => {
-      const result = await createExamCategoryAction(formData);
-      console.log("create-exam", result);
+    mutationFn: async (payload: ExamCategoryPayload) => {
+      const result = await createExamCategoryAction(payload);
+
       if (!result.success) {
         throw new Error(result.error || "Failed to create exam category.");
       }
@@ -73,12 +80,12 @@ export function useUpdateExamCategory() {
   return useMutation({
     mutationFn: async ({
       id,
-      formData,
+      data,
     }: {
       id: string;
-      formData: FormData;
+      data: ExamCategoryPayload;
     }) => {
-      const result = await updateExamCategoryAction(id, formData);
+      const result = await updateExamCategoryAction(id, data);
 
       if (!result.success) {
         throw new Error(result.error || "Failed to update exam category.");

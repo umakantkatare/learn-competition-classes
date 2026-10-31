@@ -1,15 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Tags } from "lucide-react";
+import { Plus, } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-// import {
-//   Card,
-//   CardDescription,
-//   CardHeader,
-//   CardTitle,
-// } from "@/components/ui/card";
 
 import { ExamCategoryTable } from "@/components/exam-categories/exam-category-table";
 import { ExamCategoryDialog } from "@/components/exam-categories/exam-category-dialog";
