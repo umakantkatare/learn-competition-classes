@@ -1,13 +1,12 @@
+import { ReactNode } from "react";
 import Navbar from "@/components/navbar/navbar";
 import Footer from "@/components/footer/footer";
-import { ReactNode } from "react";
+import AppLayoutClient from "@/components/layouts/app-layout-client";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
-    <>
-      <Navbar />
+    <AppLayoutClient navbar={<Navbar />} footer={<Footer />}>
       {children}
-      <Footer />
-    </>
+    </AppLayoutClient>
   );
 }

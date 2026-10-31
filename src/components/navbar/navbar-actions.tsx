@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { LogIn, UserPlus } from "lucide-react";
 
 export default function NavbarActions() {
   return (

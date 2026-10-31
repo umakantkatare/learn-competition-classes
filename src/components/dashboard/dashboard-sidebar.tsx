@@ -13,11 +13,13 @@ import {
   UserRound,
   BarChart3,
   X,
+  Tags,
 } from "lucide-react";
 
 import type { UserRole } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import { Button } from "../ui/button";
+import Logo from "../common/logo";
 
 type NavItem = {
   label: string;
@@ -33,8 +35,10 @@ type DashboardSidebarProps = {
 
 const navigation: Record<UserRole, NavItem[]> = {
   admin: [
-    { label: "Overview", href: "/admin", icon: LayoutDashboard },
+    { label: "My Profile", href: "/admin", icon: UserRound },
     { label: "Managers", href: "/admin/managers", icon: Users },
+    { label: "Exam-Category", href: "/admin/exam-categories", icon: Tags },
+    { label: "Exams", href: "/admin/exams", icon: GraduationCap },
     { label: "Teachers", href: "/admin/teachers", icon: GraduationCap },
     { label: "Students", href: "/admin/students", icon: UserRound },
     { label: "Courses & Batches", href: "/admin/batches", icon: BookOpen },
@@ -42,21 +46,24 @@ const navigation: Record<UserRole, NavItem[]> = {
     { label: "Reports", href: "/admin/reports", icon: BarChart3 },
     { label: "Settings", href: "/admin/settings", icon: Settings },
   ],
+
   manager: [
-    { label: "Overview", href: "/manager", icon: LayoutDashboard },
+    { label: "My Profile", href: "/manager", icon: UserRound },
     { label: "Teachers", href: "/manager/teachers", icon: GraduationCap },
     { label: "Batches", href: "/manager/batches", icon: BookOpen },
     { label: "Live Classes", href: "/manager/live-classes", icon: Video },
     { label: "Enrollments", href: "/manager/enrollments", icon: ClipboardList },
   ],
+
   teacher: [
-    { label: "Overview", href: "/teacher", icon: LayoutDashboard },
+    { label: "My Profile", href: "/teacher", icon: UserRound },
     { label: "My Batches", href: "/teacher/batches", icon: BookOpen },
     { label: "Live Classes", href: "/teacher/live-classes", icon: Video },
     { label: "Students", href: "/teacher/students", icon: Users },
   ],
+
   student: [
-    { label: "Overview", href: "/student", icon: LayoutDashboard },
+    { label: "My Profile", href: "/student", icon: UserRound },
     { label: "My Courses", href: "/student/courses", icon: BookOpen },
     { label: "Live Classes", href: "/student/live-classes", icon: Video },
     { label: "My Tests", href: "/student/tests", icon: ClipboardList },
@@ -104,10 +111,9 @@ export function DashboardSidebar({
             onClick={onClose}
             className="flex items-center gap-3"
           >
-            <div className="flex size-10 items-center justify-center rounded-lg bg-brand-dark text-white">
-              <GraduationCap className="size-6" />
+            <div className="flex size-10 items-center justify-center rounded-lg text-white">
+              <Logo width={40} height={40} showName={false} />
             </div>
-
             <div>
               <p className="text-base font-bold leading-tight text-text-primary">
                 LCC Institute

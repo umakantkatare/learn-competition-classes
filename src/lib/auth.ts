@@ -29,11 +29,11 @@ export const auth = betterAuth({
     schema,
   }),
 
-  advanced: {
-    database: {
-      joins: true,
-    },
-  },
+  // advanced: {
+  //   database: {
+  //     joins: true,
+  //   },
+  // },
   session: {
     expiresIn: 60 * 60 * 24 * 7,
     updateAge: 60 * 60 * 24,

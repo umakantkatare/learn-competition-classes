@@ -21,7 +21,7 @@ export function DashboardShell({
   userName,
   userEmail,
   userImage,
-  title = "Overview",
+  title = "My Profile",
 }: DashboardShellProps) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 

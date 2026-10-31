@@ -7,6 +7,7 @@ import { ResultsBanner } from "@/components/home/results-banner";
 import { SuccessStories } from "@/components/home/success-stories";
 
 export default function HomePage() {
+ 
   return (
     <main className="bg-[#fffdf8]">
       <HeroSection />

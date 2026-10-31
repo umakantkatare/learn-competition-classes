@@ -1,50 +1,46 @@
 "use client";
-import NavbarLogo from "./navbar-logo";
+
+import Logo from "../common/logo";
 import NavbarLinks from "./navbar-links";
 import NavbarSearch from "./navbar-search";
 import NavbarActions from "./navbar-actions";
 import NavbarNotifications from "./navbar-notifications";
 import NavbarUserMenu from "./navbar-userMenu";
+
 import { authClient } from "@/lib/auth-client";
-import Logo from "../common/logo";
+import { DEFAULT_USER_ROLE } from "@/lib/permissions";
 
 export default function DesktopNavbar() {
-  const { data: session, isPending } = authClient.useSession();
-
-  const isLoggedIn = !!session?.user;
-
+  const { data: session } = authClient.useSession();
   const user = session?.user;
 
   return (
-    <div className="flex h-[120px] items-center justify-between rounded-xl border bg-white px-6 shadow-sm lg:px-10">
+    <header className="hidden w-full items-center justify-between rounded-xl border bg-white px-6 py-4 shadow-sm lg:flex lg:px-8 xl:px-10">
       <Logo width={80} height={80} />
+
       <NavbarLinks />
 
       <div className="flex shrink-0 items-center gap-4">
         <NavbarSearch />
 
-        {!isPending && (
+        {user ? (
           <>
-            {isLoggedIn && user ? (
-              <>
-                <div className="h-12 w-px bg-gray-200" />
+            <div className="h-10 w-px bg-gray-200" aria-hidden="true" />
 
-                <NavbarNotifications unreadCount={1} />
+            <NavbarNotifications unreadCount={0} />
 
-                <div className="h-12 w-px bg-gray-200" />
+            <div className="h-10 w-px bg-gray-200" aria-hidden="true" />
 
-                <NavbarUserMenu
-                  name={user.name || "Student"}
-                  role="Student"
-                  avatar={user.image || "/images/default-avatar.png"}
-                />
-              </>
-            ) : (
-              <NavbarActions />
-            )}
+            <NavbarUserMenu
+              name={user.name}
+              role={user.role!}
+              avatar={user.image}
+            />
           </>
+        ) : (
+          <NavbarActions />
         )}
       </div>
-    </div>
+    </header>
   );
 }

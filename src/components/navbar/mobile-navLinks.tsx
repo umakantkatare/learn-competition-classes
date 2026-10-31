@@ -13,11 +13,6 @@ const navItems = [
   { label: "Home", href: "/" },
   { label: "Courses", href: "/courses", dropdown: true },
   { label: "Live Classes", href: "/live-classes" },
-  {
-    label: "Test Series",
-    href: "/test-series",
-    dropdown: true,
-  },
   { label: "About", href: "/about" },
   { label: "Contact", href: "/contact" },
 ];
@@ -29,14 +24,6 @@ const dropdownItems: Record<string, { label: string; href: string }[]> = {
     { label: "Banking", href: "/courses/banking" },
     { label: "Railway", href: "/courses/railway" },
     { label: "MP Police", href: "/courses/mp-police" },
-  ],
-
-  "/test-series": [
-    { label: "All Test Series", href: "/test-series" },
-    { label: "SSC", href: "/test-series/ssc" },
-    { label: "Banking", href: "/test-series/banking" },
-    { label: "Railway", href: "/test-series/railway" },
-    { label: "MP Police", href: "/test-series/mp-police" },
   ],
 };
 
