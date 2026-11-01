@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import React, { useEffect, useState } from "react";
 
 interface IImageUploadForm {
@@ -153,7 +154,7 @@ const ImageUploadForm = () => {
               <p className="text-sm font-medium text-gray-700">Image Preview</p>
 
               <div className="overflow-hidden rounded-xl border border-gray-200 bg-gray-50 p-2">
-                <img
+                <Image
                   src={preview}
                   alt="Selected image preview"
                   className="h-64 w-full rounded-lg object-contain"

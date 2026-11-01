@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -177,7 +176,7 @@ export default function VerifyEmail({ email }: VerifyEmailProps) {
           </CardTitle>
 
           <CardDescription className="mt-2 text-xs leading-relaxed text-neutral-500">
-            We've sent a 6-digit verification code to
+            We&apos;ve sent a 6-digit verification code to
             <br />
             <span className="break-all font-semibold text-amber-500">
               {email || "your email address"}
@@ -233,7 +232,7 @@ export default function VerifyEmail({ email }: VerifyEmailProps) {
             />
 
             <div className="text-center text-xs text-neutral-500">
-              Didn't receive the code?{" "}
+              Didn&apos;t receive the code?{" "}
               {canResend ? (
                 <button
                   type="button"

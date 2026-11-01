@@ -46,7 +46,7 @@ export function DashboardHeader({
   const router = useRouter();
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-border bg-background/95 px-3 backdrop-blur-md transition-colors duration-200 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-border bg-white/95 px-3 backdrop-blur-md transition-colors duration-200 sm:px-6 lg:px-8">
       {/* Left: Mobile Menu + Page Title */}
       <div className="flex min-w-0 items-center gap-2 sm:gap-3">
         <Button
@@ -66,8 +66,7 @@ export function DashboardHeader({
           </h1>
 
           <p className="hidden text-xs text-text-secondary sm:block">
-            LCC <span className="mx-1 text-border">/</span>{" "}
-            {roleLabels[role]}
+            LCC <span className="mx-1 text-border">/</span> {roleLabels[role]}
           </p>
         </div>
       </div>

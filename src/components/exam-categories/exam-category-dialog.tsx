@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
+
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -14,12 +16,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+
 import {
   Field,
   FieldDescription,
   FieldError,
   FieldLabel,
 } from "@/components/ui/field";
+
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -65,6 +69,7 @@ const defaultValues: CreateExamCategoryInput = {
 };
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
+
 const ALLOWED_IMAGE_TYPES = new Set([
   "image/png",
   "image/jpeg",
@@ -78,20 +83,27 @@ export function ExamCategoryDialog({
   category,
 }: ExamCategoryDialogProps) {
   const isEditing = Boolean(category);
+
   const createMutation = useCreateExamCategory();
   const updateMutation = useUpdateExamCategory();
 
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
+
   const [previewUrl, setPreviewUrl] = useState<string | null>(
     category?.logo ?? null,
   );
+
   const [removeExistingIcon, setRemoveExistingIcon] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const objectUrlRef = useRef<string | null>(null);
 
   const isPending = createMutation.isPending || updateMutation.isPending;
+
   const isBusy = isPending || isUploading;
 
   const form = useForm<
@@ -100,12 +112,42 @@ export function ExamCategoryDialog({
     CreateExamCategoryOutput
   >({
     resolver: zodResolver(createExamCategorySchema),
-    defaultValues,
+    defaultValues: {
+      name: category?.name ?? "",
+      slug: category?.slug ?? "",
+      isActive: category?.isActive ?? true,
+    },
   });
 
-  // Reset form state whenever the dialog opens or the selected category changes.
+  /**
+   * Releases a temporary browser object URL.
+   * Remote ImageKit URLs must not be revoked.
+   */
+  function releaseObjectUrl() {
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
+    }
+  }
+
+  /**
+   * Cleanup only: no synchronous state updates inside this effect.
+   */
   useEffect(() => {
-    if (!open) return;
+    return () => {
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
+      }
+    };
+  }, []);
+
+  /**
+   * Reset the form when opening or closing the dialog.
+   * This runs in an event handler, not in an effect.
+   */
+  function resetForm() {
+    releaseObjectUrl();
 
     form.reset({
       name: category?.name ?? "",
@@ -119,52 +161,67 @@ export function ExamCategoryDialog({
     setRemoveExistingIcon(false);
     setUploadProgress(0);
 
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  }, [open, category, form]);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }
 
-  // Create a temporary preview URL for a locally selected file and release it on cleanup.
-  useEffect(() => {
-    if (!selectedFile) return;
-
-    const objectUrl = URL.createObjectURL(selectedFile);
-    setPreviewUrl(objectUrl);
-
-    return () => URL.revokeObjectURL(objectUrl);
-  }, [selectedFile]);
-
-  function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+  /**
+   * Validate the selected image and generate its preview.
+   */
+  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.currentTarget.files?.[0];
+
     if (!file) return;
 
     setFileError(null);
 
     if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
       setFileError("Choose a PNG, JPG, WEBP, or SVG image.");
+
       event.currentTarget.value = "";
       return;
     }
 
     if (file.size > MAX_FILE_SIZE) {
       setFileError("Image size must not exceed 5 MB.");
+
       event.currentTarget.value = "";
       return;
     }
 
+    releaseObjectUrl();
+
+    const objectUrl = URL.createObjectURL(file);
+
+    objectUrlRef.current = objectUrl;
+
     setSelectedFile(file);
+    setPreviewUrl(objectUrl);
     setRemoveExistingIcon(false);
     setUploadProgress(0);
   }
 
+  /**
+   * Remove the selected image or existing category icon.
+   */
   function handleRemoveImage() {
+    releaseObjectUrl();
+
     setSelectedFile(null);
     setFileError(null);
     setPreviewUrl(null);
     setRemoveExistingIcon(true);
     setUploadProgress(0);
 
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   }
 
+  /**
+   * Create or update an exam category.
+   */
   async function onSubmit(values: CreateExamCategoryOutput) {
     if (fileError || isBusy) return;
 
@@ -182,7 +239,11 @@ export function ExamCategoryDialog({
           onProgress: setUploadProgress,
         });
 
-        logo = uploaded.url!;
+        if (!uploaded.url) {
+          throw new Error("Image upload failed. Please try again.");
+        }
+
+        logo = uploaded.url;
       } else if (removeExistingIcon) {
         logo = null;
       }
@@ -194,23 +255,21 @@ export function ExamCategoryDialog({
         logo,
       };
 
-      // These mutations must send JSON, not FormData.
+      // Mutations send JSON, not FormData.
       if (category) {
         await updateMutation.mutateAsync({
           id: category.id,
           data: payload,
         });
+
         toast.success("Exam category updated successfully.");
       } else {
         await createMutation.mutateAsync(payload);
+
         toast.success("Exam category created successfully.");
       }
 
-      form.reset(defaultValues);
-      setSelectedFile(null);
-      setFileError(null);
-      setRemoveExistingIcon(false);
-      setPreviewUrl(null);
+      resetForm();
       onOpenChange(false);
     } catch (error: unknown) {
       toast.error(
@@ -224,21 +283,14 @@ export function ExamCategoryDialog({
     }
   }
 
+  /**
+   * Handle opening and closing through the dialog UI.
+   */
   function handleOpenChange(nextOpen: boolean) {
     if (isBusy) return;
 
+    resetForm();
     onOpenChange(nextOpen);
-
-    if (!nextOpen) {
-      form.reset(defaultValues);
-      setSelectedFile(null);
-      setFileError(null);
-      setPreviewUrl(null);
-      setRemoveExistingIcon(false);
-      setUploadProgress(0);
-
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
   }
 
   return (
@@ -248,6 +300,7 @@ export function ExamCategoryDialog({
           <DialogTitle>
             {isEditing ? "Edit Exam Category" : "Create Exam Category"}
           </DialogTitle>
+
           <DialogDescription>
             {isEditing
               ? "Update the exam category details and icon."
@@ -260,6 +313,7 @@ export function ExamCategoryDialog({
           className="space-y-5"
           noValidate
         >
+          {/* Category name */}
           <Controller
             control={form.control}
             name="name"
@@ -268,6 +322,7 @@ export function ExamCategoryDialog({
                 <FieldLabel htmlFor="name">
                   Category Name <span className="text-destructive">*</span>
                 </FieldLabel>
+
                 <Input
                   {...field}
                   id="name"
@@ -276,11 +331,13 @@ export function ExamCategoryDialog({
                   disabled={isBusy}
                   aria-invalid={fieldState.invalid}
                 />
+
                 {fieldState.error && <FieldError errors={[fieldState.error]} />}
               </Field>
             )}
           />
 
+          {/* Category slug */}
           <Controller
             control={form.control}
             name="slug"
@@ -289,6 +346,7 @@ export function ExamCategoryDialog({
                 <FieldLabel htmlFor="slug">
                   Slug <span className="text-destructive">*</span>
                 </FieldLabel>
+
                 <Input
                   {...field}
                   id="slug"
@@ -297,26 +355,32 @@ export function ExamCategoryDialog({
                   disabled={isBusy}
                   aria-invalid={fieldState.invalid}
                 />
+
                 <FieldDescription>
                   A URL-friendly identifier for this category.
                 </FieldDescription>
+
                 {fieldState.error && <FieldError errors={[fieldState.error]} />}
               </Field>
             )}
           />
 
+          {/* Category icon */}
           <Field data-invalid={Boolean(fileError)}>
             <FieldLabel>Category Icon</FieldLabel>
 
             <div className="space-y-3">
               {previewUrl ? (
                 <div className="relative flex min-h-36 items-center justify-center rounded-lg border border-dashed bg-muted/30 p-4">
-                  {/* Plain img supports local object URLs and remote ImageKit URLs. */}
-                  <img
+                  <Image
                     src={previewUrl}
                     alt="Category icon preview"
+                    width={96}
+                    height={96}
+                    unoptimized
                     className="h-24 w-24 rounded-md object-contain"
                   />
+
                   <Button
                     type="button"
                     variant="destructive"
@@ -339,11 +403,13 @@ export function ExamCategoryDialog({
                   <span className="rounded-full bg-background p-3 shadow-sm">
                     <ImagePlus className="h-6 w-6" />
                   </span>
+
                   <span className="text-sm font-medium">
                     Click to upload an icon
                   </span>
+
                   <span className="text-xs text-muted-foreground">
-                    PNG, JPG, WEBP, or SVG · Maximum 2 MB
+                    PNG, JPG, WEBP, or SVG · Maximum 5 MB
                   </span>
                 </button>
               )}
@@ -372,6 +438,7 @@ export function ExamCategoryDialog({
                     <span>Uploading icon…</span>
                     <span>{uploadProgress}%</span>
                   </div>
+
                   <div
                     className="h-2 overflow-hidden rounded-full bg-muted"
                     role="progressbar"
@@ -381,7 +448,9 @@ export function ExamCategoryDialog({
                   >
                     <div
                       className="h-full rounded-full bg-primary transition-all"
-                      style={{ width: `${uploadProgress}%` }}
+                      style={{
+                        width: `${uploadProgress}%`,
+                      }}
                     />
                   </div>
                 </div>
@@ -401,6 +470,7 @@ export function ExamCategoryDialog({
             </div>
           </Field>
 
+          {/* Active status */}
           <Controller
             control={form.control}
             name="isActive"
@@ -409,12 +479,14 @@ export function ExamCategoryDialog({
                 <div className="flex items-center justify-between gap-4 rounded-lg border p-4">
                   <div className="space-y-1">
                     <FieldLabel htmlFor="isActive">Active Status</FieldLabel>
+
                     <FieldDescription>
                       {field.value
                         ? "This category is active."
                         : "This category is inactive."}
                     </FieldDescription>
                   </div>
+
                   <Switch
                     id="isActive"
                     checked={field.value}
@@ -426,6 +498,7 @@ export function ExamCategoryDialog({
             )}
           />
 
+          {/* Form actions */}
           <DialogFooter className="gap-2 sm:gap-0">
             <Button
               type="button"
@@ -435,6 +508,7 @@ export function ExamCategoryDialog({
             >
               Cancel
             </Button>
+
             <Button type="submit" disabled={isBusy}>
               {isBusy ? (
                 <>

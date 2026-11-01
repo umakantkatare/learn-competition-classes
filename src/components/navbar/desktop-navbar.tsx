@@ -8,7 +8,6 @@ import NavbarNotifications from "./navbar-notifications";
 import NavbarUserMenu from "./navbar-userMenu";
 
 import { authClient } from "@/lib/auth-client";
-import { DEFAULT_USER_ROLE } from "@/lib/permissions";
 
 export default function DesktopNavbar() {
   const { data: session } = authClient.useSession();
