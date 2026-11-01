@@ -34,6 +34,7 @@ export const auth = betterAuth({
   //     joins: true,
   //   },
   // },
+
   session: {
     expiresIn: 60 * 60 * 24 * 7,
     updateAge: 60 * 60 * 24,
@@ -80,8 +81,19 @@ export const auth = betterAuth({
         unique: true,
         trim: true,
       },
+
+      avatarFileId: {
+        type: "string",
+        required: false,
+        input: false,
+      },
     },
   },
+
+  deleteUser: {
+    enabled: true,
+  },
+
   socialProviders: {
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID as string,

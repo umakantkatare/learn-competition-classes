@@ -1,4 +1,5 @@
 import { requireDashboardRole } from "@/lib/require-dashboard-role";
+import Profile from "@/components/dashboard/profile/profile";
 
 export default async function AdminDashboardPage() {
   const user = await requireDashboardRole("admin");
@@ -7,6 +8,15 @@ export default async function AdminDashboardPage() {
     <main className="p-6">
       <h1 className="text-2xl font-bold">Admin Dashboard</h1>
       <p className="mt-2 text-muted-foreground">Welcome, {user.name}</p>
+      <Profile
+        userName={user.name}
+        userEmail={user.email}
+        phoneNumber={user.phoneNumber!}
+        userImage={user.image!}
+        role={user.role}
+        emailVerified={user.emailVerified}
+        createdAt={user.createdAt}
+      />{" "}
     </main>
   );
 }

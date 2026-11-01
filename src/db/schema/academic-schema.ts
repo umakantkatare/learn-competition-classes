@@ -26,7 +26,8 @@ export const examCategory = pgTable("exam_category", {
     .$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
-  iconUrl: text("icon_url"),
+  logo: text("logo"),
+  logoFileId: text("logo_file_id"),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -139,7 +140,9 @@ export const batch = pgTable(
     slug: text("slug").notNull().unique(),
     description: text("description").notNull(),
     thumbnail: text("thumbnail").notNull(),
+    thumbnailFileId: text("thumbnail_file_id"),
     previewVideo: text("preview_video"),
+    previewVideoFileId: text("preview_video_file_id"),
 
     originalPrice: decimal("original_price", {
       precision: 10,

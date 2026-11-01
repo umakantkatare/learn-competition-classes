@@ -38,7 +38,7 @@ const decimalSchema = z
 export const createExamCategorySchema = z.object({
   name: z.string().trim().min(2, "Category name is required").max(100),
   slug: slugSchema,
-  iconUrl: z.string().url("Invalid icon URL").optional().nullable(),
+  logo: z.string().url("Invalid icon URL").optional().nullable(),
   isActive: z.boolean().default(true),
 });
 

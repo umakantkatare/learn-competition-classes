@@ -7,7 +7,8 @@ import {
   Pencil,
   Ban,
   Tags,
-  ExternalLink,
+  RefreshCw,
+  ImageIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -16,10 +17,11 @@ import {
   useDeactivateExamCategory,
 } from "@/hooks/academic/use-exam-categories";
 
+import type { ExamCategory } from "@/types/exam-category";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-
 import {
   Card,
   CardContent,
@@ -27,7 +29,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-
 import {
   Table,
   TableBody,
@@ -36,14 +37,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
 import {
   AlertDialog,
   AlertDialogAction,
@@ -54,21 +53,61 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-
 import { Skeleton } from "@/components/ui/skeleton";
-import { ExamCategory } from "@/types/exam-category";
+import Image from "next/image";
 
 type ExamCategoryTableProps = {
   onEdit?: (category: ExamCategory) => void;
   canManage?: boolean;
 };
+interface CategoryLogoProps {
+  name: string;
+  logo?: string | null;
+}
+
+
+export function CategoryLogo({ name, logo }: CategoryLogoProps) {
+  const [hasError, setHasError] = useState(false);
+
+  if (!logo || hasError) {
+    return (
+      <div
+        className="flex size-12 shrink-0 items-center justify-center rounded-lg border border-dashed bg-muted"
+        aria-label={`No logo available for ${name}`}
+      >
+        <ImageIcon
+          className="size-5 text-muted-foreground"
+          aria-hidden="true"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <a
+      href={logo}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="relative flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted"
+      aria-label={`Open logo for ${name}`}
+    >
+      <Image
+        src={logo}
+        alt={`${name} logo`}
+        fill
+        sizes="48px"
+        className="object-contain p-1"
+        onError={() => setHasError(true)}
+      />
+    </a>
+  );
+}
 
 export function ExamCategoryTable({
   onEdit,
   canManage = false,
 }: ExamCategoryTableProps) {
   const [search, setSearch] = useState("");
-
   const [selectedCategory, setSelectedCategory] = useState<ExamCategory | null>(
     null,
   );
@@ -79,6 +118,7 @@ export function ExamCategoryTable({
     isError,
     error,
     refetch,
+    isFetching,
   } = useGetExamCategories(false);
 
   const deactivateMutation = useDeactivateExamCategory();
@@ -92,15 +132,15 @@ export function ExamCategoryTable({
     }
 
     return list.filter((category) => {
-      return (
-        category.name.toLowerCase().includes(query) ||
-        category.slug.toLowerCase().includes(query)
-      );
+      const name = String(category.name ?? "").toLowerCase();
+      const slug = String(category.slug ?? "").toLowerCase();
+
+      return name.includes(query) || slug.includes(query);
     });
   }, [categories, search]);
 
   async function handleDeactivate() {
-    if (!selectedCategory) {
+    if (!selectedCategory || deactivateMutation.isPending) {
       return;
     }
 
@@ -152,7 +192,11 @@ export function ExamCategoryTable({
 
         <CardContent>
           {isPending ? (
-            <div className="space-y-3" aria-label="Loading exam categories">
+            <div
+              className="space-y-3"
+              aria-label="Loading exam categories"
+              aria-busy="true"
+            >
               {Array.from({ length: 5 }).map((_, index) => (
                 <Skeleton key={index} className="h-14 w-full" />
               ))}
@@ -165,170 +209,140 @@ export function ExamCategoryTable({
                   : "Failed to load exam categories."}
               </p>
 
-              <Button variant="outline" onClick={() => void refetch()}>
-                Try again
+              <Button
+                variant="outline"
+                onClick={() => void refetch()}
+                disabled={isFetching}
+              >
+                <RefreshCw
+                  className={`mr-2 size-4 ${isFetching ? "animate-spin" : ""}`}
+                />
+                {isFetching ? "Retrying..." : "Try again"}
               </Button>
-            </div>
-          ) : filteredCategories.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-12 text-center">
-              <Tags className="size-10 text-muted-foreground/50" />
-
-              <p className="font-medium">
-                {search ? "No matching categories" : "No exam categories yet"}
-              </p>
-
-              <p className="text-sm text-muted-foreground">
-                {search
-                  ? "Try another search term."
-                  : "Create an exam category to get started."}
-              </p>
             </div>
           ) : (
             <>
-              <div className="mb-3 text-sm text-muted-foreground">
-                {filteredCategories.length}{" "}
-                {filteredCategories.length === 1 ? "category" : "categories"}{" "}
-                found
+              <div className="mb-3 flex items-center justify-between gap-3 text-sm text-muted-foreground">
+                <span>
+                  {filteredCategories.length}{" "}
+                  {filteredCategories.length === 1 ? "category" : "categories"}{" "}
+                  found
+                </span>
+
+                {isFetching && <span aria-live="polite">Updating...</span>}
               </div>
 
-              <div className="overflow-x-auto rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="min-w-52">Category</TableHead>
+              {filteredCategories.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 py-12 text-center">
+                  <Tags className="size-10 text-muted-foreground/50" />
 
-                      <TableHead className="min-w-48">Slug</TableHead>
+                  <p className="font-medium">
+                    {search.trim()
+                      ? "No matching categories"
+                      : "No exam categories yet"}
+                  </p>
 
-                      <TableHead className="min-w-32">Icon</TableHead>
+                  <p className="text-sm text-muted-foreground">
+                    {search.trim()
+                      ? "Try another search term."
+                      : "Create an exam category to get started."}
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="min-w-52">Category</TableHead>
 
-                      <TableHead className="min-w-28">Status</TableHead>
+                        <TableHead className="min-w-48">Slug</TableHead>
 
-                      {canManage && (
-                        <TableHead className="w-16 text-right">
-                          Actions
-                        </TableHead>
-                      )}
-                    </TableRow>
-                  </TableHeader>
+                        <TableHead className="min-w-28">Logo</TableHead>
 
-                  <TableBody>
-                    {filteredCategories.map((category) => (
-                      <TableRow key={category.id}>
-                        <TableCell className="font-medium">
-                          {category.name}
-                        </TableCell>
-
-                        <TableCell>
-                          <code className="rounded bg-muted px-2 py-1 text-xs">
-                            {category.slug}
-                          </code>
-                        </TableCell>
-
-                        <TableCell>
-                          {category.iconUrl ? (
-                            <div className="flex items-center gap-3">
-                              {/* Icon preview */}
-                              <a
-                                href={category.iconUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted"
-                                aria-label={`Open icon for ${category.name}`}
-                              >
-                                <img
-                                  src={category.iconUrl}
-                                  alt={`${category.name} icon`}
-                                  className="size-full object-contain p-1"
-                                  loading="lazy"
-                                  onError={(event) => {
-                                    event.currentTarget.style.display = "none";
-                                  }}
-                                />
-                              </a>
-
-                              {/* Icon link */}
-                              <div className="min-w-0">
-                                <p className="max-w-32 truncate text-sm font-medium">
-                                  {category.name}
-                                </p>
-
-                                <a
-                                  href={category.iconUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary hover:underline"
-                                >
-                                  View original
-                                  <ExternalLink className="size-3" />
-                                </a>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              <div className="flex size-12 items-center justify-center rounded-lg border border-dashed bg-muted">
-                                <Tags className="size-5 text-muted-foreground" />
-                              </div>
-
-                              <span className="text-sm text-muted-foreground">
-                                No icon
-                              </span>
-                            </div>
-                          )}
-                        </TableCell>
-
-                        <TableCell>
-                          <Badge
-                            variant={
-                              category.isActive ? "default" : "secondary"
-                            }
-                          >
-                            {category.isActive ? "Active" : "Inactive"}
-                          </Badge>
-                        </TableCell>
+                        <TableHead className="min-w-28">Status</TableHead>
 
                         {canManage && (
-                          <TableCell className="text-right">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger
-                                render={
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    aria-label={`Actions for ${category.name}`}
-                                  >
-                                    <MoreHorizontal className="size-4" />
-                                  </Button>
-                                }
-                              />
-
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem
-                                  onClick={() => onEdit?.(category)}
-                                >
-                                  <Pencil className="mr-2 size-4" />
-                                  Edit
-                                </DropdownMenuItem>
-
-                                {category.isActive && (
-                                  <DropdownMenuItem
-                                    className="text-destructive focus:text-destructive"
-                                    onClick={() =>
-                                      setSelectedCategory(category)
-                                    }
-                                  >
-                                    <Ban className="mr-2 size-4" />
-                                    Deactivate
-                                  </DropdownMenuItem>
-                                )}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
+                          <TableHead className="w-16 text-right">
+                            Actions
+                          </TableHead>
                         )}
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                    </TableHeader>
+
+                    <TableBody>
+                      {filteredCategories.map((category) => (
+                        <TableRow key={category.id}>
+                          <TableCell className="font-medium">
+                            {category.name}
+                          </TableCell>
+
+                          <TableCell>
+                            <code className="rounded bg-muted px-2 py-1 text-xs">
+                              {category.slug}
+                            </code>
+                          </TableCell>
+
+                          <TableCell>
+                            <CategoryLogo
+                              name={category.name}
+                              logo={category.logo}
+                            />
+                          </TableCell>
+
+                          <TableCell>
+                            <Badge
+                              variant={
+                                category.isActive ? "default" : "secondary"
+                              }
+                            >
+                              {category.isActive ? "Active" : "Inactive"}
+                            </Badge>
+                          </TableCell>
+
+                          {canManage && (
+                            <TableCell className="text-right">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger
+                                  render={
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      aria-label={`Actions for ${category.name}`}
+                                    >
+                                      <MoreHorizontal className="size-4" />
+                                    </Button>
+                                  }
+                                />
+
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    onClick={() => onEdit?.(category)}
+                                  >
+                                    <Pencil className="mr-2 size-4" />
+                                    Edit
+                                  </DropdownMenuItem>
+
+                                  {category.isActive && (
+                                    <DropdownMenuItem
+                                      className="text-destructive focus:text-destructive"
+                                      onClick={() =>
+                                        setSelectedCategory(category)
+                                      }
+                                    >
+                                      <Ban className="mr-2 size-4" />
+                                      Deactivate
+                                    </DropdownMenuItem>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
             </>
           )}
         </CardContent>
@@ -348,8 +362,8 @@ export function ExamCategoryTable({
 
             <AlertDialogDescription>
               <strong>{selectedCategory?.name}</strong> will be deactivated.
-              Existing records will not be deleted. You can continue only if you
-              have permission to perform this action.
+              Existing records will not be deleted. You can reactivate this
+              category later if your application supports reactivation.
             </AlertDialogDescription>
           </AlertDialogHeader>
 

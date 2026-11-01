@@ -23,6 +23,7 @@ export default async function DashboardLayout({
       userName={user.name}
       userEmail={user.email}
       userImage={user.image}
+      emailVerified={user.emailVerified}
     >
       {children}
     </DashboardShell>

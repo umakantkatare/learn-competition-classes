@@ -41,7 +41,7 @@ type ExamCategory = {
   id: string;
   name: string;
   slug: string;
-  iconUrl?: string | null;
+  logo?: string | null;
   isActive: boolean;
 };
 
@@ -49,7 +49,7 @@ type ExamCategoryPayload = {
   name: string;
   slug: string;
   isActive: boolean;
-  iconUrl: string | null;
+  logo: string | null;
 };
 
 interface ExamCategoryDialogProps {
@@ -86,7 +86,7 @@ export function ExamCategoryDialog({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(
-    category?.iconUrl ?? null,
+    category?.logo ?? null,
   );
   const [removeExistingIcon, setRemoveExistingIcon] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -115,7 +115,7 @@ export function ExamCategoryDialog({
 
     setSelectedFile(null);
     setFileError(null);
-    setPreviewUrl(category?.iconUrl ?? null);
+    setPreviewUrl(category?.logo ?? null);
     setRemoveExistingIcon(false);
     setUploadProgress(0);
 
@@ -172,7 +172,7 @@ export function ExamCategoryDialog({
     setUploadProgress(0);
 
     try {
-      let iconUrl: string | null = category?.iconUrl ?? null;
+      let logo: string | null = category?.logo ?? null;
 
       if (selectedFile) {
         const uploaded = await uploadFile({
@@ -182,16 +182,16 @@ export function ExamCategoryDialog({
           onProgress: setUploadProgress,
         });
 
-        iconUrl = uploaded.url!;
+        logo = uploaded.url!;
       } else if (removeExistingIcon) {
-        iconUrl = null;
+        logo = null;
       }
 
       const payload: ExamCategoryPayload = {
         name: values.name.trim(),
         slug: values.slug.trim(),
         isActive: values.isActive,
-        iconUrl,
+        logo,
       };
 
       // These mutations must send JSON, not FormData.

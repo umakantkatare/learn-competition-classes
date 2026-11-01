@@ -13,6 +13,7 @@ type DashboardShellProps = {
   userEmail: string;
   userImage?: string | null;
   title?: string;
+  emailVerified?: boolean;
 };
 
 export function DashboardShell({
@@ -49,7 +50,9 @@ export function DashboardShell({
           />
 
           <main className="w-full flex-1 p-4 sm:p-6 lg:p-8">
-            <div className="mx-auto w-full max-w-[1280px]">{children}</div>
+            <div className="mx-auto w-full max-w-[1280px] space-y-6">
+              {children}
+            </div>
           </main>
         </div>
       </div>

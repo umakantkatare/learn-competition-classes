@@ -14,7 +14,7 @@ export type ExamCategoryPayload = {
   name: string;
   slug: string;
   isActive: boolean;
-  iconUrl: string | null;
+  logo: string | null;
 };
 
 // ─── Query Keys ─────────────────────────────────────────────────

@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard,
   Users,
   GraduationCap,
   BookOpen,
@@ -20,6 +19,7 @@ import type { UserRole } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import { Button } from "../ui/button";
 import Logo from "../common/logo";
+import { SignOutButton } from "../auth/sign-out-button";
 
 type NavItem = {
   label: string;
@@ -106,27 +106,25 @@ export function DashboardSidebar({
       >
         {/* Branding */}
         <div className="flex h-16 shrink-0 items-center justify-between border-b border-border px-5">
-          <Link
-            href={`/${role}`}
-            onClick={onClose}
-            className="flex items-center gap-3"
-          >
-            <div className="flex size-10 items-center justify-center rounded-lg text-white">
-              <Logo width={40} height={40} showName={false} />
-            </div>
-            <div>
+          <div className="flex min-w-0 items-center gap-3">
+            <Logo width={40} height={40} showName={false} />
+
+            <div className="min-w-0">
               <p className="text-base font-bold leading-tight text-text-primary">
                 LCC Institute
               </p>
+
               <p className="text-xs text-text-secondary">{roleLabels[role]}</p>
             </div>
-          </Link>
+          </div>
 
           <Button
             type="button"
+            variant="ghost"
+            size="icon"
             aria-label="Close sidebar"
             onClick={onClose}
-            className="rounded-md p-2 text-text-secondary hover:bg-accent lg:hidden"
+            className="shrink-0 lg:hidden"
           >
             <X className="size-5" />
           </Button>
@@ -137,10 +135,6 @@ export function DashboardSidebar({
           aria-label={`${roleLabels[role]} navigation`}
           className="flex-1 space-y-1 overflow-y-auto p-4"
         >
-          <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-wider text-text-secondary">
-            Workspace
-          </p>
-
           {items.map((item) => {
             const active =
               pathname === item.href ||
@@ -179,16 +173,8 @@ export function DashboardSidebar({
           })}
         </nav>
 
-        {/* Footer */}
-        <div className="border-t border-border p-4">
-          <div className="rounded-lg bg-background p-3">
-            <p className="text-xs font-semibold text-text-primary">
-              LCC Institute
-            </p>
-            <p className="mt-1 text-xs text-text-secondary">
-              Learning Competition Classes
-            </p>
-          </div>
+        <div className="mt-auto shrink-0 border-t border-border p-4">
+          <SignOutButton variant="menu" />
         </div>
       </aside>
     </>
