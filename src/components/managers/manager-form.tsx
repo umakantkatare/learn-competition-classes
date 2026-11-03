@@ -1,11 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+
 import Image from "next/image";
 
 import { Controller, useForm } from "react-hook-form";
+
 import { zodResolver } from "@hookform/resolvers/zod";
+
 import { z } from "zod";
+
 import { toast } from "sonner";
 
 import {
@@ -24,16 +28,20 @@ import {
 import { upload } from "@imagekit/next";
 
 // Hooks
+
 import {
   useCreateManager,
   useUpdateManagerProfile,
 } from "@/hooks/academic/use-managers";
 
 // Validation
+
 import { createManagerProfileSchema } from "@/validations/academic/manager-validations";
 
 // UI
+
 import { Button } from "@/components/ui/button";
+
 import { Input } from "@/components/ui/input";
 
 import {
@@ -51,7 +59,9 @@ import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE } from "@/constants/image-size";
 
 // --------------------------------------------------
+
 // Types
+
 // --------------------------------------------------
 
 type ManagerFormValues = z.infer<typeof createManagerProfileSchema>;
@@ -62,38 +72,60 @@ interface ManagerFormProps {
   };
 
   onSuccessCallback?: () => void;
+
+  open?: boolean;
+
+  onOpenChange?: (open: boolean) => void;
+
+  // Hide internal trigger
+
+  hideTrigger?: boolean;
 }
 
 interface ImageKitAuthParams {
   token: string;
+
   expire: number;
+
   signature: string;
+
   publicKey: string;
 }
 
 // --------------------------------------------------
+
 // Default Values
+
 // --------------------------------------------------
 
 const getDefaultValues = (
   initialData?: ManagerFormProps["initialData"],
 ): ManagerFormValues => ({
   name: initialData?.name ?? "",
+
   email: initialData?.email ?? "",
+
   phoneNumber: initialData?.phoneNumber ?? "",
+
   employeeCode: initialData?.employeeCode ?? "",
+
   image: initialData?.image ?? null,
+
   avatarFileId: initialData?.avatarFileId ?? null,
 });
 
 // --------------------------------------------------
+
 // ImageKit Authenticator
+
 // --------------------------------------------------
 
 async function authenticator(): Promise<ImageKitAuthParams> {
   const response = await fetch("/api/upload-auth", {
     method: "GET",
+
     credentials: "include",
+
     cache: "no-store",
   });
 
@@ -105,62 +137,86 @@ async function authenticator(): Promise<ImageKitAuthParams> {
 }
 
 // --------------------------------------------------
+
 // Component
+
 // --------------------------------------------------
 
 export default function ManagerForm({
   initialData,
   onSuccessCallback,
+  open: controlledOpen,
+  onOpenChange,
+  hideTrigger = false,
 }: ManagerFormProps) {
-  // Dialog State
-  const [open, setOpen] = useState(false);
+  // Support internal Create dialog and externally controlled Edit dialog.
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
 
   // Upload States
+
   const [isUploading, setIsUploading] = useState(false);
+
   const [uploadProgress, setUploadProgress] = useState(0);
+
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   // Refs
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // Edit Mode
+
   const isEditing = Boolean(initialData);
 
   // --------------------------------------------------
+
   // Mutations
+
   // --------------------------------------------------
 
   const createManagerMutation = useCreateManager();
+
   const updateManagerMutation = useUpdateManagerProfile();
 
   const isPending =
     createManagerMutation.isPending || updateManagerMutation.isPending;
 
   // --------------------------------------------------
+
   // React Hook Form
+
   // --------------------------------------------------
 
   const form = useForm<ManagerFormValues>({
     resolver: zodResolver(createManagerProfileSchema),
+
     defaultValues: getDefaultValues(initialData),
   });
 
   const imageUrl = form.watch("image");
 
   // --------------------------------------------------
+
   // Reset Form
+
   // --------------------------------------------------
 
   useEffect(() => {
     if (!open) return;
 
     form.reset(getDefaultValues(initialData));
+
     setPreviewUrl(null);
   }, [initialData, open, form]);
 
   // --------------------------------------------------
+
   // Cleanup Object URL
+
   // --------------------------------------------------
 
   useEffect(() => {
@@ -172,7 +228,9 @@ export default function ManagerForm({
   }, [previewUrl]);
 
   // --------------------------------------------------
+
   // Cleanup Upload
+
   // --------------------------------------------------
 
   useEffect(() => {
@@ -182,53 +240,70 @@ export default function ManagerForm({
   }, []);
 
   // --------------------------------------------------
+
   // Image Upload
+
   // --------------------------------------------------
 
   async function handleImageUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
 
     // Allow selecting the same file again.
+
     event.target.value = "";
 
     if (!file) return;
 
     // Prevent multiple uploads.
+
     if (isUploading || isPending) return;
 
     // Validate image format.
+
     if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
       toast.error("Only JPEG, PNG and WebP images are allowed.");
+
       return;
     }
 
     // Validate image size.
+
     if (file.size > MAX_IMAGE_SIZE) {
       toast.error("Image size cannot exceed 5MB.");
+
       return;
     }
 
     // Generate local preview.
+
     const localPreview = URL.createObjectURL(file);
+
     setPreviewUrl(localPreview);
 
     const controller = new AbortController();
+
     abortControllerRef.current = controller;
 
     try {
       setIsUploading(true);
+
       setUploadProgress(0);
 
       // Get ImageKit authentication parameters.
+
       const authParams = await authenticator();
 
       // Upload image to ImageKit.
+
       const uploadResponse = await upload({
         ...authParams,
 
         file,
+
         fileName: file.name,
+
         useUniqueFileName: true,
+
         folder: "/managers",
 
         onProgress: (event) => {
@@ -244,18 +319,23 @@ export default function ManagerForm({
       });
 
       // Store ImageKit URL.
+
       form.setValue("image", uploadResponse.url, {
         shouldValidate: true,
+
         shouldDirty: true,
       });
 
       // Store ImageKit File ID.
+
       form.setValue("avatarFileId", uploadResponse.fileId, {
         shouldValidate: true,
+
         shouldDirty: true,
       });
 
       // Switch from local preview to ImageKit URL.
+
       setPreviewUrl(null);
 
       toast.success("Profile image uploaded successfully.");
@@ -264,6 +344,7 @@ export default function ManagerForm({
 
       if (controller.signal.aborted) {
         toast.info("Image upload cancelled.");
+
         return;
       }
 
@@ -279,13 +360,16 @@ export default function ManagerForm({
         abortControllerRef.current = null;
 
         setIsUploading(false);
+
         setUploadProgress(0);
       }
     }
   }
 
   // --------------------------------------------------
+
   // Cancel Upload
+
   // --------------------------------------------------
 
   function handleCancelUpload() {
@@ -293,7 +377,9 @@ export default function ManagerForm({
   }
 
   // --------------------------------------------------
+
   // Remove Image
+
   // --------------------------------------------------
 
   function handleRemoveImage() {
@@ -303,11 +389,13 @@ export default function ManagerForm({
 
     form.setValue("image", null, {
       shouldValidate: true,
+
       shouldDirty: true,
     });
 
     form.setValue("avatarFileId", null, {
       shouldValidate: true,
+
       shouldDirty: true,
     });
 
@@ -319,12 +407,15 @@ export default function ManagerForm({
   }
 
   // --------------------------------------------------
+
   // Submit Form
+
   // --------------------------------------------------
 
   async function onSubmit(values: ManagerFormValues) {
     if (isUploading) {
       toast.error("Please wait until image upload completes.");
+
       return;
     }
 
@@ -332,6 +423,7 @@ export default function ManagerForm({
       if (isEditing && initialData) {
         await updateManagerMutation.mutateAsync({
           id: initialData.id,
+
           formData: values,
         });
 
@@ -342,9 +434,8 @@ export default function ManagerForm({
         toast.success("Manager created successfully.");
       }
 
-      setOpen(false);
+      handleOpenChange(false);
       setPreviewUrl(null);
-
       onSuccessCallback?.();
     } catch (error) {
       toast.error(
@@ -356,17 +447,27 @@ export default function ManagerForm({
   }
 
   // --------------------------------------------------
+
   // Dialog Actions
+
   // --------------------------------------------------
 
   function handleOpenChange(nextOpen: boolean) {
     if (isPending || isUploading) return;
 
-    setOpen(nextOpen);
+    if (!isControlled) {
+      setInternalOpen(nextOpen);
+    }
+
+    onOpenChange?.(nextOpen);
 
     if (!nextOpen) {
       form.reset(getDefaultValues(initialData));
       setPreviewUrl(null);
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     }
   }
 
@@ -374,6 +475,7 @@ export default function ManagerForm({
     if (isUploading || isPending) return;
 
     form.reset(getDefaultValues(initialData));
+
     setPreviewUrl(null);
 
     if (fileInputRef.current) {
@@ -382,30 +484,34 @@ export default function ManagerForm({
   }
 
   // --------------------------------------------------
+
   // Render
+
   // --------------------------------------------------
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       {/* Trigger */}
 
-      <DialogTrigger
-        render={
-          <Button>
-            {isEditing ? (
-              <>
-                <Pencil className="mr-2 size-4" />
-                Edit Manager
-              </>
-            ) : (
-              <>
-                <Plus className="mr-2 size-4" />
-                Create Manager
-              </>
-            )}
-          </Button>
-        }
-      />
+      {!hideTrigger && (
+        <DialogTrigger
+          render={
+            <Button>
+              {isEditing ? (
+                <>
+                  <Pencil className="mr-2 size-4" />
+                  Edit Manager
+                </>
+              ) : (
+                <>
+                  <Plus className="mr-2 size-4" />
+                  Create Manager
+                </>
+              )}
+            </Button>
+          }
+        />
+      )}
 
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[550px]">
         {/* Header */}
@@ -432,11 +538,15 @@ export default function ManagerForm({
 
         <form
           onSubmit={form.handleSubmit(onSubmit)}
+
           className="space-y-6 border-t pt-6"
+
           noValidate
         >
           {/* ====================================== */}
+
           {/* Personal Information */}
+
           {/* ====================================== */}
 
           <section className="space-y-4">
@@ -450,10 +560,15 @@ export default function ManagerForm({
                   {previewUrl || imageUrl ? (
                     <Image
                       src={previewUrl || imageUrl!}
+
                       alt="Manager profile"
+
                       width={96}
+
                       height={96}
+
                       unoptimized={!!previewUrl}
+
                       className="size-full rounded-full object-cover"
                     />
                   ) : (
@@ -465,9 +580,13 @@ export default function ManagerForm({
 
                 <button
                   type="button"
+
                   disabled={isPending || isUploading}
+
                   onClick={() => fileInputRef.current?.click()}
+
                   className="absolute bottom-0 right-0 flex size-8 items-center justify-center rounded-full border-2 border-background bg-primary text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-50"
+
                   aria-label={
                     imageUrl ? "Change profile image" : "Upload profile image"
                   }
@@ -496,10 +615,15 @@ export default function ManagerForm({
 
               <input
                 ref={fileInputRef}
+
                 type="file"
+
                 accept="image/jpeg,image/png,image/webp"
+
                 className="hidden"
+
                 disabled={isPending || isUploading}
+
                 onChange={handleImageUpload}
               />
 
@@ -509,19 +633,26 @@ export default function ManagerForm({
                 <div className="w-full max-w-xs space-y-2">
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>Uploading image...</span>
+
                     <span>{uploadProgress}%</span>
                   </div>
 
                   <div
                     className="h-2 overflow-hidden rounded-full bg-muted"
+
                     role="progressbar"
+
                     aria-valuenow={uploadProgress}
+
                     aria-valuemin={0}
+
                     aria-valuemax={100}
+
                     aria-label="Image upload progress"
                   >
                     <div
                       className="h-full rounded-full bg-primary transition-all duration-300"
+
                       style={{
                         width: `${uploadProgress}%`,
                       }}
@@ -530,9 +661,13 @@ export default function ManagerForm({
 
                   <Button
                     type="button"
+
                     variant="outline"
+
                     size="sm"
+
                     className="w-full"
+
                     onClick={handleCancelUpload}
                   >
                     <X className="mr-2 size-3" />
@@ -546,10 +681,15 @@ export default function ManagerForm({
               {(imageUrl || previewUrl) && !isUploading && (
                 <Button
                   type="button"
+
                   variant="ghost"
+
                   size="sm"
+
                   className="text-xs text-destructive hover:text-destructive"
+
                   disabled={isPending}
+
                   onClick={handleRemoveImage}
                 >
                   <X className="mr-1 size-3" />
@@ -562,7 +702,9 @@ export default function ManagerForm({
 
             <Controller
               control={form.control}
+
               name="name"
+
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor="name">
@@ -572,9 +714,13 @@ export default function ManagerForm({
 
                   <Input
                     {...field}
+
                     id="name"
+
                     placeholder="Enter manager name"
+
                     disabled={isPending}
+
                     aria-invalid={fieldState.invalid}
                   />
 
@@ -589,7 +735,9 @@ export default function ManagerForm({
 
             <Controller
               control={form.control}
+
               name="email"
+
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor="email">
@@ -602,11 +750,17 @@ export default function ManagerForm({
 
                     <Input
                       {...field}
+
                       id="email"
+
                       type="email"
+
                       placeholder="manager@example.com"
+
                       className="pl-9"
+
                       disabled={isPending}
+
                       aria-invalid={fieldState.invalid}
                     />
                   </div>
@@ -622,7 +776,9 @@ export default function ManagerForm({
 
             <Controller
               control={form.control}
+
               name="phoneNumber"
+
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor="phoneNumber">
@@ -635,11 +791,17 @@ export default function ManagerForm({
 
                     <Input
                       {...field}
+
                       id="phoneNumber"
+
                       type="tel"
+
                       placeholder="Enter phone number"
+
                       className="pl-9"
+
                       disabled={isPending}
+
                       aria-invalid={fieldState.invalid}
                     />
                   </div>
@@ -653,7 +815,9 @@ export default function ManagerForm({
           </section>
 
           {/* ====================================== */}
+
           {/* Employment Information */}
+
           {/* ====================================== */}
 
           <section className="space-y-4">
@@ -667,7 +831,9 @@ export default function ManagerForm({
 
             <Controller
               control={form.control}
+
               name="employeeCode"
+
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor="employeeCode">
@@ -677,9 +843,13 @@ export default function ManagerForm({
 
                   <Input
                     {...field}
+
                     id="employeeCode"
+
                     placeholder="e.g. MGR-001"
+
                     disabled={isPending}
+
                     aria-invalid={fieldState.invalid}
                   />
 
@@ -692,14 +862,19 @@ export default function ManagerForm({
           </section>
 
           {/* ====================================== */}
+
           {/* Form Actions */}
+
           {/* ====================================== */}
 
           <DialogFooter className="gap-2 border-t pt-4 sm:gap-2">
             <Button
               type="button"
+
               variant="outline"
+
               disabled={isPending || isUploading}
+
               onClick={handleReset}
             >
               <RotateCcw className="mr-2 size-4" />
@@ -708,8 +883,11 @@ export default function ManagerForm({
 
             <Button
               type="button"
+
               variant="outline"
+
               disabled={isPending || isUploading}
+
               onClick={() => handleOpenChange(false)}
             >
               Cancel

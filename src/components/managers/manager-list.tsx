@@ -25,6 +25,7 @@ import {
 import ManagerForm from "./manager-form";
 
 // UI Components
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -73,12 +74,8 @@ type Manager = {
   phoneNumber?: string | null;
   employeeCode: string;
   image?: string | null;
-  avatarFileId?: string | null;
+  // avatarFileId?: string | null;
 };
-
-// ==================================================
-// LOADING SKELETON
-// ==================================================
 
 function ManagerListSkeleton() {
   return (
@@ -89,10 +86,6 @@ function ManagerListSkeleton() {
     </div>
   );
 }
-
-// ==================================================
-// EMPTY STATE
-// ==================================================
 
 function ManagerEmptyState({ isSearching }: { isSearching: boolean }) {
   return (
@@ -115,10 +108,6 @@ function ManagerEmptyState({ isSearching }: { isSearching: boolean }) {
     </div>
   );
 }
-
-// ==================================================
-// ERROR STATE
-// ==================================================
 
 function ManagerErrorState({
   onRetry,
@@ -154,10 +143,6 @@ function ManagerErrorState({
   );
 }
 
-// ==================================================
-// DELETE CONFIRMATION
-// ==================================================
-
 function DeleteManagerDialog({
   manager,
   isDeleting,
@@ -172,6 +157,7 @@ function DeleteManagerDialog({
   return (
     <AlertDialog
       open={Boolean(manager)}
+
       onOpenChange={(open) => {
         if (!open && !isDeleting) {
           onClose();
@@ -206,6 +192,7 @@ function DeleteManagerDialog({
               event.preventDefault();
               onConfirm();
             }}
+
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
             {isDeleting ? (
@@ -226,15 +213,7 @@ function DeleteManagerDialog({
   );
 }
 
-// ==================================================
-// MANAGER LIST
-// ==================================================
-
 export default function ManagerList() {
-  // --------------------------------------------------
-  // Queries
-  // --------------------------------------------------
-
   const {
     data: managers,
     isLoading,
@@ -244,33 +223,14 @@ export default function ManagerList() {
     isFetching,
   } = useGetAllManagers();
 
-  // --------------------------------------------------
-  // Mutations
-  // --------------------------------------------------
-
   const deleteManagerMutation = useDeleteManagerProfile();
-
   const isDeleting = deleteManagerMutation.isPending;
-
-  // --------------------------------------------------
-  // States
-  // --------------------------------------------------
-
   const [search, setSearch] = useState("");
-
   const [selectedManager, setSelectedManager] = useState<Manager | null>(null);
-
   const [managerToDelete, setManagerToDelete] = useState<Manager | null>(null);
-
-  // --------------------------------------------------
-  // Search & Filter
-  // --------------------------------------------------
-
   const filteredManagers = useMemo(() => {
     const list = (managers ?? []) as Manager[];
-
     const query = search.trim().toLowerCase();
-
     if (!query) return list;
 
     return list.filter((manager) =>
@@ -288,26 +248,16 @@ export default function ManagerList() {
     );
   }, [managers, search]);
 
-  // --------------------------------------------------
-  // Refresh
-  // --------------------------------------------------
-
   function handleRefresh() {
     void refetch();
   }
-
-  // --------------------------------------------------
-  // Delete Manager
-  // --------------------------------------------------
 
   async function handleDeleteManager() {
     if (!managerToDelete || isDeleting) return;
 
     try {
       await deleteManagerMutation.mutateAsync(managerToDelete.managerProfileId);
-
       toast.success("Manager deleted successfully.");
-
       setManagerToDelete(null);
     } catch (error) {
       toast.error(
@@ -317,10 +267,6 @@ export default function ManagerList() {
       );
     }
   }
-
-  // --------------------------------------------------
-  // Render
-  // --------------------------------------------------
 
   return (
     <>
@@ -370,6 +316,7 @@ export default function ManagerList() {
                   ? error.message
                   : "Something went wrong while fetching managers."
               }
+
               onRetry={handleRefresh}
               isFetching={isFetching}
             />
@@ -392,6 +339,7 @@ export default function ManagerList() {
                   {isFetching && (
                     <span
                       className="text-xs text-muted-foreground"
+
                       aria-live="polite"
                     >
                       Updating...
@@ -420,8 +368,6 @@ export default function ManagerList() {
               {filteredManagers.length === 0 ? (
                 <ManagerEmptyState isSearching={Boolean(search.trim())} />
               ) : (
-                /* Managers Table */
-
                 <div className="relative w-full max-w-full max-h-[500px] overflow-auto rounded-section border border-border">
                   <Table className="min-w-[800px] w-full">
                     <TableHeader className="sticky top-0 z-10 border-separate border-spacing-0 bg-muted shadow-sm">
@@ -452,6 +398,7 @@ export default function ManagerList() {
                       {filteredManagers.map((manager) => (
                         <TableRow
                           key={manager.managerProfileId}
+
                           className="transition-colors hover:bg-accent/40"
                         >
                           {/* Manager Name */}
@@ -496,7 +443,6 @@ export default function ManagerList() {
                               className="gap-1 border-0 bg-accent text-accent-foreground"
                             >
                               <Hash className="size-3" />
-
                               {manager.employeeCode || "—"}
                             </Badge>
                           </TableCell>
@@ -532,6 +478,7 @@ export default function ManagerList() {
 
                                 <DropdownMenuItem
                                   onClick={() => setManagerToDelete(manager)}
+
                                   className="text-destructive focus:text-destructive"
                                 >
                                   <Trash2 className="mr-2 size-4" />
@@ -551,37 +498,32 @@ export default function ManagerList() {
         </CardContent>
       </Card>
 
-      {/* ==========================================
-          EDIT MANAGER
-      ========================================== */}
-
-      {selectedManager && (
-        <ManagerForm
-          key={selectedManager.managerProfileId}
-          openOnMount
-          hideTrigger
-          initialData={{
-            id: selectedManager.managerProfileId,
-            name: selectedManager.name,
-            email: selectedManager.email,
-            phoneNumber:
-              selectedManager.phoneNumber ?? selectedManager.phone ?? "",
-            employeeCode: selectedManager.employeeCode,
-            image: selectedManager.image ?? null,
-            avatarFileId: selectedManager.avatarFileId ?? null,
-          }}
-          onSuccessCallback={() => {
+      {/* Edit Manager Dialog */}
+      <ManagerForm
+        key={selectedManager?.managerProfileId ?? "manager-edit"}
+        open={Boolean(selectedManager)}
+        hideTrigger
+        initialData={
+          selectedManager
+            ? {
+                id: selectedManager.managerProfileId,
+                name: selectedManager.name,
+                email: selectedManager.email,
+                phoneNumber: selectedManager.phoneNumber ?? selectedManager.phone ?? "",
+                employeeCode: selectedManager.employeeCode,
+                // image: selectedManager.image ?? null,
+              }
+            : undefined
+        }
+        onOpenChange={(open) => {
+          if (!open) {
             setSelectedManager(null);
-          }}
-          onCloseCallback={() => {
-            setSelectedManager(null);
-          }}
-        />
-      )}
-
-      {/* ==========================================
-          DELETE MANAGER
-      ========================================== */}
+          }
+        }}
+        onSuccessCallback={() => {
+          setSelectedManager(null);
+        }}
+      />
 
       <DeleteManagerDialog
         manager={managerToDelete}
