@@ -1,5 +1,6 @@
 "use client";
 
+import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE } from "@/constants/image-size";
 import Image from "next/image";
 import React, { useEffect, useState } from "react";
 
@@ -7,9 +8,9 @@ interface IImageUploadForm {
   image: File | null;
 }
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
+// const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
-const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+// const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 const ImageUploadForm = () => {
   const [formData, setFormData] = useState<IImageUploadForm>({
@@ -43,7 +44,7 @@ const ImageUploadForm = () => {
     }
 
     // Validate image size
-    if (file.size > MAX_FILE_SIZE) {
+    if (file.size > MAX_IMAGE_SIZE) {
       setFormData({ image: null });
       setPreview(null);
       setError("Image size must not exceed 5 MB.");

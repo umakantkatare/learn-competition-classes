@@ -59,8 +59,7 @@ export const managerProfiles = pgTable(
       .notNull()
       .unique()
       .references(() => user.id, { onDelete: "cascade" }),
-    department: text("department").default("Operations").notNull(),
-    employeeCode: text("employee_code").unique(),
+    employeeCode: text("employee_code").unique().notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()

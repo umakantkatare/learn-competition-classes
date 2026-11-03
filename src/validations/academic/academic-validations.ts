@@ -55,7 +55,7 @@ export const updateExaminationSchema = createExaminationSchema.partial();
 
 export const createManagerProfileSchema = z.object({
   userId: idSchema,
-  department: z.string().trim().min(2).default("Operations"),
+  department: z.string().trim().min(2),
   employeeCode: z.string().trim().min(2).optional().nullable(),
 });
 

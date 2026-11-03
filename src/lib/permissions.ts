@@ -1,9 +1,16 @@
 import { createAccessControl } from "better-auth/plugins/access";
 import { adminAc, defaultStatements } from "better-auth/plugins/admin/access";
 
-export const USER_ROLES = ["student", "teacher", "manager", "admin"] as const;
+export const USER_ROLES = ["admin", "manager", "teacher", "student"] as const;
 
 export type UserRole = (typeof USER_ROLES)[number];
+
+export const ROLES = {
+  ADMIN: "admin",
+  MANAGER: "manager",
+  TEACHER: "teacher",
+  STUDENT: "student",
+} as const satisfies Record<string, UserRole>;
 
 export const DEFAULT_USER_ROLE: UserRole = "student";
 

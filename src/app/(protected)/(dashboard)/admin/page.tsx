@@ -16,7 +16,7 @@ export default async function AdminDashboardPage() {
         role={user.role}
         emailVerified={user.emailVerified}
         createdAt={user.createdAt}
-      />{" "}
+      />
     </main>
   );
 }

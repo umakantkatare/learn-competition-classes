@@ -43,7 +43,7 @@ export const profileLinks = {
   manager: [
     {
       label: "My Profile",
-      href: "/manager/profile",
+      href: "/manager/",
       icon: UserRound,
     },
   ],
