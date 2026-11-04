@@ -6,10 +6,14 @@ import { z } from "zod";
 
 import { auth } from "@/lib/auth";
 import { TeacherService } from "@/server/services/academic/teacher-service";
+
 import {
-  createTeacherProfileSchema,
-  updateTeacherProfileSchema,
-} from "@/validations/academic/academic-validations";
+  createTeacherSchema,
+  updateTeacherSchema,
+  type CreateTeacherInput,
+  type UpdateTeacherInput,
+} from "@/validations/academic/teacher-validations";
+import { createTeacherAuthUser } from "@/helper/createTeacherAuthUser";
 
 const teacherService = new TeacherService();
 
@@ -20,6 +24,11 @@ type ActionResult<T = unknown> = {
   error?: string;
 };
 
+type Session = NonNullable<Awaited<ReturnType<typeof auth.api.getSession>>>;
+
+const MANAGEMENT_ROLES = ["ADMIN", "MANAGER"] as const;
+
+// Error handler
 function getErrorMessage(error: unknown): string {
   if (error instanceof z.ZodError) {
     return error.issues[0]?.message ?? "Invalid input.";
@@ -32,30 +41,67 @@ function getErrorMessage(error: unknown): string {
   return "An unexpected error occurred.";
 }
 
-async function getSession() {
-  return auth.api.getSession({
-    headers: await headers(),
-  });
+// Get authenticated session
+async function getSession(): Promise<Session | null> {
+  return (
+    (await auth.api.getSession({
+      headers: await headers(),
+    })) ?? null
+  );
 }
 
-async function requireAdmin(): Promise<boolean> {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+// Check ADMIN / MANAGER permissions
+function canManageTeachers(session: Session): boolean {
+  const role = session.user.role?.toUpperCase();
 
-  return ["ADMIN", "MANAGER"].includes(session?.user?.role ?? "");
+  return MANAGEMENT_ROLES.includes(role as (typeof MANAGEMENT_ROLES)[number]);
 }
 
-// 1. Create Teacher Profile — Admin only
+// Common authorization helper
+async function requireTeacherManagementAccess(): Promise<Session | null> {
+  const session = await getSession();
+
+  if (!session || !canManageTeachers(session)) {
+    return null;
+  }
+
+  return session;
+}
+
+// Unauthorized response
+function unauthorized<T = unknown>(): ActionResult<T> {
+  return {
+    success: false,
+    error: "You are not authorized to perform this action.",
+  };
+}
+
+// Revalidate teacher pages
+function revalidateTeacherPaths(id?: string): void {
+  revalidatePath("/admin/teachers");
+  revalidatePath("/manager/teachers");
+
+  if (id) {
+    revalidatePath(`/admin/teachers/${id}`);
+    revalidatePath(`/manager/teachers/${id}`);
+  }
+}
+
+// 1. CREATE TEACHER PROFILE — ADMIN / MANAGER
+
 export async function createTeacherProfileAction(
-  formData: z.infer<typeof createTeacherProfileSchema>,
+  formData: CreateTeacherInput,
 ): Promise<ActionResult> {
   try {
-    if (!(await requireAdmin())) {
-      return { success: false, error: "Unauthorized." };
+    const requestHeaders = await headers();
+    const session = await requireTeacherManagementAccess();
+
+    if (!session) {
+      return unauthorized();
     }
 
-    const parsed = createTeacherProfileSchema.safeParse(formData);
+    // Validate input
+    const parsed = createTeacherSchema.safeParse(formData);
 
     if (!parsed.success) {
       return {
@@ -64,108 +110,66 @@ export async function createTeacherProfileAction(
       };
     }
 
-    const profile = await teacherService.createProfile(parsed.data);
+    const profile = await teacherService.createProfile(parsed.data, {
+      createAuthUser: (input) =>
+        createTeacherAuthUser({
+          ...input,
+          headers: requestHeaders,
+        }),
+    });
 
-    revalidatePath("/admin/teachers");
+    revalidateTeacherPaths();
 
     return {
       success: true,
       data: profile,
-      message: "Teacher profile created successfully.",
+      message: "Teacher created successfully.",
     };
   } catch (error: unknown) {
-    return { success: false, error: getErrorMessage(error) };
+    return {
+      success: false,
+      error: getErrorMessage(error),
+    };
   }
 }
 
-// 2. Update Teacher Profile — Admin or profile owner
-export async function updateTeacherProfileAction(
-  id: string,
-  formData: z.infer<typeof updateTeacherProfileSchema>,
-): Promise<ActionResult> {
+// 2. GET ALL TEACHERS — ADMIN / MANAGER
+
+export async function getAllTeachersAction(): Promise<ActionResult> {
   try {
-    const session = await getSession();
+    const session = await requireTeacherManagementAccess();
 
     if (!session) {
-      return { success: false, error: "Unauthorized." };
+      return unauthorized();
     }
 
-    if (!id?.trim()) {
-      return {
-        success: false,
-        error: "Teacher profile ID is required.",
-      };
-    }
-
-    const parsed = updateTeacherProfileSchema.safeParse(formData);
-
-    if (!parsed.success) {
-      return {
-        success: false,
-        error: parsed.error.issues[0]?.message ?? "Invalid input.",
-      };
-    }
-
-    const existingProfile = await teacherService.getProfileById(id);
-
-    const isAdmin = session.user.role === "ADMIN";
-    const isOwner = existingProfile.userId === session.user.id;
-
-    if (!isAdmin && !isOwner) {
-      return { success: false, error: "Unauthorized." };
-    }
-
-    const updatedProfile = await teacherService.updateProfile(id, parsed.data);
-
-    revalidatePath("/admin/teachers");
-    revalidatePath(`/admin/teachers/${id}`);
+    const teachers = await teacherService.getAllTeachers();
 
     return {
       success: true,
-      data: updatedProfile,
-      message: "Teacher profile updated successfully.",
+      data: teachers,
+      message: "Teachers fetched successfully.",
     };
   } catch (error: unknown) {
-    return { success: false, error: getErrorMessage(error) };
+    return {
+      success: false,
+      error: getErrorMessage(error),
+    };
   }
 }
 
-// 3. Get Teacher Profile by User ID — Admin or same user
-export async function getTeacherProfileByUserIdAction(
-  userId: string,
-): Promise<ActionResult> {
-  try {
-    const session = await getSession();
+// 3. GET TEACHER PROFILE BY ID — ADMIN / MANAGER
 
-    if (!session) {
-      return { success: false, error: "Unauthorized." };
-    }
-
-    if (!userId?.trim()) {
-      return { success: false, error: "User ID is required." };
-    }
-
-    const isAdmin = session.user.role === "ADMIN";
-    const isOwner = session.user.id === userId;
-
-    if (!isAdmin && !isOwner) {
-      return { success: false, error: "Unauthorized." };
-    }
-
-    const profile = await teacherService.getProfileByUserId(userId);
-
-    return { success: true, data: profile };
-  } catch (error: unknown) {
-    return { success: false, error: getErrorMessage(error) };
-  }
-}
-
-// 4. Get Teacher Profile by Profile ID
-// Public endpoint: return only public-safe profile fields.
 export async function getTeacherProfileByIdAction(
   id: string,
 ): Promise<ActionResult> {
   try {
+    const session = await requireTeacherManagementAccess();
+
+    if (!session) {
+      return unauthorized();
+    }
+
     if (!id?.trim()) {
       return {
         success: false,
@@ -175,10 +179,131 @@ export async function getTeacherProfileByIdAction(
 
     const profile = await teacherService.getProfileById(id);
 
-    // TODO: Return a public DTO containing only fields intended
-    // for the public teacher page. Do not expose private user data.
-    return { success: true, data: profile };
+    return {
+      success: true,
+      data: profile,
+      message: "Teacher profile fetched successfully.",
+    };
   } catch (error: unknown) {
-    return { success: false, error: getErrorMessage(error) };
+    return {
+      success: false,
+      error: getErrorMessage(error),
+    };
+  }
+}
+
+// 4. GET TEACHER PROFILE BY USER ID — ADMIN / MANAGER
+
+export async function getTeacherProfileByUserIdAction(
+  userId: string,
+): Promise<ActionResult> {
+  try {
+    const session = await requireTeacherManagementAccess();
+
+    if (!session) {
+      return unauthorized();
+    }
+
+    if (!userId?.trim()) {
+      return {
+        success: false,
+        error: "User ID is required.",
+      };
+    }
+
+    const profile = await teacherService.getProfileByUserId(userId);
+
+    return {
+      success: true,
+      data: profile,
+      message: "Teacher profile fetched successfully.",
+    };
+  } catch (error: unknown) {
+    return {
+      success: false,
+      error: getErrorMessage(error),
+    };
+  }
+}
+
+// 5. UPDATE TEACHER PROFILE — ADMIN / MANAGER
+
+export async function updateTeacherProfileAction(
+  id: string,
+  formData: UpdateTeacherInput,
+): Promise<ActionResult> {
+  try {
+    const session = await requireTeacherManagementAccess();
+
+    if (!session) {
+      return unauthorized();
+    }
+
+    if (!id?.trim()) {
+      return {
+        success: false,
+        error: "Teacher profile ID is required.",
+      };
+    }
+
+    const parsed = updateTeacherSchema.safeParse(formData);
+
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: parsed.error.issues[0]?.message ?? "Invalid input.",
+      };
+    }
+
+    const updatedProfile = await teacherService.updateProfile(id, parsed.data);
+
+    revalidateTeacherPaths(id);
+
+    return {
+      success: true,
+      data: updatedProfile,
+      message: "Teacher profile updated successfully.",
+    };
+  } catch (error: unknown) {
+    return {
+      success: false,
+      error: getErrorMessage(error),
+    };
+  }
+}
+
+// 6. DELETE TEACHER PROFILE — ADMIN / MANAGER
+
+export async function deleteTeacherProfileAction(
+  id: string,
+): Promise<ActionResult> {
+  try {
+    const session = await requireTeacherManagementAccess();
+
+    if (!session) {
+      return unauthorized();
+    }
+
+    if (!id?.trim()) {
+      return {
+        success: false,
+        error: "Teacher profile ID is required.",
+      };
+    }
+
+    const deletedProfile = await teacherService.deleteProfile(id);
+
+    revalidateTeacherPaths();
+
+    return {
+      success: true,
+      data: deletedProfile,
+      message: "Teacher profile deleted successfully.",
+    };
+  } catch (error: unknown) {
+    return {
+      success: false,
+      error: getErrorMessage(error),
+    };
   }
 }

@@ -79,7 +79,7 @@ export const teacherProfiles = pgTable(
       .notNull()
       .unique()
       .references(() => user.id, { onDelete: "cascade" }),
-    subject: text("subject").notNull(),
+    subject: text("subject").array().notNull(),
     experienceYears: integer("experience_years").default(1).notNull(),
     qualification: text("qualification"),
     bio: text("bio"),

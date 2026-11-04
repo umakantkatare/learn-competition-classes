@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { TeacherService } from "@/server/services/academic/teacher-service";
-import { updateTeacherProfileSchema } from "@/validations/academic/academic-validations";
 import { requireAdminOrManager } from "@/lib/authorize";
+import { updateTeacherSchema } from "@/validations/academic/teacher-validations";
 
 const teacherService = new TeacherService();
 
@@ -87,7 +87,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
       );
     }
 
-    const validationResult = updateTeacherProfileSchema.safeParse(body);
+    const validationResult = updateTeacherSchema.safeParse(body);
 
     if (!validationResult.success) {
       return NextResponse.json(

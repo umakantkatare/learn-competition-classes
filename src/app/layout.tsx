@@ -43,6 +43,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
+      data-scroll-behavior="smooth"
       className={cn("h-full", "antialiased", poppins.variable, roboto.variable, inter.variable, geistMono.variable, "font-sans", geist.variable)}
     >
       <body className="flex min-h-full flex-col bg-background text-text-primary">

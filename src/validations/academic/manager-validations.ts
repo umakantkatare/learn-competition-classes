@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-const idSchema = z.string().trim().min(1, "Manager ID is required");
-
 const emailSchema = z
   .string()
   .trim()
@@ -56,19 +54,6 @@ export type CreateManagerInfer = z.infer<typeof createManagerSchema>;
 export type CreateManagerInput = z.input<typeof createManagerSchema>;
 
 export type CreateManagerOutput = z.output<typeof createManagerSchema>;
-
-// export const createManagerProfileRequestSchema = z
-//   .object({
-//     userId: idSchema,
-//     employeeCode: employeeCodeSchema,
-//   })
-//   .strict();
-
-// export type CreateManagerProfileRequest = z.infer<
-//   typeof createManagerProfileRequestSchema
-// >;
-
-// export const createManagerProfileSchema = createManagerProfileRequestSchema;
 
 export type CreateManagerProfileInput = z.input<
   typeof createManagerProfileSchema

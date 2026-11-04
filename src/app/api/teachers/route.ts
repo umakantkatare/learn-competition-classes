@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { TeacherService } from "@/server/services/academic/teacher-service";
-import { createTeacherProfileSchema } from "@/validations/academic/academic-validations";
 import { requireAdminOrManager } from "@/lib/authorize";
+import { createTeacherAuthUser } from "@/helper/createTeacherAuthUser";
+import { headers } from "next/headers";
+import { createTeacherSchema } from "@/validations/academic/teacher-validations";
 
 const teacherService = new TeacherService();
 
@@ -45,7 +47,6 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Fetch all teachers (Admin/Manager only)
     const access = await requireAdminOrManager();
 
     if (!access.authorized) {
@@ -98,6 +99,8 @@ export async function GET(req: NextRequest) {
 // POST: Create a teacher profile
 export async function POST(req: NextRequest) {
   try {
+    const requestHeaders = await headers();
+
     const access = await requireAdminOrManager();
 
     if (!access.authorized) {
@@ -124,7 +127,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const validationResult = createTeacherProfileSchema.safeParse(body);
+    const validationResult = createTeacherSchema.safeParse(body);
 
     if (!validationResult.success) {
       return NextResponse.json(
@@ -140,7 +143,16 @@ export async function POST(req: NextRequest) {
 
     const newProfile = await teacherService.createProfile(
       validationResult.data,
+      {
+        createAuthUser: (input) =>
+          createTeacherAuthUser({
+            ...input,
+            headers: requestHeaders,
+          }),
+      },
     );
+
+    console.log("New teacher profile created:", newProfile);
 
     return NextResponse.json(
       {
