@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-
+import { APIError } from "better-auth/api";
 import { TeacherService } from "@/server/services/academic/teacher-service";
 import { requireAdminOrManager } from "@/lib/authorize";
 import { createTeacherAuthUser } from "@/helper/createTeacherAuthUser";
@@ -163,17 +163,41 @@ export async function POST(req: NextRequest) {
       { status: 201 },
     );
   } catch (error: unknown) {
-    if (error instanceof Error) {
-      console.error(error.message);
-    }
     console.error("POST /api/teachers error:", error);
+
+    if (error instanceof APIError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: error.message,
+          code: error.body?.code,
+        },
+        { status: error.statusCode },
+      );
+    }
 
     return NextResponse.json(
       {
         success: false,
-        error: "Failed to create teacher profile",
+        error:
+          error instanceof Error ? error.message : "Unexpected server error",
       },
       { status: 500 },
     );
   }
+
+  //   } catch (error: unknown) {
+  //     if (error instanceof Error) {
+  //       console.error(error.message);
+  //     }
+  //     console.error("POST /api/teachers error:", error);
+
+  //     return NextResponse.json(
+  //       {
+  //         success: false,
+  //         error: "Failed to create teacher profile",
+  //       },
+  //       { status: 500 },
+  //     );
+  //   }
 }

@@ -19,7 +19,7 @@ const subjectSchema = z
       .min(2, "Subject must contain at least 2 characters.")
       .max(50, "Subject cannot exceed 50 characters."),
   )
-  .min(1, "Select at least one subject.")
+  .min(0, "Select at least one subject.")
   .max(10, "You can select a maximum of 10 subjects.")
   .refine(
     (subjects) =>

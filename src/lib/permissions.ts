@@ -33,6 +33,7 @@ export const adminRole = ac.newRole({
 });
 
 export const managerRole = ac.newRole({
+  user: ["create", "set-role"],
   teacherProfile: ["create", "read", "update"],
   batch: ["create", "read", "update", "delete"],
   liveClass: ["read"],

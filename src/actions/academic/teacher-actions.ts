@@ -4,7 +4,6 @@ import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { auth } from "@/lib/auth";
 import { TeacherService } from "@/server/services/academic/teacher-service";
 
 import {
@@ -14,6 +13,7 @@ import {
   type UpdateTeacherInput,
 } from "@/validations/academic/teacher-validations";
 import { createTeacherAuthUser } from "@/helper/createTeacherAuthUser";
+import { requireAdminOrManager } from "@/lib/authorize";
 
 const teacherService = new TeacherService();
 
@@ -23,10 +23,6 @@ type ActionResult<T = unknown> = {
   message?: string;
   error?: string;
 };
-
-type Session = NonNullable<Awaited<ReturnType<typeof auth.api.getSession>>>;
-
-const MANAGEMENT_ROLES = ["ADMIN", "MANAGER"] as const;
 
 // Error handler
 function getErrorMessage(error: unknown): string {
@@ -41,32 +37,6 @@ function getErrorMessage(error: unknown): string {
   return "An unexpected error occurred.";
 }
 
-// Get authenticated session
-async function getSession(): Promise<Session | null> {
-  return (
-    (await auth.api.getSession({
-      headers: await headers(),
-    })) ?? null
-  );
-}
-
-// Check ADMIN / MANAGER permissions
-function canManageTeachers(session: Session): boolean {
-  const role = session.user.role?.toUpperCase();
-
-  return MANAGEMENT_ROLES.includes(role as (typeof MANAGEMENT_ROLES)[number]);
-}
-
-// Common authorization helper
-async function requireTeacherManagementAccess(): Promise<Session | null> {
-  const session = await getSession();
-
-  if (!session || !canManageTeachers(session)) {
-    return null;
-  }
-
-  return session;
-}
 
 // Unauthorized response
 function unauthorized<T = unknown>(): ActionResult<T> {
@@ -87,14 +57,13 @@ function revalidateTeacherPaths(id?: string): void {
   }
 }
 
-// 1. CREATE TEACHER PROFILE — ADMIN / MANAGER
 
 export async function createTeacherProfileAction(
   formData: CreateTeacherInput,
 ): Promise<ActionResult> {
   try {
     const requestHeaders = await headers();
-    const session = await requireTeacherManagementAccess();
+    const session = await requireAdminOrManager();
 
     if (!session) {
       return unauthorized();
@@ -137,7 +106,7 @@ export async function createTeacherProfileAction(
 
 export async function getAllTeachersAction(): Promise<ActionResult> {
   try {
-    const session = await requireTeacherManagementAccess();
+    const session = await requireAdminOrManager();
 
     if (!session) {
       return unauthorized();
@@ -164,7 +133,7 @@ export async function getTeacherProfileByIdAction(
   id: string,
 ): Promise<ActionResult> {
   try {
-    const session = await requireTeacherManagementAccess();
+    const session = await requireAdminOrManager ();
 
     if (!session) {
       return unauthorized();
@@ -198,7 +167,7 @@ export async function getTeacherProfileByUserIdAction(
   userId: string,
 ): Promise<ActionResult> {
   try {
-    const session = await requireTeacherManagementAccess();
+    const session = await requireAdminOrManager();
 
     if (!session) {
       return unauthorized();
@@ -233,7 +202,7 @@ export async function updateTeacherProfileAction(
   formData: UpdateTeacherInput,
 ): Promise<ActionResult> {
   try {
-    const session = await requireTeacherManagementAccess();
+    const session = await requireAdminOrManager();
 
     if (!session) {
       return unauthorized();
@@ -278,7 +247,7 @@ export async function deleteTeacherProfileAction(
   id: string,
 ): Promise<ActionResult> {
   try {
-    const session = await requireTeacherManagementAccess();
+    const session = await requireAdminOrManager ();
 
     if (!session) {
       return unauthorized();
