@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { examination } from "@/db/schema/academic-schema";
+import { examCategory, examination } from "@/db/schema/academic-schema";
 import { eq, and } from "drizzle-orm";
 
 export type Examination = typeof examination.$inferSelect;
@@ -17,6 +17,24 @@ export class ExaminationRepository {
     }
 
     return result;
+  }
+
+  //  Get all examinations with category fields
+  async getAllExaminations() {
+    return db
+      .select({
+        id: examination.id,
+        name: examination.name,
+        slug: examination.slug,
+        isActive: examination.isActive,
+        categoryId: examCategory.id,
+        categoryName: examCategory.name,
+        categorySlug: examCategory.slug,
+        createdAt: examination.createdAt,
+      })
+      .from(examination)
+      .leftJoin(examCategory, eq(examination.categoryId, examCategory.id))
+      .orderBy(examination.createdAt);
   }
 
   async findById(id: string): Promise<Examination | undefined> {

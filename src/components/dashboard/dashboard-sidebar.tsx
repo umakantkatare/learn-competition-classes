@@ -33,13 +33,14 @@ type DashboardSidebarProps = {
   onClose?: () => void;
 };
 
+// Static navigation configuration
 const navigation: Record<UserRole, NavItem[]> = {
   admin: [
     { label: "My Profile", href: "/admin", icon: UserRound },
     { label: "Managers", href: "/admin/managers", icon: Users },
+    { label: "Teachers", href: "/admin/teachers", icon: GraduationCap },
     { label: "Exam-Category", href: "/admin/exam-categories", icon: Tags },
     { label: "Exams", href: "/admin/exams", icon: GraduationCap },
-    { label: "Teachers", href: "/admin/teachers", icon: GraduationCap },
     { label: "Students", href: "/admin/students", icon: UserRound },
     { label: "Courses & Batches", href: "/admin/batches", icon: BookOpen },
     { label: "Live Classes", href: "/admin/live-classes", icon: Video },
@@ -50,6 +51,8 @@ const navigation: Record<UserRole, NavItem[]> = {
   manager: [
     { label: "My Profile", href: "/manager", icon: UserRound },
     { label: "Teachers", href: "/manager/teachers", icon: GraduationCap },
+    { label: "Exam-Category", href: "/manager/exam-categories", icon: Tags },
+    { label: "Exams", href: "/manager/exams", icon: GraduationCap },
     { label: "Batches", href: "/manager/batches", icon: BookOpen },
     { label: "Live Classes", href: "/manager/live-classes", icon: Video },
     { label: "Enrollments", href: "/manager/enrollments", icon: ClipboardList },
@@ -84,7 +87,18 @@ export function DashboardSidebar({
   onClose,
 }: DashboardSidebarProps) {
   const pathname = usePathname();
+
+  // Select navigation using the server-provided role prop.
   const items = navigation[role];
+
+  // Determine active navigation item.
+  const isActive = (href: string) => {
+    if (href === `/${role}`) {
+      return pathname === href;
+    }
+
+    return pathname === href || pathname.startsWith(`${href}/`);
+  };
 
   return (
     <>
@@ -136,11 +150,7 @@ export function DashboardSidebar({
           className="flex-1 space-y-1 overflow-y-auto p-4"
         >
           {items.map((item) => {
-            const active =
-              pathname === item.href ||
-              (item.href !== `/${role}` &&
-                pathname.startsWith(`${item.href}/`));
-
+            const active = isActive(item.href);
             const Icon = item.icon;
 
             return (
@@ -173,6 +183,7 @@ export function DashboardSidebar({
           })}
         </nav>
 
+        {/* Sign Out */}
         <div className="mt-auto shrink-0 border-t border-border p-4">
           <SignOutButton variant="menu" />
         </div>

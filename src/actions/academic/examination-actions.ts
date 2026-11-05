@@ -10,6 +10,7 @@ import {
 } from "@/validations/academic/academic-validations";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
+import { requireAdminOrManager } from "@/lib/authorize";
 
 const examinationService = new ExaminationService();
 
@@ -32,20 +33,12 @@ function getErrorMessage(error: unknown): string {
   return "An unexpected error occurred.";
 }
 
-async function requireAdmin(): Promise<boolean> {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-
-  return session?.user?.role === "ADMIN";
-}
-
 // 1. Create Examination
 export async function createExaminationAction(
   formData: z.infer<typeof createExaminationSchema>,
 ): Promise<ActionResult> {
   try {
-    if (!(await requireAdmin())) {
+    if (!(await requireAdminOrManager())) {
       return { success: false, error: "Unauthorized." };
     }
 
@@ -73,13 +66,24 @@ export async function createExaminationAction(
   }
 }
 
+// get examination with category fields
+export async function getAllExaminationsAction(): Promise<ActionResult> {
+  try {
+    const examinations = await examinationService.getAllExaminations();
+
+    return { success: true, data: examinations };
+  } catch (error: unknown) {
+    return { success: false, error: getErrorMessage(error) };
+  }
+}
+
 // 2. Update Examination
 export async function updateExaminationAction(
   id: string,
   formData: z.infer<typeof updateExaminationSchema>,
 ): Promise<ActionResult> {
   try {
-    if (!(await requireAdmin())) {
+    if (!(await requireAdminOrManager())) {
       return { success: false, error: "Unauthorized." };
     }
 
@@ -155,7 +159,7 @@ export async function deactivateExaminationAction(
   id: string,
 ): Promise<ActionResult> {
   try {
-    if (!(await requireAdmin())) {
+    if (!(await requireAdminOrManager())) {
       return { success: false, error: "Unauthorized." };
     }
 

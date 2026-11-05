@@ -38,6 +38,11 @@ export class ExaminationService {
     return this.examinationRepo.create(data);
   }
 
+  // get all examinations with category fields
+  async getAllExaminations() {
+    return this.examinationRepo.getAllExaminations();
+  }
+
   // Get examination by ID
   async getExaminationById(id: string) {
     const examination = await this.examinationRepo.findById(id);
