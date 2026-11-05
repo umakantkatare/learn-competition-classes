@@ -22,7 +22,7 @@ import {
   useDeleteTeacher,
 } from "@/hooks/academic/use-teachers";
 
-// import TeacherForm from "./teacher-form";
+import TeacherForm from "./teacher-form";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,10 +64,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-// ---------------------------------------------
-// Types
-// ---------------------------------------------
-
 type Teacher = {
   id: string;
   name: string;
@@ -77,10 +73,6 @@ type Teacher = {
   experienceYears: number;
   qualification: string;
 };
-
-// ---------------------------------------------
-// Loading Skeleton
-// ---------------------------------------------
 
 function TeacherListSkeleton() {
   return (
@@ -99,7 +91,6 @@ function normalizeSubjects(subject: string | string[]): string[] {
 
   const value = subject.trim();
 
-  // Handle PostgreSQL array format: {"Biology","Science"}
   if (value.startsWith("{") && value.endsWith("}")) {
     return value
       .slice(1, -1)
@@ -110,10 +101,6 @@ function normalizeSubjects(subject: string | string[]): string[] {
 
   return [value];
 }
-
-// ---------------------------------------------
-// Empty State
-// ---------------------------------------------
 
 function TeacherEmptyState({ isSearching }: { isSearching: boolean }) {
   return (
@@ -571,30 +558,30 @@ export default function TeacherList() {
 
       {/* Edit Teacher Dialog */}
 
-      {/* <TeacherForm
-        key={selectedTeacher?.id ?? "teacher-edit"}
-        open={Boolean(selectedTeacher)}
-        hideTrigger
-        initialData={
-          selectedTeacher
-            ? {
-                id: selectedTeacher.id,
-                name: selectedTeacher.name,
-                email: selectedTeacher.email,
-                phone: selectedTeacher.phone,
-                subject: selectedTeacher.subject,
-                experience: selectedTeacher.experience,
-                qualification: selectedTeacher.qualification,
-              }
-            : undefined
-        }
-        onOpenChange={(open: any) => {
-          if (!open) setSelectedTeacher(null);
-        }}
-        onSuccessCallback={() => {
-          setSelectedTeacher(null);
-        }}
-      /> */}
+      {selectedTeacher && (
+        <TeacherForm
+          key={selectedTeacher.id}
+          open={Boolean(selectedTeacher)}
+          hideTrigger
+          initialData={{
+            id: selectedTeacher.id,
+            name: selectedTeacher.name,
+            email: selectedTeacher.email,
+            phoneNumber: selectedTeacher.phone,
+            subject: normalizeSubjects(selectedTeacher.subject),
+            experienceYears: selectedTeacher.experienceYears,
+            qualification: selectedTeacher.qualification,
+          }}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedTeacher(null);
+            }
+          }}
+          onSuccessCallback={() => {
+            setSelectedTeacher(null);
+          }}
+        />
+      )}
 
       {/* Delete Confirmation Dialog */}
 

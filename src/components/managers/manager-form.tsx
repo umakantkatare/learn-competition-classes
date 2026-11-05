@@ -494,23 +494,25 @@ export default function ManagerForm({
       {/* Trigger */}
 
       {!hideTrigger && (
-        <DialogTrigger
-          render={
-            <Button>
-              {isEditing ? (
-                <>
-                  <Pencil className="mr-2 size-4" />
-                  Edit Manager
-                </>
-              ) : (
-                <>
-                  <Plus className="mr-2 size-4" />
-                  Create Manager
-                </>
-              )}
-            </Button>
-          }
-        />
+        <div className="flex justify-end mb-5">
+          <DialogTrigger
+            render={
+              <Button>
+                {isEditing ? (
+                  <>
+                    <Pencil className="mr-2 size-4" />
+                    Edit Teacher
+                  </>
+                ) : (
+                  <>
+                    <Plus className="mr-2 size-4" />
+                    Create Teacher
+                  </>
+                )}
+              </Button>
+            }
+          />
+        </div>
       )}
 
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[550px]">

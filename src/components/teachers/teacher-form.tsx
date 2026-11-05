@@ -458,19 +458,6 @@ export default function TeacherForm({
     }
   }
 
-  function handleReset() {
-    if (isUploading || isPending) return;
-
-    form.reset(getDefaultValues(initialData));
-
-    setPreviewUrl(null);
-    setSubjectInput("");
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  }
-
   // --------------------------------------------------
   // Render
   // --------------------------------------------------
@@ -480,23 +467,25 @@ export default function TeacherForm({
       {/* Trigger */}
 
       {!hideTrigger && (
-        <DialogTrigger
-          render={
-            <Button>
-              {isEditing ? (
-                <>
-                  <Pencil className="mr-2 size-4" />
-                  Edit Teacher
-                </>
-              ) : (
-                <>
-                  <Plus className="mr-2 size-4" />
-                  Create Teacher
-                </>
-              )}
-            </Button>
-          }
-        />
+        <div className="flex justify-end mb-5">
+          <DialogTrigger
+            render={
+              <Button>
+                {isEditing ? (
+                  <>
+                    <Pencil className="mr-2 size-4" />
+                    Edit Teacher
+                  </>
+                ) : (
+                  <>
+                    <Plus className="mr-2 size-4" />
+                    Create Teacher
+                  </>
+                )}
+              </Button>
+            }
+          />
+        </div>
       )}
 
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[550px]">
@@ -932,16 +921,6 @@ export default function TeacherForm({
           {/* ====================================== */}
 
           <DialogFooter className="gap-2 border-t pt-4 sm:gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={isPending || isUploading}
-              onClick={handleReset}
-            >
-              <RotateCcw className="mr-2 size-4" />
-              Reset
-            </Button>
-
             <Button
               type="button"
               variant="outline"
