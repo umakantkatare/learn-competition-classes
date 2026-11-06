@@ -1,17 +1,30 @@
 import { db } from "@/db";
-import { batch } from "@/db/schema/academic-schema";
+import { batch, teacherProfiles } from "@/db/schema/academic-schema";
+import { user } from "@/db/schema/auth-schema";
 import { and, eq } from "drizzle-orm";
 
-// Drizzle inferred types
+// ---------------------------------------------
+// Types
+// ---------------------------------------------
+
 export type Batch = typeof batch.$inferSelect;
 export type NewBatch = typeof batch.$inferInsert;
 
-export type UpdateBatch = Partial<Omit<NewBatch, "id">>;
+export type UpdateBatch = Partial<Omit<NewBatch, "id" | "createdBy">>;
+
+// Transaction executor
+export type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+export type DbExecutor = typeof db | DbTransaction;
+
+// ---------------------------------------------
+// Batch Repository
+// ---------------------------------------------
 
 export class BatchRepository {
   // Create batch
-  async create(data: NewBatch): Promise<Batch> {
-    const [result] = await db.insert(batch).values(data).returning();
+  async create(data: NewBatch, executor: DbExecutor = db): Promise<Batch> {
+    const [result] = await executor.insert(batch).values(data).returning();
 
     if (!result) {
       throw new Error("Failed to create batch");
@@ -20,9 +33,22 @@ export class BatchRepository {
     return result;
   }
 
+  // Find all batches
+  async findAll(executor: DbExecutor = db): Promise<Batch[]> {
+    return executor.select().from(batch);
+  }
+
+  // Find all published batches
+  async findAllPublished(executor: DbExecutor = db): Promise<Batch[]> {
+    return executor.select().from(batch).where(eq(batch.isPublished, true));
+  }
+
   // Find batch by ID
-  async findById(id: string): Promise<Batch | undefined> {
-    const [result] = await db
+  async findById(
+    id: string,
+    executor: DbExecutor = db,
+  ): Promise<Batch | undefined> {
+    const [result] = await executor
       .select()
       .from(batch)
       .where(eq(batch.id, id))
@@ -31,9 +57,12 @@ export class BatchRepository {
     return result;
   }
 
-  // Find published batch by ID (public access)
-  async findPublishedById(id: string): Promise<Batch | undefined> {
-    const [result] = await db
+  // Find published batch by ID
+  async findPublishedById(
+    id: string,
+    executor: DbExecutor = db,
+  ): Promise<Batch | undefined> {
+    const [result] = await executor
       .select()
       .from(batch)
       .where(and(eq(batch.id, id), eq(batch.isPublished, true)))
@@ -43,8 +72,11 @@ export class BatchRepository {
   }
 
   // Find batch by slug
-  async findBySlug(slug: string): Promise<Batch | undefined> {
-    const [result] = await db
+  async findBySlug(
+    slug: string,
+    executor: DbExecutor = db,
+  ): Promise<Batch | undefined> {
+    const [result] = await executor
       .select()
       .from(batch)
       .where(eq(batch.slug, slug))
@@ -53,9 +85,12 @@ export class BatchRepository {
     return result;
   }
 
-  // Find published batch by slug (public access)
-  async findPublishedBySlug(slug: string): Promise<Batch | undefined> {
-    const [result] = await db
+  // Find published batch by slug
+  async findPublishedBySlug(
+    slug: string,
+    executor: DbExecutor = db,
+  ): Promise<Batch | undefined> {
+    const [result] = await executor
       .select()
       .from(batch)
       .where(and(eq(batch.slug, slug), eq(batch.isPublished, true)))
@@ -64,17 +99,23 @@ export class BatchRepository {
     return result;
   }
 
-  // Find all batches for an examination (admin/internal use)
-  async findByExaminationId(examinationId: string): Promise<Batch[]> {
-    return db
+  // Find batches by examination
+  async findByExaminationId(
+    examinationId: string,
+    executor: DbExecutor = db,
+  ): Promise<Batch[]> {
+    return executor
       .select()
       .from(batch)
       .where(eq(batch.examinationId, examinationId));
   }
 
-  // Find published batches for an examination (public use)
-  async findPublishedByExaminationId(examinationId: string): Promise<Batch[]> {
-    return db
+  // Find published batches by examination
+  async findPublishedByExaminationId(
+    examinationId: string,
+    executor: DbExecutor = db,
+  ): Promise<Batch[]> {
+    return executor
       .select()
       .from(batch)
       .where(
@@ -86,12 +127,16 @@ export class BatchRepository {
   }
 
   // Update batch
-  async update(id: string, data: UpdateBatch): Promise<Batch | undefined> {
+  async update(
+    id: string,
+    data: UpdateBatch,
+    executor: DbExecutor = db,
+  ): Promise<Batch | undefined> {
     if (Object.keys(data).length === 0) {
       throw new Error("At least one field is required to update a batch");
     }
 
-    const [result] = await db
+    const [result] = await executor
       .update(batch)
       .set(data)
       .where(eq(batch.id, id))
@@ -101,8 +146,11 @@ export class BatchRepository {
   }
 
   // Publish batch
-  async publish(id: string): Promise<Batch | undefined> {
-    const [result] = await db
+  async publish(
+    id: string,
+    executor: DbExecutor = db,
+  ): Promise<Batch | undefined> {
+    const [result] = await executor
       .update(batch)
       .set({ isPublished: true })
       .where(eq(batch.id, id))
@@ -111,9 +159,12 @@ export class BatchRepository {
     return result;
   }
 
-  // Unpublish batch instead of permanent deletion
-  async unpublish(id: string): Promise<Batch | undefined> {
-    const [result] = await db
+  // Unpublish batch
+  async unpublish(
+    id: string,
+    executor: DbExecutor = db,
+  ): Promise<Batch | undefined> {
+    const [result] = await executor
       .update(batch)
       .set({ isPublished: false })
       .where(eq(batch.id, id))

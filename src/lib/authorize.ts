@@ -1,10 +1,11 @@
 import { headers } from "next/headers";
+
 import { auth } from "@/lib/auth";
-import { USER_ROLES, type UserRole } from "@/lib/permissions";
+import { ROLES, USER_ROLES, type UserRole } from "@/lib/permissions";
 
 type AuthUser = typeof auth.$Infer.Session.user;
 
-type AuthorizedUser = AuthUser & {
+export type AuthorizedUser = AuthUser & {
   role: UserRole;
 };
 
@@ -12,7 +13,7 @@ type RequireRoleOptions = {
   roles: readonly UserRole[];
 };
 
-type AuthorizationResult =
+export type AuthorizationResult =
   | {
       authorized: false;
       status: 401;
@@ -30,9 +31,9 @@ type AuthorizationResult =
       status: 200;
       error: null;
       message: "Authorization successful";
+      user: AuthorizedUser;
     };
 
-// Custom authorization error
 export class AuthorizationError extends Error {
   constructor(
     public readonly status: 401 | 403,
@@ -41,17 +42,17 @@ export class AuthorizationError extends Error {
   ) {
     super(message);
     this.name = "AuthorizationError";
+
+    Object.setPrototypeOf(this, new.target.prototype);
   }
 }
 
-// Fetch the current session
 export async function getSession() {
   return auth.api.getSession({
     headers: await headers(),
   });
 }
 
-// Validate user role
 function isValidRole(role: unknown): role is UserRole {
   return (
     typeof role === "string" &&
@@ -59,7 +60,6 @@ function isValidRole(role: unknown): role is UserRole {
   );
 }
 
-// Get the authenticated user
 export async function getCurrentUser(): Promise<AuthorizedUser | null> {
   const session = await getSession();
 
@@ -73,7 +73,6 @@ export async function getCurrentUser(): Promise<AuthorizedUser | null> {
   };
 }
 
-// Require one or more specific roles
 export async function requireRole({
   roles,
 }: RequireRoleOptions): Promise<AuthorizedUser> {
@@ -98,7 +97,6 @@ export async function requireRole({
   return user;
 }
 
-// Check whether the current user is an admin
 export async function requireAdmin(): Promise<boolean> {
   const user = await getCurrentUser();
 
@@ -110,7 +108,7 @@ export async function requireAdmin(): Promise<boolean> {
     );
   }
 
-  if (user.role !== "admin") {
+  if (user.role !== ROLES.ADMIN) {
     throw new AuthorizationError(
       403,
       "FORBIDDEN",
@@ -121,7 +119,6 @@ export async function requireAdmin(): Promise<boolean> {
   return true;
 }
 
-// Require admin or manager
 export async function requireAdminOrManager(): Promise<AuthorizationResult> {
   const user = await getCurrentUser();
 
@@ -134,7 +131,7 @@ export async function requireAdminOrManager(): Promise<AuthorizationResult> {
     };
   }
 
-  if (user.role !== "admin" && user.role !== "manager") {
+  if (user.role !== ROLES.ADMIN && user.role !== ROLES.MANAGER) {
     return {
       authorized: false,
       status: 403,
@@ -148,5 +145,6 @@ export async function requireAdminOrManager(): Promise<AuthorizationResult> {
     status: 200,
     error: null,
     message: "Authorization successful",
+    user,
   };
 }

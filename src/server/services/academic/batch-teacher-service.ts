@@ -1,3 +1,5 @@
+import { db } from "@/db";
+
 import { BatchTeacherRepository } from "@/server/repositories/academic/batch-teacher-repository";
 import { BatchRepository } from "@/server/repositories/academic/batch-repository";
 import { TeacherRepository } from "@/server/repositories/academic/teacher-repository";
@@ -13,32 +15,120 @@ export class BatchTeacherService {
     this.teacherRepo = new TeacherRepository();
   }
 
-  // Assign one teacher to a batch
+  // ---------------------------------------------
+  // Private Helpers
+  // ---------------------------------------------
+
+  private async validateTeacher(teacherId: string): Promise<void> {
+    const teacher = await this.teacherRepo.findById(teacherId);
+
+    if (!teacher) {
+      throw new Error("Teacher profile not found.");
+    }
+  }
+
+  private async validateTeachers(teacherIds: string[]): Promise<void> {
+    if (teacherIds.length === 0) return;
+
+    const teacherProfiles = await Promise.all(
+      teacherIds.map((id) => this.teacherRepo.findById(id)),
+    );
+
+    if (teacherProfiles.some((teacher) => !teacher)) {
+      throw new Error("One or more teacher profiles were not found.");
+    }
+  }
+
+  // ---------------------------------------------
+  // Assign One Teacher To Batch
+  // ---------------------------------------------
+
   async assignTeacherToBatch(batchId: string, teacherId: string) {
     const batch = await this.batchRepo.findById(batchId);
 
     if (!batch) {
       throw new Error("Batch not found.");
     }
-    const teacher = await this.teacherRepo.findById(teacherId);
 
-    if (!teacher) {
-      throw new Error("Teacher profile not found.");
-    }
+    await this.validateTeacher(teacherId);
 
-    const existingAssignments =
-      await this.batchTeacherRepo.findByBatchId(batchId);
+    const existingAssignment = await this.batchTeacherRepo.findAssignment(
+      batchId,
+      teacherId,
+    );
 
-    if (existingAssignments.some((item) => item.teacherId === teacherId)) {
+    if (existingAssignment) {
       throw new Error("This teacher is already assigned to this batch.");
     }
 
-    return this.batchTeacherRepo.create({ batchId, teacherId });
+    return this.batchTeacherRepo.create({
+      batchId,
+      teacherId,
+    });
   }
 
-  // Assign multiple teachers to a batch
+  // ---------------------------------------------
+  // Assign Multiple Teachers To Batch
+  // ---------------------------------------------
+
+  // async assignMultipleTeachers(batchId: string, teacherIds: string[]) {
+  //   // Prevent duplicate IDs
+  //   const uniqueTeacherIds = [...new Set(teacherIds)];
+
+  //   if (uniqueTeacherIds.length !== teacherIds.length) {
+  //     throw new Error("Duplicate teachers are not allowed.");
+  //   }
+
+  //   if (uniqueTeacherIds.length === 0) {
+  //     return [];
+  //   }
+
+  //   const batch = await this.batchRepo.findById(batchId);
+
+  //   if (!batch) {
+  //     throw new Error("Batch not found.");
+  //   }
+
+  //   // Verify all teacher profiles
+  //   await this.validateTeachers(uniqueTeacherIds);
+
+  //   // Find existing assignments
+  //   const existingAssignments =
+  //     await this.batchTeacherRepo.findByBatchId(batchId);
+
+  //   const existingTeacherIds = new Set(
+  //     existingAssignments.map((item) => item.teacherId),
+  //   );
+
+  //   // Only assign new teachers
+  //   const newTeacherIds = uniqueTeacherIds.filter(
+  //     (id) => !existingTeacherIds.has(id),
+  //   );
+
+  //   if (newTeacherIds.length === 0) {
+  //     return [];
+  //   }
+
+  //   // YAHAN CHANGE KIYA GAYA HAI
+  //   // db.transaction hata diya gaya hai kyunki single createMany apne aap mein atomic hai
+  //   return this.batchTeacherRepo.createMany(
+  //     newTeacherIds.map((teacherId) => ({
+  //       batchId,
+  //       teacherId,
+  //     })),
+  //     // 'tx' argument pass karne ki ab zarurat nahi
+  //   );
+  // }
+
+// any one
+
   async assignMultipleTeachers(batchId: string, teacherIds: string[]) {
+    // Prevent duplicate IDs
     const uniqueTeacherIds = [...new Set(teacherIds)];
+
+    if (uniqueTeacherIds.length !== teacherIds.length) {
+      throw new Error("Duplicate teachers are not allowed.");
+    }
 
     if (uniqueTeacherIds.length === 0) {
       return [];
@@ -50,15 +140,10 @@ export class BatchTeacherService {
       throw new Error("Batch not found.");
     }
 
-    // Verify every teacher exists before creating assignments
-    const teacherProfiles = await Promise.all(
-      uniqueTeacherIds.map((id) => this.teacherRepo.findById(id)),
-    );
+    // Verify all teacher profiles
+    await this.validateTeachers(uniqueTeacherIds);
 
-    if (teacherProfiles.some((teacher) => !teacher)) {
-      throw new Error("One or more teacher profiles were not found.");
-    }
-
+    // Find existing assignments
     const existingAssignments =
       await this.batchTeacherRepo.findByBatchId(batchId);
 
@@ -66,6 +151,7 @@ export class BatchTeacherService {
       existingAssignments.map((item) => item.teacherId),
     );
 
+    // Only assign new teachers
     const newTeacherIds = uniqueTeacherIds.filter(
       (id) => !existingTeacherIds.has(id),
     );
@@ -74,15 +160,21 @@ export class BatchTeacherService {
       return [];
     }
 
-    return this.batchTeacherRepo.createMany(
-      newTeacherIds.map((teacherId) => ({
-        batchId,
-        teacherId,
-      })),
-    );
+    return db.transaction(async (tx) => {
+      return this.batchTeacherRepo.createMany(
+        newTeacherIds.map((teacherId) => ({
+          batchId,
+          teacherId,
+        })),
+        tx,
+      );
+    });
   }
 
-  // Get teachers assigned to a batch
+  // ---------------------------------------------
+  // Get Teachers Assigned To Batch
+  // ---------------------------------------------
+
   async getTeachersForBatch(batchId: string) {
     const batch = await this.batchRepo.findById(batchId);
 
@@ -93,19 +185,27 @@ export class BatchTeacherService {
     return this.batchTeacherRepo.findByBatchId(batchId);
   }
 
-  // Get batches assigned to a teacher
-  async getBatchesForTeacher(teacherId: string) {
-    const teacher = await this.teacherRepo.findById(teacherId);
+  // ---------------------------------------------
+  // Get Batches Assigned To Teacher
+  // ---------------------------------------------
 
-    if (!teacher) {
-      throw new Error("Teacher profile not found.");
-    }
+  async getBatchesForTeacher(teacherId: string) {
+    await this.validateTeacher(teacherId);
 
     return this.batchTeacherRepo.findByTeacherId(teacherId);
   }
 
-  // Remove teacher assignment
+  // ---------------------------------------------
+  // Remove Teacher From Batch
+  // ---------------------------------------------
+
   async removeTeacherFromBatch(batchId: string, teacherId: string) {
+    const batch = await this.batchRepo.findById(batchId);
+
+    if (!batch) {
+      throw new Error("Batch not found.");
+    }
+
     const deletedRecord = await this.batchTeacherRepo.delete(
       batchId,
       teacherId,

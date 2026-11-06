@@ -133,4 +133,31 @@ export class TeacherRepository {
 
     return result;
   }
+
+  // Find teacher by ID with user details
+  async findByIdWithUser(id: string) {
+    const [result] = await db
+      .select({
+        teacher: teacherProfiles,
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          image: user.image,
+        },
+      })
+      .from(teacherProfiles)
+      .innerJoin(user, eq(teacherProfiles.userId, user.id))
+      .where(eq(teacherProfiles.id, id))
+      .limit(1);
+
+    if (!result) {
+      return undefined;
+    }
+
+    return {
+      ...result.teacher,
+      user: result.user,
+    };
+  }
 }

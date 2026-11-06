@@ -138,6 +138,7 @@ export const batch = pgTable(
     title: text("title").notNull(),
     slug: text("slug").notNull().unique(),
     description: text("description").notNull(),
+    // features: text("features").array().default([]).notNull(),
     thumbnail: text("thumbnail").notNull(),
     thumbnailFileId: text("thumbnail_file_id"),
     previewVideo: text("preview_video"),

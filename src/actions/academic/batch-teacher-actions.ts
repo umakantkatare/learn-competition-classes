@@ -5,12 +5,22 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { auth } from "@/lib/auth";
+
 import { BatchTeacherService } from "@/server/services/academic/batch-teacher-service";
 import { TeacherService } from "@/server/services/academic/teacher-service";
-import { batchTeacherSchema } from "@/validations/academic/academic-validations";
+
+import {
+  assignBatchTeacherSchema,
+  assignBatchTeachersSchema,
+  removeBatchTeacherSchema,
+} from "@/validations/academic/batch-teacher-validations";
 
 const batchTeacherService = new BatchTeacherService();
 const teacherService = new TeacherService();
+
+// ---------------------------------------------
+// Types
+// ---------------------------------------------
 
 type ActionResult<T = unknown> = {
   success: boolean;
@@ -18,6 +28,32 @@ type ActionResult<T = unknown> = {
   message?: string;
   error?: string;
 };
+
+type Session = NonNullable<Awaited<ReturnType<typeof auth.api.getSession>>>;
+
+// ---------------------------------------------
+// Helpers
+// ---------------------------------------------
+
+async function getSession(): Promise<Session | null> {
+  return await auth.api.getSession({
+    headers: await headers(),
+  });
+}
+
+async function requireAdminOrManager(): Promise<Session | null> {
+  const session = await getSession();
+
+  if (!session) return null;
+
+  const allowedRoles = ["ADMIN", "MANAGER"];
+
+  if (!allowedRoles.includes(session.user.role ?? "")) {
+    return null;
+  }
+
+  return session;
+}
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof z.ZodError) {
@@ -31,38 +67,57 @@ function getErrorMessage(error: unknown): string {
   return "An unexpected error occurred.";
 }
 
-async function getSession() {
-  return auth.api.getSession({
-    headers: await headers(),
-  });
+function getValidationError(error: z.ZodError) {
+  return {
+    error: error.issues[0]?.message ?? "Invalid input.",
+    issues: error.issues.map((issue) => ({
+      field: issue.path.join("."),
+      message: issue.message,
+    })),
+  };
 }
 
-async function requireAdminOrManager(): Promise<boolean> {
-  const session = await getSession();
-
-  return ["ADMIN", "MANAGER"].includes(session?.user?.role ?? "");
+function revalidateBatch(batchId: string) {
+  revalidatePath("/admin/batches");
+  revalidatePath(`/admin/batches/${batchId}`);
 }
+
+// ---------------------------------------------
+// Bulk Assignment Validation
+// ---------------------------------------------
 
 const bulkAssignmentSchema = z.object({
   batchId: z.string().trim().min(1, "Batch ID is required."),
-  teacherIds: z.array(z.string().trim().min(1)).min(1).max(100),
+
+  teacherIds: assignBatchTeachersSchema.shape.teacherIds
+    .unwrap()
+    .min(1, "At least one teacher must be selected.")
+    .max(100, "You cannot assign more than 100 teachers at once."),
 });
 
-// 1. Assign one teacher to a batch
+// ---------------------------------------------
+// 1. Assign One Teacher To Batch
+// ---------------------------------------------
+
 export async function assignTeacherToBatchAction(
-  formData: z.infer<typeof batchTeacherSchema>,
+  formData: z.input<typeof assignBatchTeacherSchema>,
 ): Promise<ActionResult> {
   try {
-    if (!(await requireAdminOrManager())) {
-      return { success: false, error: "Unauthorized." };
+    const session = await requireAdminOrManager();
+
+    if (!session) {
+      return {
+        success: false,
+        error: "Unauthorized access.",
+      };
     }
 
-    const parsed = batchTeacherSchema.safeParse(formData);
+    const parsed = assignBatchTeacherSchema.safeParse(formData);
 
     if (!parsed.success) {
       return {
         success: false,
-        error: parsed.error.issues[0]?.message ?? "Invalid input.",
+        ...getValidationError(parsed.error),
       };
     }
 
@@ -71,7 +126,7 @@ export async function assignTeacherToBatchAction(
       parsed.data.teacherId,
     );
 
-    revalidatePath(`/admin/batches/${parsed.data.batchId}`);
+    revalidateBatch(parsed.data.batchId);
 
     return {
       success: true,
@@ -79,18 +134,31 @@ export async function assignTeacherToBatchAction(
       message: "Teacher assigned to batch successfully.",
     };
   } catch (error: unknown) {
-    return { success: false, error: getErrorMessage(error) };
+    console.error("assignTeacherToBatchAction error:", error);
+
+    return {
+      success: false,
+      error: getErrorMessage(error),
+    };
   }
 }
 
-// 2. Assign multiple teachers to a batch
+// ---------------------------------------------
+// 2. Assign Multiple Teachers To Batch
+// ---------------------------------------------
+
 export async function assignMultipleTeachersAction(
   batchId: string,
   teacherIds: string[],
 ): Promise<ActionResult> {
   try {
-    if (!(await requireAdminOrManager())) {
-      return { success: false, error: "Unauthorized." };
+    const session = await requireAdminOrManager();
+
+    if (!session) {
+      return {
+        success: false,
+        error: "Unauthorized access.",
+      };
     }
 
     const parsed = bulkAssignmentSchema.safeParse({
@@ -101,18 +169,17 @@ export async function assignMultipleTeachersAction(
     if (!parsed.success) {
       return {
         success: false,
-        error: parsed.error.issues[0]?.message ?? "Invalid input.",
+        ...getValidationError(parsed.error),
       };
     }
 
-    const uniqueTeacherIds = [...new Set(parsed.data.teacherIds)];
-
+    // Duplicate IDs are rejected by validation.
     const assignments = await batchTeacherService.assignMultipleTeachers(
       parsed.data.batchId,
-      uniqueTeacherIds,
+      parsed.data.teacherIds,
     );
 
-    revalidatePath(`/admin/batches/${parsed.data.batchId}`);
+    revalidateBatch(parsed.data.batchId);
 
     return {
       success: true,
@@ -120,80 +187,147 @@ export async function assignMultipleTeachersAction(
       message: `${assignments.length} new teacher assignment(s) created.`,
     };
   } catch (error: unknown) {
-    return { success: false, error: getErrorMessage(error) };
+    console.error("assignMultipleTeachersAction error:", error);
+
+    return {
+      success: false,
+      error: getErrorMessage(error),
+    };
   }
 }
 
-// 3. Remove a teacher from a batch
+// ---------------------------------------------
+// 3. Remove Teacher From Batch
+// ---------------------------------------------
+
 export async function removeTeacherFromBatchAction(
-  formData: z.infer<typeof batchTeacherSchema>,
+  formData: z.input<typeof removeBatchTeacherSchema>,
 ): Promise<ActionResult> {
   try {
-    if (!(await requireAdminOrManager())) {
-      return { success: false, error: "Unauthorized." };
+    const session = await requireAdminOrManager();
+
+    if (!session) {
+      return {
+        success: false,
+        error: "Unauthorized access.",
+      };
     }
 
-    const parsed = batchTeacherSchema.safeParse(formData);
+    const parsed = removeBatchTeacherSchema.safeParse(formData);
 
     if (!parsed.success) {
       return {
         success: false,
-        error: parsed.error.issues[0]?.message ?? "Invalid input.",
+        ...getValidationError(parsed.error),
       };
     }
 
-    await batchTeacherService.removeTeacherFromBatch(
+    const deletedAssignment = await batchTeacherService.removeTeacherFromBatch(
       parsed.data.batchId,
       parsed.data.teacherId,
     );
 
-    revalidatePath(`/admin/batches/${parsed.data.batchId}`);
+    revalidateBatch(parsed.data.batchId);
 
     return {
       success: true,
+      data: deletedAssignment,
       message: "Teacher removed from batch successfully.",
     };
   } catch (error: unknown) {
-    return { success: false, error: getErrorMessage(error) };
+    console.error("removeTeacherFromBatchAction error:", error);
+
+    return {
+      success: false,
+      error: getErrorMessage(error),
+    };
   }
 }
 
-// 4. Get teachers assigned to a batch — Admin/Manager
+// ---------------------------------------------
+// 4. Get Teachers Assigned To Batch (Admin)
+// ---------------------------------------------
+
 export async function getTeachersForBatchAction(
   batchId: string,
 ): Promise<ActionResult> {
   try {
-    if (!(await requireAdminOrManager())) {
-      return { success: false, error: "Unauthorized." };
+    const session = await requireAdminOrManager();
+
+    if (!session) {
+      return {
+        success: false,
+        error: "Unauthorized access.",
+      };
     }
 
     if (!batchId?.trim()) {
-      return { success: false, error: "Batch ID is required." };
+      return {
+        success: false,
+        error: "Batch ID is required.",
+      };
     }
 
     const teachers = await batchTeacherService.getTeachersForBatch(batchId);
 
-    return { success: true, data: teachers };
+    return {
+      success: true,
+      data: teachers,
+    };
   } catch (error: unknown) {
-    return { success: false, error: getErrorMessage(error) };
+    console.error("getTeachersForBatchAction error:", error);
+
+    return {
+      success: false,
+      error: getErrorMessage(error),
+    };
   }
 }
 
-// 5. Get batches for the authenticated teacher
+// ---------------------------------------------
+// 5. Get Batches For Authenticated Teacher
+// ---------------------------------------------
+
 export async function getBatchesForTeacherAction(): Promise<ActionResult> {
   try {
     const session = await getSession();
 
     if (!session) {
-      return { success: false, error: "Unauthorized." };
+      return {
+        success: false,
+        error: "Unauthorized access.",
+      };
+    }
+
+    // Only authenticated teachers can access their assigned batches.
+    if (session.user.role !== "TEACHER") {
+      return {
+        success: false,
+        error: "Only teachers can access their assigned batches.",
+      };
     }
 
     const profile = await teacherService.getProfileByUserId(session.user.id);
 
+    if (!profile) {
+      return {
+        success: false,
+        error: "Teacher profile not found.",
+      };
+    }
+
     const batches = await batchTeacherService.getBatchesForTeacher(profile.id);
 
-    return { success: true, data: batches };
+    return {
+      success: true,
+      data: batches,
+    };
   } catch (error: unknown) {
-    return { success: false, error: getErrorMessage(error) };
+    console.error("getBatchesForTeacherAction error:", error);
+
+    return {
+      success: false,
+      error: getErrorMessage(error),
+    };
   }
 }

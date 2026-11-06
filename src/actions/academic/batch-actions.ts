@@ -1,17 +1,20 @@
 "use server";
 
-import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-
-import { auth } from "@/lib/auth";
+import { requireAdminOrManager } from "@/lib/authorize";
 import { BatchService } from "@/server/services/academic/batch-service";
+
 import {
   createBatchSchema,
   updateBatchSchema,
-} from "@/validations/academic/academic-validations";
+} from "@/validations/academic/batch-validation";
 
 const batchService = new BatchService();
+
+// ---------------------------------------------
+// Types
+// ---------------------------------------------
 
 type ActionResult<T = unknown> = {
   success: boolean;
@@ -19,6 +22,10 @@ type ActionResult<T = unknown> = {
   message?: string;
   error?: string;
 };
+
+// ---------------------------------------------
+// Helpers
+// ---------------------------------------------
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof z.ZodError) {
@@ -32,100 +39,201 @@ function getErrorMessage(error: unknown): string {
   return "An unexpected error occurred.";
 }
 
-async function requireAdmin(): Promise<boolean> {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-
-  return session?.user?.role === "ADMIN";
+function getValidationError(error: z.ZodError) {
+  return {
+    error: error.issues[0]?.message ?? "Invalid input.",
+    issues: error.issues.map((issue) => ({
+      field: issue.path.join("."),
+      message: issue.message,
+    })),
+  };
 }
 
+async function authorizeBatchAction(): Promise<ActionResult | null> {
+  const authorization = await requireAdminOrManager();
+
+  if (!authorization.authorized) {
+    return {
+      success: false,
+      error: authorization.message,
+    };
+  }
+
+  return null;
+}
+
+function revalidateBatchPaths(id: string, slug?: string) {
+  revalidatePath("/admin/batches");
+  revalidatePath(`/admin/batches/${id}`);
+
+  revalidatePath("/manager/batches");
+  revalidatePath(`/manager/batches/${id}`);
+
+  if (slug) {
+    revalidatePath(`/batch/${slug}`);
+  }
+}
+
+// ---------------------------------------------
 // 1. Create Batch
+// ---------------------------------------------
+
 export async function createBatchAction(
-  formData: z.infer<typeof createBatchSchema>,
-  teacherIds: string[] = [],
+  formData: z.input<typeof createBatchSchema>,
 ): Promise<ActionResult> {
   try {
-    if (!(await requireAdmin())) {
-      return { success: false, error: "Unauthorized." };
-    }
+    const authorizationError = await authorizeBatchAction();
+
+    if (authorizationError) return authorizationError;
+
+    // Validate input
 
     const parsed = createBatchSchema.safeParse(formData);
 
     if (!parsed.success) {
       return {
         success: false,
-        error: parsed.error.issues[0]?.message ?? "Invalid input.",
+        ...getValidationError(parsed.error),
       };
     }
 
-    const parsedTeacherIds = z
-      .array(z.string().trim().min(1))
-      .safeParse(teacherIds);
+    // Create batch and teacher assignments atomically.
 
-    if (!parsedTeacherIds.success) {
+    const authorization = await requireAdminOrManager();
+
+    if (!authorization.authorized) {
       return {
         success: false,
-        error: "Invalid teacher IDs.",
+        error: authorization.message,
       };
     }
 
-    const batch = await batchService.createBatch(parsed.data, [
-      ...new Set(parsedTeacherIds.data),
-    ]);
+    const newBatch = await batchService.createBatch(
+      parsed.data,
+      authorization.user.id,
+    );
+
+    // Revalidate affected pages
 
     revalidatePath("/admin/batches");
     revalidatePath(`/admin/examinations/${parsed.data.examinationId}`);
 
     return {
       success: true,
-      data: batch,
+      data: newBatch,
       message: "Batch created successfully.",
     };
   } catch (error: unknown) {
-    return { success: false, error: getErrorMessage(error) };
+    console.error("createBatchAction error:", error);
+
+    return {
+      success: false,
+      error: getErrorMessage(error),
+    };
   }
 }
 
-// 2. Update Batch
+// ---------------------------------------------
+// 2. Get All Batches (Admin)
+// ---------------------------------------------
+
+export async function getAllBatchesAction(): Promise<ActionResult> {
+  try {
+    const authorizationError = await authorizeBatchAction();
+
+    if (authorizationError) return authorizationError;
+
+    const batches = await batchService.getAllBatches();
+
+    return {
+      success: true,
+      data: batches,
+    };
+  } catch (error: unknown) {
+    console.error("getAllBatchesAction error:", error);
+
+    return {
+      success: false,
+      error: getErrorMessage(error),
+    };
+  }
+}
+
+// ---------------------------------------------
+// 3. Get All Published Batches (Public/Student)
+// ---------------------------------------------
+
+export async function getAllPublishedBatchesAction(): Promise<ActionResult> {
+  try {
+    const batches = await batchService.getAllPublishedBatches();
+
+    return {
+      success: true,
+      data: batches,
+    };
+  } catch (error: unknown) {
+    console.error("getAllPublishedBatchesAction error:", error);
+
+    return {
+      success: false,
+      error: getErrorMessage(error),
+    };
+  }
+}
+
+// ---------------------------------------------
+// 4. Update Batch
+// ---------------------------------------------
+
 export async function updateBatchAction(
   id: string,
-  formData: z.infer<typeof updateBatchSchema>,
+  formData: z.input<typeof updateBatchSchema>,
 ): Promise<ActionResult> {
   try {
-    if (!(await requireAdmin())) {
-      return { success: false, error: "Unauthorized." };
-    }
+    const authorizationError = await authorizeBatchAction();
+
+    if (authorizationError) return authorizationError;
 
     if (!id?.trim()) {
-      return { success: false, error: "Batch ID is required." };
+      return {
+        success: false,
+        error: "Batch ID is required.",
+      };
     }
+
+    // Validate input
 
     const parsed = updateBatchSchema.safeParse(formData);
 
     if (!parsed.success) {
       return {
         success: false,
-        error: parsed.error.issues[0]?.message ?? "Invalid input.",
+        ...getValidationError(parsed.error),
       };
     }
 
+    if (Object.keys(parsed.data).length === 0) {
+      return {
+        success: false,
+        error: "At least one field is required to update a batch.",
+      };
+    }
+
+    // Fetch current batch for slug revalidation.
+
     const currentBatch = await batchService.getBatchById(id);
 
-    if (!currentBatch) {
-      return { success: false, error: "Batch not found." };
-    }
+    // Update batch and synchronize teachers if supplied.
 
     const updatedBatch = await batchService.updateBatch(id, parsed.data);
 
-    if (!updatedBatch) {
-      return { success: false, error: "Failed to update batch." };
-    }
+    revalidateBatchPaths(id, currentBatch.slug);
 
-    revalidatePath("/admin/batches");
-    revalidatePath(`/admin/batches/${id}`);
-    revalidatePath(`/batch/${currentBatch.slug}`);
-    revalidatePath(`/batch/${updatedBatch.slug}`);
+    // Revalidate new slug if changed.
+
+    if (updatedBatch.slug !== currentBatch.slug) {
+      revalidatePath(`/batch/${updatedBatch.slug}`);
+    }
 
     return {
       success: true,
@@ -133,42 +241,47 @@ export async function updateBatchAction(
       message: "Batch updated successfully.",
     };
   } catch (error: unknown) {
-    return { success: false, error: getErrorMessage(error) };
+    console.error("updateBatchAction error:", error);
+
+    return {
+      success: false,
+      error: getErrorMessage(error),
+    };
   }
 }
 
-// 3. Publish or unpublish Batch
+// ---------------------------------------------
+// 5. Publish / Unpublish Batch
+// ---------------------------------------------
+
 export async function toggleBatchPublishStatusAction(
   id: string,
   isPublished: boolean,
 ): Promise<ActionResult> {
   try {
-    if (!(await requireAdmin())) {
-      return { success: false, error: "Unauthorized." };
-    }
+    const authorizationError = await authorizeBatchAction();
+
+    if (authorizationError) return authorizationError;
 
     if (!id?.trim()) {
-      return { success: false, error: "Batch ID is required." };
+      return {
+        success: false,
+        error: "Batch ID is required.",
+      };
     }
 
     if (typeof isPublished !== "boolean") {
-      return { success: false, error: "Invalid publish status." };
+      return {
+        success: false,
+        error: "Invalid publish status.",
+      };
     }
 
     const batch = isPublished
       ? await batchService.publishBatch(id)
       : await batchService.unpublishBatch(id);
 
-    if (!batch) {
-      return {
-        success: false,
-        error: "Batch not found.",
-      };
-    }
-
-    revalidatePath("/admin/batches");
-    revalidatePath(`/admin/batches/${id}`);
-    revalidatePath(`/batch/${batch.slug}`);
+    revalidateBatchPaths(id, batch.slug);
 
     return {
       success: true,
@@ -178,18 +291,26 @@ export async function toggleBatchPublishStatusAction(
         : "Batch unpublished successfully.",
     };
   } catch (error: unknown) {
-    return { success: false, error: getErrorMessage(error) };
+    console.error("toggleBatchPublishStatusAction error:", error);
+
+    return {
+      success: false,
+      error: getErrorMessage(error),
+    };
   }
 }
 
-// 4. Get Batches by Examination (Admin)
+// ---------------------------------------------
+// 6. Get Batches By Examination (Admin)
+// ---------------------------------------------
+
 export async function getBatchesByExaminationAction(
   examinationId: string,
 ): Promise<ActionResult> {
   try {
-    if (!(await requireAdmin())) {
-      return { success: false, error: "Unauthorized." };
-    }
+    const authorizationError = await authorizeBatchAction();
+
+    if (authorizationError) return authorizationError;
 
     if (!examinationId?.trim()) {
       return {
@@ -200,52 +321,73 @@ export async function getBatchesByExaminationAction(
 
     const batches = await batchService.getBatchesByExamination(examinationId);
 
-    return { success: true, data: batches };
+    return {
+      success: true,
+      data: batches,
+    };
   } catch (error: unknown) {
-    return { success: false, error: getErrorMessage(error) };
+    console.error("getBatchesByExaminationAction error:", error);
+
+    return {
+      success: false,
+      error: getErrorMessage(error),
+    };
   }
 }
 
-// 5. Get published Batch by slug (Public)
+// ---------------------------------------------
+// 7. Get Published Batch By Slug (Public)
+// ---------------------------------------------
+
 export async function getBatchBySlugAction(
   slug: string,
 ): Promise<ActionResult> {
   try {
     if (!slug?.trim()) {
-      return { success: false, error: "Batch slug is required." };
-    }
-
-    const batch = await batchService.getBatchBySlug(slug);
-
-    return { success: true, data: batch };
-  } catch (error: unknown) {
-    return { success: false, error: getErrorMessage(error) };
-  }
-}
-
-// 6. Unpublish Batch instead of physically deleting it
-export async function deleteBatchAction(id: string): Promise<ActionResult> {
-  try {
-    if (!(await requireAdmin())) {
-      return { success: false, error: "Unauthorized." };
-    }
-
-    if (!id?.trim()) {
-      return { success: false, error: "Batch ID is required." };
-    }
-
-    const batch = await batchService.unpublishBatch(id);
-
-    if (!batch) {
       return {
         success: false,
-        error: "Batch not found.",
+        error: "Batch slug is required.",
       };
     }
 
-    revalidatePath("/admin/batches");
-    revalidatePath(`/admin/batches/${id}`);
-    revalidatePath(`/batch/${batch.slug}`);
+    const batch = await batchService.getBatchBySlug(slug.trim());
+
+    return {
+      success: true,
+      data: batch,
+    };
+  } catch (error: unknown) {
+    console.error("getBatchBySlugAction error:", error);
+
+    return {
+      success: false,
+      error: getErrorMessage(error),
+    };
+  }
+}
+
+// ---------------------------------------------
+// 8. Delete Batch (Soft Delete / Unpublish)
+// ---------------------------------------------
+
+export async function deleteBatchAction(id: string): Promise<ActionResult> {
+  try {
+    const authorizationError = await authorizeBatchAction();
+
+    if (authorizationError) return authorizationError;
+
+    if (!id?.trim()) {
+      return {
+        success: false,
+        error: "Batch ID is required.",
+      };
+    }
+
+    // This performs an unpublish operation, not physical deletion.
+
+    const batch = await batchService.unpublishBatch(id);
+
+    revalidateBatchPaths(id, batch.slug);
 
     return {
       success: true,
@@ -253,6 +395,11 @@ export async function deleteBatchAction(id: string): Promise<ActionResult> {
       message: "Batch unpublished successfully.",
     };
   } catch (error: unknown) {
-    return { success: false, error: getErrorMessage(error) };
+    console.error("deleteBatchAction error:", error);
+
+    return {
+      success: false,
+      error: getErrorMessage(error),
+    };
   }
 }

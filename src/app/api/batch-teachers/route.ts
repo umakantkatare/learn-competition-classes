@@ -1,22 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { BatchTeacherService } from "@/server/services/academic/batch-teacher-service";
-import { batchTeacherSchema } from "@/validations/academic/academic-validations";
 import { requireAdminOrManager } from "@/lib/authorize";
+import { BatchTeacherService } from "@/server/services/academic/batch-teacher-service";
+
+import { idSchema } from "@/validations/academic/batch-validation";
+import {
+  assignBatchTeacherSchema,
+  assignBatchTeachersSchema,
+  removeBatchTeacherSchema,
+} from "@/validations/academic/batch-teacher-validations";
 
 const batchTeacherService = new BatchTeacherService();
 
-const bulkAssignSchema = z.object({
-  batchId: z.string().trim().min(1, "Batch ID is required"),
-    teacherIds: z
-        .array(z.string().trim().min(1, "Teacher ID cannot be empty"))
-        .min(1, "At least one Teacher ID is required")
-    .refine(
-      (teacherIds) => new Set(teacherIds).size === teacherIds.length,
-      "Duplicate Teacher IDs are not allowed",
-    ),
-});
+const NO_STORE_HEADERS = {
+  "Cache-Control": "no-store, no-cache, must-revalidate",
+};
+
+const bulkAssignSchema = assignBatchTeachersSchema
+  .extend({
+    batchId: idSchema,
+  })
+  .superRefine(({ teacherIds }, ctx) => {
+    if (teacherIds.length === 0) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["teacherIds"],
+        message: "At least one teacher ID is required",
+      });
+    }
+  });
 
 function validationError(error: z.ZodError) {
   return NextResponse.json(
@@ -24,14 +37,41 @@ function validationError(error: z.ZodError) {
       success: false,
       error: error.issues[0]?.message ?? "Invalid request data",
     },
-    { status: 400 },
+    { status: 400, headers: NO_STORE_HEADERS },
+  );
+}
+
+function authorizationError(
+  access: Awaited<ReturnType<typeof requireAdminOrManager>>,
+) {
+  return NextResponse.json(
+    {
+      success: false,
+      error: access.error,
+      message: access.message,
+    },
+    { status: access.status, headers: NO_STORE_HEADERS },
+  );
+}
+
+function serverError(message: string) {
+  return NextResponse.json(
+    { success: false, error: message },
+    { status: 500, headers: NO_STORE_HEADERS },
   );
 }
 
 // GET: Fetch teachers assigned to a batch OR batches assigned to a teacher
 export async function GET(req: NextRequest) {
   try {
+    const access = await requireAdminOrManager();
+
+    if (!access.authorized) {
+      return authorizationError(access);
+    }
+
     const { searchParams } = new URL(req.url);
+
     const batchId = searchParams.get("batchId");
     const teacherId = searchParams.get("teacherId");
 
@@ -41,42 +81,48 @@ export async function GET(req: NextRequest) {
           success: false,
           error: "Provide either batchId or teacherId, not both",
         },
-        { status: 400 },
+        { status: 400, headers: NO_STORE_HEADERS },
       );
+    }
+
+    if (!batchId && !teacherId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Please provide batchId or teacherId",
+        },
+        { status: 400, headers: NO_STORE_HEADERS },
+      );
+    }
+
+    const idResult = idSchema.safeParse(batchId ?? teacherId);
+
+    if (!idResult.success) {
+      return validationError(idResult.error);
     }
 
     if (batchId) {
-      const teachers = await batchTeacherService.getTeachersForBatch(batchId);
+      const teachers = await batchTeacherService.getTeachersForBatch(
+        idResult.data,
+      );
 
       return NextResponse.json(
         { success: true, data: teachers },
-        { status: 200 },
+        { status: 200, headers: NO_STORE_HEADERS },
       );
     }
 
-    if (teacherId) {
-      const batches = await batchTeacherService.getBatchesForTeacher(teacherId);
-
-      return NextResponse.json(
-        { success: true, data: batches },
-        { status: 200 },
-      );
-    }
+    const batches = await batchTeacherService.getBatchesForTeacher(
+      idResult.data,
+    );
 
     return NextResponse.json(
-      {
-        success: false,
-        error: "Please provide batchId or teacherId",
-      },
-      { status: 400 },
+      { success: true, data: batches },
+      { status: 200, headers: NO_STORE_HEADERS },
     );
   } catch (error) {
     console.error("[GET /api/batch-teachers]", error);
-
-    return NextResponse.json(
-      { success: false, error: "Failed to fetch assignments" },
-      { status: 500 },
-    );
+    return serverError("Failed to fetch assignments");
   }
 }
 
@@ -86,13 +132,7 @@ export async function POST(req: NextRequest) {
     const access = await requireAdminOrManager();
 
     if (!access.authorized) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Unauthorized: Admin or Manager access required",
-        },
-        { status: access.status },
-      );
+      return authorizationError(access);
     }
 
     let body: unknown;
@@ -102,7 +142,7 @@ export async function POST(req: NextRequest) {
     } catch {
       return NextResponse.json(
         { success: false, error: "Invalid JSON body" },
-        { status: 400 },
+        { status: 400, headers: NO_STORE_HEADERS },
       );
     }
 
@@ -126,11 +166,11 @@ export async function POST(req: NextRequest) {
           message: `${assignments.length} teacher(s) assigned successfully`,
           data: assignments,
         },
-        { status: 201 },
+        { status: 201, headers: NO_STORE_HEADERS },
       );
     }
 
-    const validationResult = batchTeacherSchema.safeParse(body);
+    const validationResult = assignBatchTeacherSchema.safeParse(body);
 
     if (!validationResult.success) {
       return validationError(validationResult.error);
@@ -149,15 +189,11 @@ export async function POST(req: NextRequest) {
         message: "Teacher assigned to batch successfully",
         data: assignment,
       },
-      { status: 201 },
+      { status: 201, headers: NO_STORE_HEADERS },
     );
   } catch (error) {
     console.error("[POST /api/batch-teachers]", error);
-
-    return NextResponse.json(
-      { success: false, error: "Failed to assign teacher(s)" },
-      { status: 500 },
-    );
+    return serverError("Failed to assign teacher(s)");
   }
 }
 
@@ -167,18 +203,12 @@ export async function DELETE(req: NextRequest) {
     const access = await requireAdminOrManager();
 
     if (!access.authorized) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Unauthorized: Admin or Manager access required",
-        },
-        { status: access.status },
-      );
+      return authorizationError(access);
     }
 
     const { searchParams } = new URL(req.url);
 
-    const validationResult = batchTeacherSchema.safeParse({
+    const validationResult = removeBatchTeacherSchema.safeParse({
       batchId: searchParams.get("batchId"),
       teacherId: searchParams.get("teacherId"),
     });
@@ -196,14 +226,10 @@ export async function DELETE(req: NextRequest) {
         success: true,
         message: "Teacher removed from batch successfully",
       },
-      { status: 200 },
+      { status: 200, headers: NO_STORE_HEADERS },
     );
   } catch (error) {
     console.error("[DELETE /api/batch-teachers]", error);
-
-    return NextResponse.json(
-      { success: false, error: "Failed to remove teacher assignment" },
-      { status: 500 },
-    );
+    return serverError("Failed to remove teacher assignment");
   }
 }

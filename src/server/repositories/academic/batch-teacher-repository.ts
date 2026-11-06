@@ -2,13 +2,29 @@ import { db } from "@/db";
 import { batchTeachers } from "@/db/schema/academic-schema";
 import { and, eq } from "drizzle-orm";
 
+import type { DbExecutor } from "./batch-repository";
+
+// ---------------------------------------------
+// Types
+// ---------------------------------------------
+
 export type BatchTeacher = typeof batchTeachers.$inferSelect;
 export type NewBatchTeacher = typeof batchTeachers.$inferInsert;
 
+// ---------------------------------------------
+// Batch Teacher Repository
+// ---------------------------------------------
+
 export class BatchTeacherRepository {
-  // Assign one teacher to a batch
-  async create(data: NewBatchTeacher): Promise<BatchTeacher> {
-    const [result] = await db.insert(batchTeachers).values(data).returning();
+  // Assign one teacher
+  async create(
+    data: NewBatchTeacher,
+    executor: DbExecutor = db,
+  ): Promise<BatchTeacher> {
+    const [result] = await executor
+      .insert(batchTeachers)
+      .values(data)
+      .returning();
 
     if (!result) {
       throw new Error("Failed to assign teacher to batch");
@@ -17,37 +33,67 @@ export class BatchTeacherRepository {
     return result;
   }
 
-  // Assign multiple teachers to a batch
-  async createMany(data: NewBatchTeacher[]): Promise<BatchTeacher[]> {
+  // Assign multiple teachers
+  async createMany(
+    data: NewBatchTeacher[],
+    executor: DbExecutor = db,
+  ): Promise<BatchTeacher[]> {
     if (data.length === 0) {
       return [];
     }
 
-    return db.insert(batchTeachers).values(data).returning();
+    return executor.insert(batchTeachers).values(data).returning();
   }
 
-  // Get all teacher assignments for a batch
-  async findByBatchId(batchId: string): Promise<BatchTeacher[]> {
-    return db
+  // Get teachers assigned to a batch
+  async findByBatchId(
+    batchId: string,
+    executor: DbExecutor = db,
+  ): Promise<BatchTeacher[]> {
+    return executor
       .select()
       .from(batchTeachers)
       .where(eq(batchTeachers.batchId, batchId));
   }
 
-  // Get all batch assignments for a teacher
-  async findByTeacherId(teacherId: string): Promise<BatchTeacher[]> {
-    return db
+  // Get batches assigned to a teacher
+  async findByTeacherId(
+    teacherId: string,
+    executor: DbExecutor = db,
+  ): Promise<BatchTeacher[]> {
+    return executor
       .select()
       .from(batchTeachers)
       .where(eq(batchTeachers.teacherId, teacherId));
   }
 
-  // Remove one teacher from a batch
+  // Find a specific assignment
+  async findAssignment(
+    batchId: string,
+    teacherId: string,
+    executor: DbExecutor = db,
+  ): Promise<BatchTeacher | undefined> {
+    const [result] = await executor
+      .select()
+      .from(batchTeachers)
+      .where(
+        and(
+          eq(batchTeachers.batchId, batchId),
+          eq(batchTeachers.teacherId, teacherId),
+        ),
+      )
+      .limit(1);
+
+    return result;
+  }
+
+  // Remove one teacher from batch
   async delete(
     batchId: string,
     teacherId: string,
+    executor: DbExecutor = db,
   ): Promise<BatchTeacher | undefined> {
-    const [result] = await db
+    const [result] = await executor
       .delete(batchTeachers)
       .where(
         and(
@@ -60,9 +106,12 @@ export class BatchTeacherRepository {
     return result;
   }
 
-  // Remove all teacher assignments from a batch
-  async deleteByBatchId(batchId: string): Promise<BatchTeacher[]> {
-    return db
+  // Remove all teachers from batch
+  async deleteByBatchId(
+    batchId: string,
+    executor: DbExecutor = db,
+  ): Promise<BatchTeacher[]> {
+    return executor
       .delete(batchTeachers)
       .where(eq(batchTeachers.batchId, batchId))
       .returning();
