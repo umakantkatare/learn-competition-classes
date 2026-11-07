@@ -61,7 +61,12 @@ export class BatchService {
     const selectedDate =
       typeof startDate === "string"
         ? startDate.slice(0, 10)
-        : startDate.toISOString().slice(0, 10);
+        : new Intl.DateTimeFormat("en-CA", {
+            timeZone: "Asia/Kolkata",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+          }).format(startDate);
 
     if (selectedDate < today) {
       throw new Error("Batch start date cannot be earlier than today's date.");
@@ -216,6 +221,9 @@ export class BatchService {
           ...batchData,
           features: batchData.features ?? [],
           thumbnail: batchData.thumbnail ?? "",
+          thumbnailFileId: batchData.thumbnailFileId ?? null,
+          previewVideo: batchData.previewVideo ?? null,
+          previewVideoFileId: batchData.previewVideoFileId ?? null,
           createdBy: userId,
         },
         tx,
@@ -245,7 +253,6 @@ export class BatchService {
 
   async getAllBatches() {
     const batches = await this.batchRepo.findAll();
-
     return this.enrichBatches(batches);
   }
 
@@ -255,7 +262,6 @@ export class BatchService {
 
   async getAllPublishedBatches() {
     const batches = await this.batchRepo.findAllPublished();
-
     return this.enrichBatches(batches);
   }
 
@@ -373,11 +379,10 @@ export class BatchService {
     // Validate final dates
     const finalStartDate = batchData.startDate ?? currentBatch.startDate;
 
-    this.validateStartDate(batchData.startDate ?? currentBatch.startDate);
+    this.validateStartDate(finalStartDate);
 
     // Resolve final schedule using existing database values
     let finalExpiryDate: Date | null = currentBatch.expiryDate;
-
     let finalValidityMonths: number | null = currentBatch.validityMonths;
 
     // If a new expiry date is provided, clear validity.

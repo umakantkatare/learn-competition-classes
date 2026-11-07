@@ -119,8 +119,10 @@ const baseBatchSchema = z.object({
   features: batchFeaturesSchema,
 
   thumbnail: optionalUrlSchema,
+  thumbnailFileId: z.string().trim().nullable().optional(),
 
   previewVideo: optionalUrlSchema,
+  previewVideoFileId: z.string().trim().nullable().optional(),
 
   originalPrice: decimalSchema,
 

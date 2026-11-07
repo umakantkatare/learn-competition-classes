@@ -47,6 +47,7 @@ export interface Batch {
   description: string;
   features: string[];
 
+  // ImageKit media
   thumbnail: string | null;
   thumbnailFileId: string | null;
 

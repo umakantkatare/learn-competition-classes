@@ -1,23 +1,38 @@
 "use client";
 
-import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE } from "@/constants/image-size";
+import {
+  ALLOWED_IMAGE_TYPES,
+  ALLOWED_VIDEO_TYPES,
+  MAX_IMAGE_SIZE,
+  MAX_VIDEO_SIZE,
+} from "@/constants/image-size";
+
+import { uploadFile, type UploadedFile } from "@/helper/imagekit/upload";
+
 import Image from "next/image";
 import React, { useEffect, useState } from "react";
 
-interface IImageUploadForm {
+interface IUploadForm {
   image: File | null;
+  video: File | null;
 }
 
-// const MAX_FILE_SIZE = 5 * 1024 * 1024;
-
-// const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
-
 const ImageUploadForm = () => {
-  const [formData, setFormData] = useState<IImageUploadForm>({
+  const [formData, setFormData] = useState<IUploadForm>({
     image: null,
+    video: null,
   });
 
-  const [preview, setPreview] = useState<string | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [videoPreview, setVideoPreview] = useState<string | null>(null);
+
+  const [uploadedImage, setUploadedImage] = useState<UploadedFile | null>(null);
+
+  const [uploadedVideo, setUploadedVideo] = useState<UploadedFile | null>(null);
+
+  const [imageProgress, setImageProgress] = useState(0);
+  const [videoProgress, setVideoProgress] = useState(0);
+
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -25,156 +40,292 @@ const ImageUploadForm = () => {
     const file = e.target.files?.[0] ?? null;
 
     setError(null);
+    setUploadedImage(null);
 
     if (!file) {
-      setFormData({ image: null });
-      setPreview(null);
+      setFormData((prev) => ({ ...prev, image: null }));
+      setImagePreview(null);
       return;
     }
 
-    // Validate image format
-    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
-      setFormData({ image: null });
-      setPreview(null);
+    if (
+      !ALLOWED_IMAGE_TYPES.includes(
+        file.type as (typeof ALLOWED_IMAGE_TYPES)[number],
+      )
+    ) {
+      setFormData((prev) => ({ ...prev, image: null }));
+      setImagePreview(null);
+
       setError("Please select a JPG, PNG, or WebP image.");
 
-      // Allow selecting the same file again
       e.target.value = "";
       return;
     }
 
     // Validate image size
     if (file.size > MAX_IMAGE_SIZE) {
-      setFormData({ image: null });
-      setPreview(null);
+      setFormData((prev) => ({ ...prev, image: null }));
+      setImagePreview(null);
+
       setError("Image size must not exceed 5 MB.");
 
       e.target.value = "";
       return;
     }
 
-    // Update selected image
-    setFormData({ image: file });
-    setPreview(URL.createObjectURL(file));
+    setFormData((prev) => ({ ...prev, image: file }));
+    setImagePreview(URL.createObjectURL(file));
   };
 
-  // Clean up object URLs when the preview changes
+  const handleVideoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+
+    setError(null);
+    setUploadedVideo(null);
+
+    if (!file) {
+      setFormData((prev) => ({ ...prev, video: null }));
+      setVideoPreview(null);
+      return;
+    }
+
+    // Validate video format
+    if (
+      !ALLOWED_VIDEO_TYPES.includes(
+        file.type as (typeof ALLOWED_VIDEO_TYPES)[number],
+      )
+    ) {
+      setFormData((prev) => ({ ...prev, video: null }));
+      setVideoPreview(null);
+
+      setError("Please select an MP4, WebM, or MOV video.");
+
+      e.target.value = "";
+      return;
+    }
+
+    // Validate video size
+    if (file.size > MAX_VIDEO_SIZE) {
+      setFormData((prev) => ({ ...prev, video: null }));
+      setVideoPreview(null);
+
+      setError("Video size must not exceed 100 MB.");
+
+      e.target.value = "";
+      return;
+    }
+
+    setFormData((prev) => ({ ...prev, video: file }));
+    setVideoPreview(URL.createObjectURL(file));
+  };
+
+
   useEffect(() => {
     return () => {
-      if (preview) {
-        URL.revokeObjectURL(preview);
+      if (imagePreview) {
+        URL.revokeObjectURL(imagePreview);
+      }
+
+      if (videoPreview) {
+        URL.revokeObjectURL(videoPreview);
       }
     };
-  }, [preview]);
+  }, [imagePreview, videoPreview]);
 
-  // Handle form submission
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
     setError(null);
 
-    const { image } = formData;
+    const { image, video } = formData;
 
-    if (!image) {
-      setError("Please select an image before submitting.");
+    if (!image && !video) {
+      setError("Please select an image or video before submitting.");
       return;
     }
 
-    if (isSubmitting) {
-      return;
-    }
+    if (isSubmitting) return;
 
     setIsSubmitting(true);
 
+    setImageProgress(0);
+    setVideoProgress(0);
+
     try {
-      const payload = new FormData();
-      payload.append("image", image);
+      let imageResponse: UploadedFile | null = null;
+      let videoResponse: UploadedFile | null = null;
 
-      // TODO: Replace with your actual API request.
-      // Example:
-      // await axios.post("/api/upload", payload);
+      if (image) {
+        imageResponse = await uploadFile({
+          file: image,
+          folder: "batches/thumbnails",
+          tags: ["batch", "thumbnail"],
+          onProgress: setImageProgress,
+        });
 
-      console.log("Image ready for upload:", {
-        name: image.name,
-        size: image.size,
-        type: image.type,
+        setUploadedImage(imageResponse);
+      }
+
+      if (video) {
+        videoResponse = await uploadFile({
+          file: video,
+          folder: "batches/previews",
+          tags: ["batch", "preview"],
+          onProgress: setVideoProgress,
+        });
+
+        setUploadedVideo(videoResponse);
+      }
+
+      const payload = {
+        thumbnail: imageResponse
+          ? {
+              url: imageResponse.url,
+              fileId: imageResponse.fileId,
+            }
+          : null,
+
+        previewVideo: videoResponse
+          ? {
+              url: videoResponse.url,
+              fileId: videoResponse.fileId,
+            }
+          : null,
+      };
+
+      console.log("ImageKit upload successful:", {
+        image: imageResponse,
+        video: videoResponse,
       });
 
-      console.log("FormData prepared successfully.");
+      console.log("Database payload:", payload);
     } catch (err) {
-      console.error("Image upload failed:", err);
-      setError("Failed to upload image. Please try again.");
+      console.error("Media upload failed:", err);
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to upload media. Please try again.",
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
-
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-10">
-      <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-lg sm:p-8">
+      <div className="w-full max-w-2xl space-y-8 rounded-2xl bg-white p-6 shadow-lg sm:p-8">
         {/* Header */}
-        <div className="mb-8">
+
+        <div>
           <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
-            Upload Image
+            Upload Media
           </h1>
 
           <p className="mt-2 text-sm text-gray-500">
-            Select an image to upload.
+            Upload your image and preview video to ImageKit.
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6" noValidate>
+        <form onSubmit={handleSubmit} className="space-y-8" noValidate>
           {/* Image Upload */}
-          <div className="space-y-2">
-            <label
-              htmlFor="image"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Image <span className="text-red-500">*</span>
-            </label>
+
+          <section className="space-y-3">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-900">
+                Thumbnail Image
+              </h2>
+
+              <p className="text-xs text-gray-500">
+                JPG, PNG, WebP · Maximum 5 MB
+              </p>
+            </div>
 
             <input
-              id="image"
-              name="image"
               type="file"
               accept="image/jpeg,image/png,image/webp"
               onChange={handleImageChange}
-              aria-invalid={!!error}
-              aria-describedby="image-help image-error"
               disabled={isSubmitting}
-              className="block w-full cursor-pointer rounded-lg border border-gray-300 bg-gray-50 text-sm text-gray-600 file:mr-4 file:border-0 file:bg-gray-900 file:px-4 file:py-3 file:text-sm file:font-medium file:text-white hover:file:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+              className="block w-full cursor-pointer rounded-lg border border-gray-300 bg-gray-50 text-sm file:mr-4 file:border-0 file:bg-gray-900 file:px-4 file:py-3 file:text-white"
             />
 
-            <p id="image-help" className="text-xs text-gray-500">
-              Supported formats: JPG, PNG, WebP. Maximum size: 5 MB.
-            </p>
-          </div>
-
-          {/* Image Preview */}
-          {preview && (
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-gray-700">Image Preview</p>
-
-              <div className="overflow-hidden rounded-xl border border-gray-200 bg-gray-50 p-2">
+            {imagePreview && (
+              <div className="space-y-2">
                 <Image
-                  src={preview}
-                  alt="Selected image preview"
-                  className="h-64 w-full rounded-lg object-contain"
+                  src={imagePreview}
+                  alt="Image preview"
+                  width={1000}
+                  height={500}
+                  unoptimized
+                  className="h-56 w-full rounded-xl border object-contain"
                 />
-              </div>
 
-              {formData.image && (
-                <p className="break-all text-xs text-gray-500">
-                  {formData.image.name} (
-                  {(formData.image.size / (1024 * 1024)).toFixed(2)} MB)
+                <p className="text-xs text-gray-500">
+                  {formData.image?.name} ·{" "}
+                  {((formData.image?.size ?? 0) / (1024 * 1024)).toFixed(2)} MB
                 </p>
-              )}
-            </div>
-          )}
+              </div>
+            )}
 
-          {/* Error Message */}
+            {isSubmitting && formData.image && (
+              <UploadProgress
+                label="Image uploading"
+                progress={imageProgress}
+              />
+            )}
+
+            {uploadedImage && <UploadSuccess file={uploadedImage} />}
+          </section>
+
+          {/* Video Upload */}
+
+          <section className="space-y-3">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-900">
+                Preview Video
+              </h2>
+
+              <p className="text-xs text-gray-500">
+                MP4, WebM, MOV · Maximum 100 MB
+              </p>
+            </div>
+
+            <input
+              type="file"
+              accept="video/mp4,video/webm,video/quicktime"
+              onChange={handleVideoChange}
+              disabled={isSubmitting}
+              className="block w-full cursor-pointer rounded-lg border border-gray-300 bg-gray-50 text-sm file:mr-4 file:border-0 file:bg-gray-900 file:px-4 file:py-3 file:text-white"
+            />
+
+            {videoPreview && (
+              <div className="space-y-2">
+                <video
+                  src={videoPreview}
+                  controls
+                  className="w-full rounded-xl border"
+                />
+
+                <p className="text-xs text-gray-500">
+                  {formData.video?.name} ·{" "}
+                  {((formData.video?.size ?? 0) / (1024 * 1024)).toFixed(2)} MB
+                </p>
+              </div>
+            )}
+
+            {isSubmitting && formData.video && (
+              <UploadProgress
+                label="Video uploading"
+                progress={videoProgress}
+              />
+            )}
+
+            {uploadedVideo && <UploadSuccess file={uploadedVideo} />}
+          </section>
+
+          {/* Error */}
+
           {error && (
             <p
-              id="image-error"
               role="alert"
               className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600"
             >
@@ -182,18 +333,57 @@ const ImageUploadForm = () => {
             </p>
           )}
 
-          {/* Submit Button */}
+          {/* Submit */}
+
           <button
             type="submit"
-            disabled={isSubmitting}
-            className="w-full rounded-lg bg-black px-5 py-3 text-sm font-semibold text-white transition hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-black/30 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={isSubmitting || (!formData.image && !formData.video)}
+            className="w-full rounded-lg bg-black px-5 py-3 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isSubmitting ? "Uploading..." : "Upload Image"}
+            {isSubmitting ? "Uploading Media..." : "Upload Media"}
           </button>
         </form>
       </div>
     </div>
   );
 };
+
+function UploadProgress({
+  label,
+  progress,
+}: {
+  label: string;
+  progress: number;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex justify-between text-sm">
+        <span className="font-medium text-gray-700">{label}</span>
+        <span className="text-gray-500">{progress}%</span>
+      </div>
+
+      <div className="h-2 overflow-hidden rounded-full bg-gray-200">
+        <div
+          className="h-full rounded-full bg-blue-600 transition-all duration-300"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function UploadSuccess({ file }: { file: UploadedFile }) {
+  return (
+    <div className="space-y-1 rounded-lg border border-green-200 bg-green-50 p-3">
+      <p className="text-sm font-semibold text-green-700">
+        Uploaded successfully
+      </p>
+
+      <p className="break-all text-xs text-green-700">File ID: {file.fileId}</p>
+
+      <p className="break-all text-xs text-green-700">URL: {file.url}</p>
+    </div>
+  );
+}
 
 export default ImageUploadForm;

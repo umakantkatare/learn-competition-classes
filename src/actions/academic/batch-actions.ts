@@ -5,7 +5,6 @@ import { z } from "zod";
 
 import { requireAdminOrManager } from "@/lib/authorize";
 import { BatchService } from "@/server/services/academic/batch-service";
-
 import {
   createBatchSchema,
   updateBatchSchema,
@@ -129,9 +128,18 @@ export async function createBatchAction(
       return getValidationError(parsed.error);
     }
 
+    // Explicitly handle ImageKit media fields
+    const batchData = {
+      ...parsed.data,
+      thumbnail: parsed.data.thumbnail ?? "",
+      thumbnailFileId: parsed.data.thumbnailFileId ?? null,
+      previewVideo: parsed.data.previewVideo ?? null,
+      previewVideoFileId: parsed.data.previewVideoFileId ?? null,
+    };
+
     // Create batch and teacher assignments
     const newBatch = await batchService.createBatch(
-      parsed.data,
+      batchData,
       authorization.userId,
     );
 
@@ -244,7 +252,8 @@ export async function updateBatchAction(
     // Fetch current batch for slug and examination revalidation
     const currentBatch = await batchService.getBatchById(id);
 
-    // Update batch and synchronize teachers if supplied
+    // Update batch and synchronize teachers if supplied.
+    // Media URL and ImageKit fileId fields are forwarded independently.
     const updatedBatch = await batchService.updateBatch(id, parsed.data);
 
     revalidateBatchPaths(id, currentBatch.slug);
