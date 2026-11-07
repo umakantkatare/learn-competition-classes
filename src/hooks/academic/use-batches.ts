@@ -41,22 +41,34 @@ export interface Batch {
   id: string;
   examinationId: string;
   createdBy: string;
+
   title: string;
   slug: string;
   description: string;
+  features: string[];
+
   thumbnail: string | null;
+  thumbnailFileId: string | null;
+
   previewVideo: string | null;
+  previewVideoFileId: string | null;
+
   originalPrice: string;
   discountPrice: string;
   isFree: boolean;
+
   startDate: string;
-  expiryDate: string;
-  validityMonths: number;
+  expiryDate: string | null;
+  validityMonths: number | null;
+
   medium: "ENGLISH" | "HINDI" | "HINGLISH";
-  status: "UPCOMING" | "ONGOING" | "COMPLETED" | "EXPIRED";
+  status: "UPCOMING" | "ONGOING" | "COMPLETED";
+
   isPublished: boolean;
+
   createdAt: string;
   updatedAt: string;
+
   teachers: BatchTeacher[];
 }
 
@@ -66,15 +78,61 @@ export interface Batch {
 
 export const batchKeys = {
   all: ["batches"] as const,
+
   lists: () => [...batchKeys.all, "list"] as const,
+
   adminList: () => [...batchKeys.lists(), "admin"] as const,
+
   publishedList: () => [...batchKeys.lists(), "published"] as const,
+
   byExamination: (examinationId: string) =>
     [...batchKeys.lists(), "examination", examinationId] as const,
+
   details: () => [...batchKeys.all, "detail"] as const,
+
   detailBySlug: (slug: string) =>
     [...batchKeys.details(), "slug", slug] as const,
 };
+
+// -----------------------------------------------------------------------------
+// Helpers
+// -----------------------------------------------------------------------------
+
+type ActionResponse<T = unknown> = {
+  success: boolean;
+  data?: T;
+  message?: string;
+  error?: string;
+};
+
+function getActionData<T>(
+  response: ActionResponse,
+  fallbackMessage: string,
+): T {
+  if (!response.success) {
+    throw new Error(response.error || fallbackMessage);
+  }
+
+  if (response.data === undefined) {
+    throw new Error("The server returned an empty response.");
+  }
+
+  return response.data as T;
+}
+
+function handleMutationResponse(
+  response: ActionResponse,
+  successMessage: string,
+  errorMessage: string,
+): boolean {
+  if (!response.success) {
+    toast.error(response.error || errorMessage);
+    return false;
+  }
+
+  toast.success(response.message || successMessage);
+  return true;
+}
 
 // -----------------------------------------------------------------------------
 // Query Hooks
@@ -86,31 +144,21 @@ export const batchKeys = {
 export function useGetBatches() {
   return useQuery({
     queryKey: batchKeys.adminList(),
+
     queryFn: async () => {
       const response = await getAllBatchesAction();
 
-      if (!response.success) {
-        throw new Error(response.error || "Failed to fetch batches.");
-      }
-
-      return response.data as Batch[];
+      return getActionData<Batch[]>(response, "Failed to fetch batches.");
     },
   });
 }
 
+/**
+ * Alias for fetching all admin batches.
+ * Uses the same query key to avoid duplicate cache entries.
+ */
 export function useGetAllBatches() {
-  return useQuery({
-    queryKey: [...batchKeys.adminList(), "all"],
-    queryFn: async () => {
-      const response = await getAllBatchesAction();
-
-      if (!response.success) {
-        throw new Error(response.error || "Failed to fetch all batches.");
-      }
-
-      return response.data as Batch[];
-    },
-  });
+  return useGetBatches();
 }
 
 /**
@@ -119,14 +167,14 @@ export function useGetAllBatches() {
 export function useGetPublishedBatches() {
   return useQuery({
     queryKey: batchKeys.publishedList(),
+
     queryFn: async () => {
       const response = await getAllPublishedBatchesAction();
 
-      if (!response.success) {
-        throw new Error(response.error || "Failed to fetch published batches.");
-      }
-
-      return response.data as Batch[];
+      return getActionData<Batch[]>(
+        response,
+        "Failed to fetch published batches.",
+      );
     },
   });
 }
@@ -137,6 +185,7 @@ export function useGetPublishedBatches() {
 export function useGetBatchesByExamination(examinationId?: string) {
   return useQuery({
     queryKey: batchKeys.byExamination(examinationId ?? ""),
+
     queryFn: async () => {
       if (!examinationId) {
         throw new Error("Examination ID is required.");
@@ -144,14 +193,12 @@ export function useGetBatchesByExamination(examinationId?: string) {
 
       const response = await getBatchesByExaminationAction(examinationId);
 
-      if (!response.success) {
-        throw new Error(
-          response.error || "Failed to fetch examination batches.",
-        );
-      }
-
-      return response.data as Batch[];
+      return getActionData<Batch[]>(
+        response,
+        "Failed to fetch examination batches.",
+      );
     },
+
     enabled: Boolean(examinationId),
   });
 }
@@ -162,6 +209,7 @@ export function useGetBatchesByExamination(examinationId?: string) {
 export function useGetBatchBySlug(slug?: string) {
   return useQuery({
     queryKey: batchKeys.detailBySlug(slug ?? ""),
+
     queryFn: async () => {
       if (!slug) {
         throw new Error("Batch slug is required.");
@@ -169,12 +217,9 @@ export function useGetBatchBySlug(slug?: string) {
 
       const response = await getBatchBySlugAction(slug);
 
-      if (!response.success) {
-        throw new Error(response.error || "Failed to fetch batch.");
-      }
-
-      return response.data as Batch;
+      return getActionData<Batch>(response, "Failed to fetch batch.");
     },
+
     enabled: Boolean(slug),
   });
 }
@@ -193,12 +238,13 @@ export function useCreateBatch() {
     mutationFn: createBatchAction,
 
     onSuccess: (response) => {
-      if (!response.success) {
-        toast.error(response.error || "Failed to create batch.");
-        return;
-      }
+      const success = handleMutationResponse(
+        response,
+        "Batch created successfully.",
+        "Failed to create batch.",
+      );
 
-      toast.success("Batch created successfully.");
+      if (!success) return;
 
       queryClient.invalidateQueries({
         queryKey: batchKeys.all,
@@ -227,12 +273,13 @@ export function useUpdateBatch() {
     }) => updateBatchAction(id, formData),
 
     onSuccess: (response) => {
-      if (!response.success) {
-        toast.error(response.error || "Failed to update batch.");
-        return;
-      }
+      const success = handleMutationResponse(
+        response,
+        "Batch updated successfully.",
+        "Failed to update batch.",
+      );
 
-      toast.success("Batch updated successfully.");
+      if (!success) return;
 
       queryClient.invalidateQueries({
         queryKey: batchKeys.all,
@@ -256,12 +303,13 @@ export function useToggleBatchPublishStatus() {
       toggleBatchPublishStatusAction(id, isPublished),
 
     onSuccess: (response) => {
-      if (!response.success) {
-        toast.error(response.error || "Failed to update batch status.");
-        return;
-      }
+      const success = handleMutationResponse(
+        response,
+        "Batch status updated successfully.",
+        "Failed to update batch status.",
+      );
 
-      toast.success("Batch status updated successfully.");
+      if (!success) return;
 
       queryClient.invalidateQueries({
         queryKey: batchKeys.all,
@@ -284,12 +332,13 @@ export function useDeleteBatch() {
     mutationFn: deleteBatchAction,
 
     onSuccess: (response) => {
-      if (!response.success) {
-        toast.error(response.error || "Failed to delete batch.");
-        return;
-      }
+      const success = handleMutationResponse(
+        response,
+        "Batch unpublished successfully.",
+        "Failed to unpublish batch.",
+      );
 
-      toast.success("Batch deleted successfully.");
+      if (!success) return;
 
       queryClient.invalidateQueries({
         queryKey: batchKeys.all,

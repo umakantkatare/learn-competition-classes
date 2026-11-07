@@ -12,16 +12,15 @@ import {
 } from "@/hooks/academic/use-batches";
 import { useGetAllExaminations } from "@/hooks/academic/use-exams";
 import { useGetAllTeachers } from "@/hooks/academic/use-teachers";
-import {
-  createBatchSchema,
-  type CreateBatchInput,
-} from "@/validations/academic/batch-validations";
+
+import { createBatchSchema } from "@/validations/academic/batch-validation";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
+
 import {
   Dialog,
   DialogContent,
@@ -31,22 +30,36 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+
 import {
   Field,
   FieldDescription,
   FieldError,
   FieldLabel,
 } from "@/components/ui/field";
+
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-import { Loader2, Plus } from "lucide-react";
+import { Check, ChevronsUpDown, Loader2, Plus, X } from "lucide-react";
+
+// -----------------------------------------------------------------------------
+// Types
+// -----------------------------------------------------------------------------
 
 type BatchFormValues = z.input<typeof createBatchSchema>;
 type BatchFormOutput = z.output<typeof createBatchSchema>;
@@ -67,16 +80,18 @@ interface ExaminationOption {
 
 interface TeacherOption {
   id: string;
-  subject?: string;
-  user?: {
-    name?: string;
-    email?: string;
-  };
+  name: string;
+  email: string;
+  phone: string | null;
+  subject: string;
+  experienceYears: number;
+  qualification: string;
+  bio: string | null;
 }
 
-/* -------------------------------------------------------------------------- */
-/* Helpers                                                                    */
-/* -------------------------------------------------------------------------- */
+// -----------------------------------------------------------------------------
+// Helpers
+// -----------------------------------------------------------------------------
 
 function extractList<T>(response: unknown): T[] {
   if (Array.isArray(response)) {
@@ -89,18 +104,11 @@ function extractList<T>(response: unknown): T[] {
 
   const result = response as Record<string, unknown>;
 
-  if (Array.isArray(result.data)) {
-    return result.data as T[];
-  }
-
-  if (Array.isArray(result.items)) {
-    return result.items as T[];
-  }
-
+  if (Array.isArray(result.data)) return result.data as T[];
+  if (Array.isArray(result.items)) return result.items as T[];
   if (Array.isArray(result.examinations)) {
     return result.examinations as T[];
   }
-
   if (Array.isArray(result.teachers)) {
     return result.teachers as T[];
   }
@@ -115,9 +123,12 @@ function extractList<T>(response: unknown): T[] {
 function getDefaultValues(initialData?: Batch): BatchFormValues {
   return {
     examinationId: initialData?.examinationId ?? "",
+
     title: initialData?.title ?? "",
     slug: initialData?.slug ?? "",
     description: initialData?.description ?? "",
+
+    features: initialData?.features ?? [],
 
     thumbnail: initialData?.thumbnail ?? "",
     previewVideo: initialData?.previewVideo ?? "",
@@ -134,47 +145,19 @@ function getDefaultValues(initialData?: Batch): BatchFormValues {
       ? initialData.expiryDate.slice(0, 10)
       : "",
 
-    validityMonths: initialData?.validityMonths ?? 12,
+    validityMonths: initialData?.validityMonths ?? null,
 
     medium: initialData?.medium ?? "HINGLISH",
-    status: initialData?.status ?? "UPCOMING",
+
     isPublished: initialData?.isPublished ?? false,
 
     teacherIds: initialData?.teachers?.map((item) => item.teacherId) ?? [],
   };
 }
 
-function buildBatchPayload(values: BatchFormValues) {
-  return {
-    examinationId: values.examinationId,
-    title: values.title,
-    slug: values.slug,
-    description: values.description,
-
-    thumbnail: values.thumbnail || undefined,
-    previewVideo: values.previewVideo || undefined,
-
-    originalPrice: values.isFree ? 0 : values.originalPrice,
-
-    discountPrice: values.isFree ? 0 : values.discountPrice,
-
-    isFree: values.isFree,
-
-    startDate: values.startDate,
-    expiryDate: values.expiryDate,
-    validityMonths: values.validityMonths,
-
-    medium: values.medium,
-    status: values.status,
-    isPublished: values.isPublished,
-
-    teacherIds: values.teacherIds ?? [],
-  };
-}
-
-/* -------------------------------------------------------------------------- */
-/* Component                                                                  */
-/* -------------------------------------------------------------------------- */
+// -----------------------------------------------------------------------------
+// Component
+// -----------------------------------------------------------------------------
 
 export default function BatchForm({
   initialData,
@@ -184,6 +167,11 @@ export default function BatchForm({
   onSuccessCallback,
 }: BatchFormProps) {
   const [internalOpen, setInternalOpen] = useState(false);
+
+  const [examinationOpen, setExaminationOpen] = useState(false);
+  const [mediumOpen, setMediumOpen] = useState(false);
+
+  const [featureInput, setFeatureInput] = useState("");
 
   const isControlled = controlledOpen !== undefined;
   const open = isControlled ? controlledOpen : internalOpen;
@@ -208,18 +196,39 @@ export default function BatchForm({
 
   const isPending = createMutation.isPending || updateMutation.isPending;
 
+  const mediumOptions = {
+    ENGLISH: "English",
+    HINDI: "Hindi",
+    HINGLISH: "Hinglish",
+  } as const;
+
   const form = useForm<BatchFormValues, unknown, BatchFormOutput>({
     resolver: zodResolver(createBatchSchema),
     defaultValues: getDefaultValues(initialData),
   });
 
   const isFree = form.watch("isFree");
+  const features = form.watch("features") ?? [];
+
+  const expiryDate = form.watch("expiryDate");
+  const validityMonths = form.watch("validityMonths");
+
+  const hasExpiryDate = Boolean(expiryDate);
+  const hasValidityMonths =
+    validityMonths !== null &&
+    validityMonths !== undefined &&
+    validityMonths !== "";
 
   useEffect(() => {
     if (open) {
       form.reset(getDefaultValues(initialData));
+      setFeatureInput("");
     }
   }, [open, initialData, form]);
+
+  // ---------------------------------------------------------------------------
+  // Dialog
+  // ---------------------------------------------------------------------------
 
   function handleOpenChange(nextOpen: boolean) {
     if (!isControlled) {
@@ -230,14 +239,104 @@ export default function BatchForm({
 
     if (!nextOpen) {
       form.reset(getDefaultValues(initialData));
+      setFeatureInput("");
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Feature Handlers
+  // ---------------------------------------------------------------------------
+
+  function addFeature() {
+    const value = featureInput.trim();
+
+    if (!value) return;
+
+    if (
+      features.some((feature) => feature.toLowerCase() === value.toLowerCase())
+    ) {
+      form.setError("features", {
+        type: "manual",
+        message: "This feature has already been added.",
+      });
+      return;
+    }
+
+    if (value.length > 150) {
+      form.setError("features", {
+        type: "manual",
+        message: "Feature must not exceed 150 characters.",
+      });
+      return;
+    }
+
+    form.setValue("features", [...features, value], {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+
+    form.clearErrors("features");
+    setFeatureInput("");
+  }
+
+  function removeFeature(index: number) {
+    form.setValue(
+      "features",
+      features.filter((_, i) => i !== index),
+      {
+        shouldDirty: true,
+        shouldValidate: true,
+      },
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Schedule Handlers
+  // ---------------------------------------------------------------------------
+
+  function handleExpiryDateChange(value: string) {
+    form.setValue("expiryDate", value, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+
+    if (value) {
+      form.setValue("validityMonths", null, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    }
+  }
+
+  function handleValidityChange(value: string) {
+    form.setValue("validityMonths", value === "" ? null : Number(value), {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+
+    if (value !== "") {
+      form.setValue("expiryDate", "", {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Submit
+  // ---------------------------------------------------------------------------
 
   async function onSubmit(values: BatchFormOutput) {
     const payload = {
       ...values,
-      startDate: values.startDate.toISOString(),
-      expiryDate: values.expiryDate?.toISOString() ?? null,
+
+      // Ensure empty features are stored as an empty array.
+      features: values.features ?? [],
+
+      // Preserve mutually exclusive schedule fields.
+      expiryDate: values.expiryDate ? values.expiryDate.toISOString() : null,
+
+      validityMonths: values.validityMonths ?? null,
     };
 
     try {
@@ -260,6 +359,10 @@ export default function BatchForm({
       // Mutation hooks handle errors.
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -289,35 +392,102 @@ export default function BatchForm({
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           {/* Examination */}
+
           <Controller
             control={form.control}
             name="examinationId"
-            render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid}>
-                <FieldLabel>Examination</FieldLabel>
+            render={({ field, fieldState }) => {
+              const selectedExamination = examinations.find(
+                (examination) => examination.id === field.value,
+              );
 
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger aria-invalid={fieldState.invalid}>
-                    <SelectValue placeholder="Select examination" />
-                  </SelectTrigger>
+              return (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel>Examination</FieldLabel>
 
-                  <SelectContent>
-                    {examinations.map((examination) => (
-                      <SelectItem key={examination.id} value={examination.id}>
-                        {examination.title ??
-                          examination.name ??
-                          examination.id}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <Popover
+                    open={examinationOpen}
+                    onOpenChange={setExaminationOpen}
+                  >
+                    <PopoverTrigger
+                      render={
+                        <Button
+                          type="button"
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={examinationOpen}
+                          aria-invalid={fieldState.invalid}
+                          className="w-full justify-between font-normal"
+                        >
+                          <span className="truncate">
+                            {selectedExamination
+                              ? (selectedExamination.title ??
+                                selectedExamination.name ??
+                                selectedExamination.id)
+                              : "Select examination"}
+                          </span>
 
-                <FieldError errors={[fieldState.error]} />
-              </Field>
-            )}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      }
+                    />
+
+                    <PopoverContent
+                      className="w-[var(--anchor-width)] min-w-[var(--anchor-width)] p-0"
+                      align="start"
+                    >
+                      <Command>
+                        <CommandInput placeholder="Search examination..." />
+
+                        <CommandList>
+                          {examinationQuery.isLoading ? (
+                            <CommandEmpty>Loading examinations...</CommandEmpty>
+                          ) : examinations.length === 0 ? (
+                            <CommandEmpty>No examination found.</CommandEmpty>
+                          ) : (
+                            <CommandGroup>
+                              {examinations.map((examination) => {
+                                const label =
+                                  examination.title ??
+                                  examination.name ??
+                                  examination.id;
+
+                                const isSelected =
+                                  field.value === examination.id;
+
+                                return (
+                                  <CommandItem
+                                    key={examination.id}
+                                    value={label}
+                                    onSelect={() => {
+                                      field.onChange(examination.id);
+                                      setExaminationOpen(false);
+                                    }}
+                                  >
+                                    <Check
+                                      className={`mr-2 h-4 w-4 ${
+                                        isSelected ? "opacity-100" : "opacity-0"
+                                      }`}
+                                    />
+                                    {label}
+                                  </CommandItem>
+                                );
+                              })}
+                            </CommandGroup>
+                          )}
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+
+                  <FieldError errors={[fieldState.error]} />
+                </Field>
+              );
+            }}
           />
 
           {/* Basic Information */}
+
           <section className="space-y-4">
             <h3 className="text-sm font-semibold">Basic Information</h3>
 
@@ -382,7 +552,69 @@ export default function BatchForm({
             />
           </section>
 
+          {/* Batch Features */}
+
+          <section className="space-y-3">
+            <div>
+              <h3 className="text-sm font-semibold">Batch Features</h3>
+
+              <p className="text-sm text-muted-foreground">
+                Add the key benefits and facilities included in this batch.
+              </p>
+            </div>
+
+            <div className="flex gap-2">
+              <Input
+                value={featureInput}
+                onChange={(event) => setFeatureInput(event.target.value)}
+                placeholder="e.g. Live classes, mock tests, study material"
+                maxLength={150}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    addFeature();
+                  }
+                }}
+              />
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={addFeature}
+                disabled={!featureInput.trim()}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add
+              </Button>
+            </div>
+
+            {features.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {features.map((feature, index) => (
+                  <div
+                    key={`${feature}-${index}`}
+                    className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm"
+                  >
+                    <span>{feature}</span>
+
+                    <button
+                      type="button"
+                      onClick={() => removeFeature(index)}
+                      className="text-muted-foreground hover:text-destructive"
+                      aria-label={`Remove ${feature}`}
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <FieldError errors={[form.formState.errors.features]} />
+          </section>
+
           {/* Media */}
+
           <section className="space-y-4">
             <h3 className="text-sm font-semibold">Media</h3>
 
@@ -399,7 +631,7 @@ export default function BatchForm({
                       placeholder="https://example.com/image.jpg"
                       aria-invalid={fieldState.invalid}
                       {...field}
-                      value={field.value ?? ""}
+                      value={typeof field.value === "string" ? field.value : ""}
                     />
 
                     <FieldError errors={[fieldState.error]} />
@@ -421,7 +653,7 @@ export default function BatchForm({
                       placeholder="https://example.com/video"
                       aria-invalid={fieldState.invalid}
                       {...field}
-                      value={field.value ?? ""}
+                      value={typeof field.value === "string" ? field.value : ""}
                     />
 
                     <FieldError errors={[fieldState.error]} />
@@ -432,6 +664,7 @@ export default function BatchForm({
           </section>
 
           {/* Pricing */}
+
           <section className="space-y-4">
             <h3 className="text-sm font-semibold">Pricing</h3>
 
@@ -529,30 +762,37 @@ export default function BatchForm({
           </section>
 
           {/* Schedule */}
+
           <section className="space-y-4">
-            <h3 className="text-sm font-semibold">Batch Schedule</h3>
+            <div>
+              <h3 className="text-sm font-semibold">Batch Schedule</h3>
+
+              <p className="text-sm text-muted-foreground">
+                Choose either a fixed expiry date or a validity duration.
+              </p>
+            </div>
+
+            <Controller
+              control={form.control}
+              name="startDate"
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor="startDate">Start Date</FieldLabel>
+
+                  <Input
+                    id="startDate"
+                    type="date"
+                    aria-invalid={fieldState.invalid}
+                    {...field}
+                    value={String(field.value ?? "")}
+                  />
+
+                  <FieldError errors={[fieldState.error]} />
+                </Field>
+              )}
+            />
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <Controller
-                control={form.control}
-                name="startDate"
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="startDate">Start Date</FieldLabel>
-
-                    <Input
-                      id="startDate"
-                      type="date"
-                      aria-invalid={fieldState.invalid}
-                      {...field}
-                      value={field.value ?? ""}
-                    />
-
-                    <FieldError errors={[fieldState.error]} />
-                  </Field>
-                )}
-              />
-
               <Controller
                 control={form.control}
                 name="expiryDate"
@@ -564,9 +804,16 @@ export default function BatchForm({
                       id="expiryDate"
                       type="date"
                       aria-invalid={fieldState.invalid}
-                      {...field}
-                      value={field.value ?? ""}
+                      value={String(field.value ?? "")}
+                      disabled={hasValidityMonths}
+                      onChange={(event) =>
+                        handleExpiryDateChange(event.target.value)
+                      }
                     />
+
+                    <FieldDescription>
+                      Use this when the batch has a fixed expiry date.
+                    </FieldDescription>
 
                     <FieldError errors={[fieldState.error]} />
                   </Field>
@@ -588,75 +835,114 @@ export default function BatchForm({
                       min="1"
                       placeholder="12"
                       aria-invalid={fieldState.invalid}
-                      value={field.value ?? ""}
+                      value={String(field.value ?? "")}
+                      disabled={hasExpiryDate}
                       onChange={(event) =>
-                        field.onChange(
-                          event.target.value === ""
-                            ? ""
-                            : Number(event.target.value),
-                        )
+                        handleValidityChange(event.target.value)
                       }
                     />
 
-                    <FieldError errors={[fieldState.error]} />
-                  </Field>
-                )}
-              />
-
-              <Controller
-                control={form.control}
-                name="medium"
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel>Medium</FieldLabel>
-
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger aria-invalid={fieldState.invalid}>
-                        <SelectValue placeholder="Select medium" />
-                      </SelectTrigger>
-
-                      <SelectContent>
-                        <SelectItem value="ENGLISH">English</SelectItem>
-                        <SelectItem value="HINDI">Hindi</SelectItem>
-                        <SelectItem value="HINGLISH">Hinglish</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <FieldDescription>
+                      Use this when access is valid for a fixed number of
+                      months.
+                    </FieldDescription>
 
                     <FieldError errors={[fieldState.error]} />
                   </Field>
                 )}
               />
             </div>
+
+            {(hasExpiryDate || hasValidityMonths) && (
+              <p className="text-xs text-muted-foreground">
+                {hasExpiryDate
+                  ? "Fixed expiry date selected. Validity months are disabled."
+                  : "Validity duration selected. Expiry date is disabled."}
+              </p>
+            )}
           </section>
 
-          {/* Status */}
-          <section className="space-y-4">
-            <h3 className="text-sm font-semibold">Batch Status</h3>
+          {/* Medium */}
 
+          <section className="space-y-4">
             <Controller
               control={form.control}
-              name="status"
+              name="medium"
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel>Status</FieldLabel>
+                  <FieldLabel>Medium</FieldLabel>
 
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger aria-invalid={fieldState.invalid}>
-                      <SelectValue placeholder="Select status" />
-                    </SelectTrigger>
+                  <Popover open={mediumOpen} onOpenChange={setMediumOpen}>
+                    <PopoverTrigger
+                      render={
+                        <Button
+                          type="button"
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={mediumOpen}
+                          aria-invalid={fieldState.invalid}
+                          className="w-full justify-between font-normal"
+                        >
+                          {mediumOptions[
+                            field.value as keyof typeof mediumOptions
+                          ] ?? "Select medium"}
 
-                    <SelectContent>
-                      <SelectItem value="UPCOMING">Upcoming</SelectItem>
-                      <SelectItem value="ONGOING">Ongoing</SelectItem>
-                      <SelectItem value="COMPLETED">Completed</SelectItem>
-                      <SelectItem value="EXPIRED">Expired</SelectItem>
-                    </SelectContent>
-                  </Select>
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      }
+                    />
+
+                    <PopoverContent
+                      className="w-[var(--anchor-width)] min-w-[var(--anchor-width)] p-0"
+                      align="start"
+                    >
+                      <Command>
+                        <CommandInput placeholder="Search medium..." />
+
+                        <CommandList>
+                          <CommandEmpty>No medium found.</CommandEmpty>
+
+                          <CommandGroup>
+                            {[
+                              { value: "ENGLISH", label: "English" },
+                              { value: "HINDI", label: "Hindi" },
+                              { value: "HINGLISH", label: "Hinglish" },
+                            ].map((option) => (
+                              <CommandItem
+                                key={option.value}
+                                value={option.label}
+                                onSelect={() => {
+                                  field.onChange(option.value);
+                                  setMediumOpen(false);
+                                }}
+                              >
+                                <Check
+                                  className={`mr-2 h-4 w-4 ${
+                                    field.value === option.value
+                                      ? "opacity-100"
+                                      : "opacity-0"
+                                  }`}
+                                />
+
+                                {option.label}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
 
                   <FieldError errors={[fieldState.error]} />
                 </Field>
               )}
             />
+          </section>
+
+          {/* Publishing */}
+
+          <section className="space-y-4">
+            <h3 className="text-sm font-semibold">Publishing</h3>
 
             <Controller
               control={form.control}
@@ -681,6 +967,7 @@ export default function BatchForm({
           </section>
 
           {/* Teachers */}
+
           <section className="space-y-3">
             <div>
               <h3 className="text-sm font-semibold">Assign Teachers</h3>
@@ -699,50 +986,48 @@ export default function BatchForm({
                 return (
                   <Field data-invalid={fieldState.invalid}>
                     <ScrollArea className="h-52 rounded-md border p-3">
-                      {teachers.length > 0 ? (
-                        <div className="space-y-3">
-                          {teachers.map((teacher) => {
-                            const checked = selectedIds.includes(teacher.id);
-
-                            return (
-                              <label
-                                key={teacher.id}
-                                className="flex cursor-pointer items-start gap-3 rounded-md p-2 hover:bg-muted"
-                              >
-                                <Checkbox
-                                  checked={checked}
-                                  onCheckedChange={(value) => {
-                                    const nextIds = value
-                                      ? [...selectedIds, teacher.id]
-                                      : selectedIds.filter(
-                                          (id) => id !== teacher.id,
-                                        );
-
-                                    field.onChange(nextIds);
-                                  }}
-                                />
-
-                                <div className="min-w-0">
-                                  <p className="text-sm font-medium">
-                                    {teacher.user?.name ?? "Unnamed Teacher"}
-                                  </p>
-
-                                  <p className="text-xs text-muted-foreground">
-                                    {teacher.subject ??
-                                      teacher.user?.email ??
-                                      "No subject specified"}
-                                  </p>
-                                </div>
-                              </label>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <p className="py-8 text-center text-sm text-muted-foreground">
-                          {teacherQuery.isLoading
-                            ? "Loading teachers..."
-                            : "No teachers found."}
+                      {teacherQuery.isLoading ? (
+                        <p className="p-2 text-sm text-muted-foreground">
+                          Loading teachers...
                         </p>
+                      ) : teachers.length === 0 ? (
+                        <p className="p-2 text-sm text-muted-foreground">
+                          No teachers found.
+                        </p>
+                      ) : (
+                        teachers.map((teacher) => {
+                          const checked = selectedIds.includes(teacher.id);
+
+                          return (
+                            <label
+                              key={teacher.id}
+                              className="flex cursor-pointer items-start gap-3 rounded-md p-2 hover:bg-muted"
+                            >
+                              <Checkbox
+                                checked={checked}
+                                onCheckedChange={(value) => {
+                                  const nextIds = value
+                                    ? [...selectedIds, teacher.id]
+                                    : selectedIds.filter(
+                                        (id) => id !== teacher.id,
+                                      );
+
+                                  field.onChange(nextIds);
+                                }}
+                              />
+
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium">
+                                  {teacher.name}
+                                </p>
+
+                                <p className="text-xs text-muted-foreground">
+                                  {teacher.subject.replace(/[{}"]/g, " ")}
+                                </p>
+                              </div>
+                            </label>
+                          );
+                        })
                       )}
                     </ScrollArea>
 
@@ -758,6 +1043,7 @@ export default function BatchForm({
           </section>
 
           {/* Actions */}
+
           <DialogFooter className="gap-2">
             <Button
               type="button"

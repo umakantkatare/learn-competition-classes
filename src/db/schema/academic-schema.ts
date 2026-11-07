@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   pgTable,
   text,
@@ -8,6 +9,7 @@ import {
   primaryKey,
   uniqueIndex,
   index,
+  check,
 } from "drizzle-orm/pg-core";
 import { user } from "./auth-schema";
 import {
@@ -134,16 +136,14 @@ export const batch = pgTable(
     createdBy: text("created_by")
       .notNull()
       .references(() => user.id, { onDelete: "restrict" }),
-
     title: text("title").notNull(),
     slug: text("slug").notNull().unique(),
     description: text("description").notNull(),
-    // features: text("features").array().default([]).notNull(),
+    features: text("features").array().default([]).notNull(),
     thumbnail: text("thumbnail").notNull(),
     thumbnailFileId: text("thumbnail_file_id"),
     previewVideo: text("preview_video"),
     previewVideoFileId: text("preview_video_file_id"),
-
     originalPrice: decimal("original_price", {
       precision: 10,
       scale: 2,
@@ -153,14 +153,12 @@ export const batch = pgTable(
       scale: 2,
     }).notNull(),
     isFree: boolean("is_free").default(false).notNull(),
-
     startDate: timestamp("start_date").notNull(),
     expiryDate: timestamp("expiry_date"),
-    validityMonths: integer("validity_months").default(12),
+    validityMonths: integer("validity_months"),
     medium: batchMediumEnum("medium").default("HINGLISH").notNull(),
     status: batchStatusEnum("status").default("UPCOMING").notNull(),
     isPublished: boolean("is_published").default(false).notNull(),
-
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -170,6 +168,18 @@ export const batch = pgTable(
   (table) => [
     index("batch_examinationId_idx").on(table.examinationId),
     index("batch_createdBy_idx").on(table.createdBy),
+    check(
+      "batch_schedule_xor_check",
+      sql`(${table.expiryDate} IS NOT NULL) <> (${table.validityMonths} IS NOT NULL)`,
+    ),
+    check(
+      "batch_validity_positive_check",
+      sql`${table.validityMonths} IS NULL OR ${table.validityMonths} > 0`,
+    ),
+    check(
+      "batch_expiry_after_start_check",
+      sql`${table.expiryDate} IS NULL OR ${table.expiryDate} > ${table.startDate}`,
+    ),
   ],
 );
 

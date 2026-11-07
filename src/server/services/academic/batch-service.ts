@@ -15,9 +15,9 @@ import type {
   UpdateBatchInput,
 } from "@/validations/academic/batch-validation";
 
-// ---------------------------------------------
-// Batch Service
-// ---------------------------------------------
+/* -------------------------------------------------------------------------- */
+/* Batch Service                                                              */
+/* -------------------------------------------------------------------------- */
 
 export class BatchService {
   private readonly batchRepo: BatchRepository;
@@ -32,10 +32,11 @@ export class BatchService {
     this.teacherRepo = new TeacherRepository();
   }
 
-  // ---------------------------------------------
-  // Private Helpers
-  // ---------------------------------------------
+  /* ------------------------------------------------------------------------ */
+  /* Private Helpers                                                          */
+  /* ------------------------------------------------------------------------ */
 
+  // Validate teacher profiles
   private async validateTeachers(teacherIds: string[]): Promise<void> {
     if (teacherIds.length === 0) return;
 
@@ -48,6 +49,26 @@ export class BatchService {
     }
   }
 
+  // Validate start date using Indian timezone
+  private validateStartDate(startDate: Date | string): void {
+    const today = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+
+    const selectedDate =
+      typeof startDate === "string"
+        ? startDate.slice(0, 10)
+        : startDate.toISOString().slice(0, 10);
+
+    if (selectedDate < today) {
+      throw new Error("Batch start date cannot be earlier than today's date.");
+    }
+  }
+
+  // Validate pricing
   private validatePricing(
     isFree: boolean,
     originalPrice: number,
@@ -75,11 +96,38 @@ export class BatchService {
     }
   }
 
-  // Attach teachers to a single batch
+  // Validate mutually exclusive schedule fields
+  private validateSchedule(
+    expiryDate: Date | null,
+    validityMonths: number | null,
+  ): void {
+    const hasExpiryDate = expiryDate !== null;
+    const hasValidityMonths = validityMonths !== null;
 
-  // ---------------------------------------------
-  // Enrich Batch With Teacher Details
-  // ---------------------------------------------
+    if (hasExpiryDate === hasValidityMonths) {
+      throw new Error(
+        "Provide either expiry date or validity months, not both.",
+      );
+    }
+
+    if (
+      validityMonths !== null &&
+      (!Number.isInteger(validityMonths) || validityMonths <= 0)
+    ) {
+      throw new Error("Validity months must be a positive integer.");
+    }
+  }
+
+  // Validate expiry date against start date
+  private validateExpiryDate(startDate: Date, expiryDate: Date | null): void {
+    if (expiryDate && expiryDate <= startDate) {
+      throw new Error("Expiry date must be after the start date.");
+    }
+  }
+
+  /* ------------------------------------------------------------------------ */
+  /* Enrich Batch With Teacher Details                                        */
+  /* ------------------------------------------------------------------------ */
 
   private async enrichBatch(batch: Batch) {
     const assignments = await this.batchTeacherRepo.findByBatchId(batch.id);
@@ -104,21 +152,22 @@ export class BatchService {
     };
   }
 
-  // Attach teachers to multiple batches
+  /* ------------------------------------------------------------------------ */
+  /* Enrich Multiple Batches                                                  */
+  /* ------------------------------------------------------------------------ */
 
   private async enrichBatches(batches: Batch[]) {
     return Promise.all(batches.map((batch) => this.enrichBatch(batch)));
   }
 
-  // ---------------------------------------------
-  // Create Batch + Assign Teachers
-  // ---------------------------------------------
+  /* ------------------------------------------------------------------------ */
+  /* Create Batch + Assign Teachers                                           */
+  /* ------------------------------------------------------------------------ */
 
   async createBatch(data: CreateBatchInput, userId: string) {
     const { teacherIds = [], ...batchData } = data;
 
     // Validate examination
-
     const examination = await this.examinationRepo.findById(
       batchData.examinationId,
     );
@@ -131,8 +180,10 @@ export class BatchService {
       throw new Error("Cannot create a batch for an inactive examination.");
     }
 
-    // Validate unique slug
+    // Validate start date
+    this.validateStartDate(batchData.startDate);
 
+    // Validate unique slug
     const existingBatch = await this.batchRepo.findBySlug(batchData.slug);
 
     if (existingBatch) {
@@ -140,34 +191,37 @@ export class BatchService {
     }
 
     // Validate pricing
-
     this.validatePricing(
       batchData.isFree,
       Number(batchData.originalPrice),
       Number(batchData.discountPrice),
     );
 
-    // Validate expiry date
+    // Validate schedule
+    this.validateSchedule(
+      batchData.expiryDate ?? null,
+      batchData.validityMonths ?? null,
+    );
 
-    if (batchData.expiryDate && batchData.expiryDate <= batchData.startDate) {
-      throw new Error("Expiry date must be after the start date.");
-    }
+    // Validate expiry date
+    this.validateExpiryDate(batchData.startDate, batchData.expiryDate ?? null);
 
     // Validate teacher profiles
-
     await this.validateTeachers(teacherIds);
 
-    // Create batch and assignments atomically
-
+    // Create batch and teacher assignments atomically
     const newBatch = await db.transaction(async (tx) => {
       const createdBatch = await this.batchRepo.create(
         {
           ...batchData,
+          features: batchData.features ?? [],
+          thumbnail: batchData.thumbnail ?? "",
           createdBy: userId,
         },
         tx,
       );
 
+      // Assign teachers
       if (teacherIds.length > 0) {
         await this.batchTeacherRepo.createMany(
           teacherIds.map((teacherId) => ({
@@ -182,13 +236,12 @@ export class BatchService {
     });
 
     // Return enriched batch details
-
     return this.getBatchById(newBatch.id);
   }
 
-  // ---------------------------------------------
-  // Get All Batches (Admin)
-  // ---------------------------------------------
+  /* ------------------------------------------------------------------------ */
+  /* Get All Batches (Admin)                                                  */
+  /* ------------------------------------------------------------------------ */
 
   async getAllBatches() {
     const batches = await this.batchRepo.findAll();
@@ -196,15 +249,19 @@ export class BatchService {
     return this.enrichBatches(batches);
   }
 
-  // ---------------------------------------------
-  // Get All Published Batches (Public/Student)
-  // ---------------------------------------------
+  /* ------------------------------------------------------------------------ */
+  /* Get All Published Batches (Public/Student)                               */
+  /* ------------------------------------------------------------------------ */
 
   async getAllPublishedBatches() {
     const batches = await this.batchRepo.findAllPublished();
 
     return this.enrichBatches(batches);
   }
+
+  /* ------------------------------------------------------------------------ */
+  /* Get Published Batch By ID                                                */
+  /* ------------------------------------------------------------------------ */
 
   async getPublishedBatchById(id: string) {
     const batch = await this.batchRepo.findPublishedById(id);
@@ -216,9 +273,9 @@ export class BatchService {
     return this.enrichBatch(batch);
   }
 
-  // ---------------------------------------------
-  // Get Batch By ID (Admin/Internal)
-  // ---------------------------------------------
+  /* ------------------------------------------------------------------------ */
+  /* Get Batch By ID (Admin/Internal)                                         */
+  /* ------------------------------------------------------------------------ */
 
   async getBatchById(id: string) {
     const batch = await this.batchRepo.findById(id);
@@ -230,9 +287,9 @@ export class BatchService {
     return this.enrichBatch(batch);
   }
 
-  // ---------------------------------------------
-  // Get Published Batch By Slug (Public)
-  // ---------------------------------------------
+  /* ------------------------------------------------------------------------ */
+  /* Get Published Batch By Slug (Public)                                     */
+  /* ------------------------------------------------------------------------ */
 
   async getBatchBySlug(slug: string) {
     const batch = await this.batchRepo.findPublishedBySlug(slug);
@@ -244,9 +301,9 @@ export class BatchService {
     return this.enrichBatch(batch);
   }
 
-  // ---------------------------------------------
-  // Get Batches By Examination
-  // ---------------------------------------------
+  /* ------------------------------------------------------------------------ */
+  /* Get Batches By Examination                                               */
+  /* ------------------------------------------------------------------------ */
 
   async getBatchesByExamination(examinationId: string) {
     const examination = await this.examinationRepo.findById(examinationId);
@@ -260,9 +317,9 @@ export class BatchService {
     return this.enrichBatches(batches);
   }
 
-  // ---------------------------------------------
-  // Update Batch + Optional Teacher Sync
-  // ---------------------------------------------
+  /* ------------------------------------------------------------------------ */
+  /* Update Batch + Optional Teacher Sync                                     */
+  /* ------------------------------------------------------------------------ */
 
   async updateBatch(id: string, data: UpdateBatchInput) {
     const currentBatch = await this.batchRepo.findById(id);
@@ -274,7 +331,6 @@ export class BatchService {
     const { teacherIds, ...batchData } = data;
 
     // Validate examination if changed
-
     if (
       batchData.examinationId &&
       batchData.examinationId !== currentBatch.examinationId
@@ -293,7 +349,6 @@ export class BatchService {
     }
 
     // Validate slug if changed
-
     if (batchData.slug && batchData.slug !== currentBatch.slug) {
       const existingBatch = await this.batchRepo.findBySlug(batchData.slug);
 
@@ -303,7 +358,6 @@ export class BatchService {
     }
 
     // Validate final prices
-
     const finalOriginalPrice = Number(
       batchData.originalPrice ?? currentBatch.originalPrice,
     );
@@ -317,29 +371,59 @@ export class BatchService {
     this.validatePricing(finalIsFree, finalOriginalPrice, finalDiscountPrice);
 
     // Validate final dates
-
     const finalStartDate = batchData.startDate ?? currentBatch.startDate;
 
-    const finalExpiryDate =
-      batchData.expiryDate !== undefined
-        ? batchData.expiryDate
-        : currentBatch.expiryDate;
+    this.validateStartDate(batchData.startDate ?? currentBatch.startDate);
 
-    if (finalExpiryDate && finalExpiryDate <= finalStartDate) {
-      throw new Error("Expiry date must be after the start date.");
+    // Resolve final schedule using existing database values
+    let finalExpiryDate: Date | null = currentBatch.expiryDate;
+
+    let finalValidityMonths: number | null = currentBatch.validityMonths;
+
+    // If a new expiry date is provided, clear validity.
+    if (batchData.expiryDate !== undefined && batchData.expiryDate !== null) {
+      finalExpiryDate = batchData.expiryDate;
+      finalValidityMonths = null;
     }
 
-    // Validate teachers only when teacherIds are supplied
+    // If a new validity is provided, clear expiry date.
+    if (
+      batchData.validityMonths !== undefined &&
+      batchData.validityMonths !== null
+    ) {
+      finalValidityMonths = batchData.validityMonths;
+      finalExpiryDate = null;
+    }
 
+    // Handle explicit null values
+    if (
+      batchData.expiryDate === null &&
+      batchData.validityMonths === undefined
+    ) {
+      finalExpiryDate = null;
+    }
+
+    if (
+      batchData.validityMonths === null &&
+      batchData.expiryDate === undefined
+    ) {
+      finalValidityMonths = null;
+    }
+
+    // Validate final schedule
+    this.validateSchedule(finalExpiryDate, finalValidityMonths);
+
+    // Validate final expiry date
+    this.validateExpiryDate(finalStartDate, finalExpiryDate);
+
+    // Validate teachers only when teacherIds are supplied
     if (teacherIds !== undefined) {
       await this.validateTeachers(teacherIds);
     }
 
     // Update batch and synchronize assignments atomically
-
     await db.transaction(async (tx) => {
       // Update batch fields only when provided
-
       if (Object.keys(batchData).length > 0) {
         const result = await this.batchRepo.update(
           id,
@@ -353,7 +437,6 @@ export class BatchService {
       }
 
       // Sync teachers only when teacherIds is provided
-
       if (teacherIds !== undefined) {
         await this.batchTeacherRepo.deleteByBatchId(id, tx);
 
@@ -370,13 +453,12 @@ export class BatchService {
     });
 
     // Return updated batch with teachers
-
     return this.getBatchById(id);
   }
 
-  // ---------------------------------------------
-  // Publish Batch
-  // ---------------------------------------------
+  /* ------------------------------------------------------------------------ */
+  /* Publish Batch                                                            */
+  /* ------------------------------------------------------------------------ */
 
   async publishBatch(id: string) {
     const batch = await this.batchRepo.findById(id);
@@ -402,9 +484,9 @@ export class BatchService {
     return this.enrichBatch(result);
   }
 
-  // ---------------------------------------------
-  // Unpublish Batch
-  // ---------------------------------------------
+  /* ------------------------------------------------------------------------ */
+  /* Unpublish Batch                                                          */
+  /* ------------------------------------------------------------------------ */
 
   async unpublishBatch(id: string) {
     const batch = await this.batchRepo.findById(id);

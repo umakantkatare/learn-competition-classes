@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+
 import { requireAdminOrManager } from "@/lib/authorize";
 import { BatchService } from "@/server/services/academic/batch-service";
 
@@ -9,6 +10,10 @@ import {
   createBatchSchema,
   updateBatchSchema,
 } from "@/validations/academic/batch-validation";
+
+// ---------------------------------------------
+// Service
+// ---------------------------------------------
 
 const batchService = new BatchService();
 
@@ -21,7 +26,21 @@ type ActionResult<T = unknown> = {
   data?: T;
   message?: string;
   error?: string;
+  issues?: {
+    field: string;
+    message: string;
+  }[];
 };
+
+type BatchAuthorization =
+  | {
+      authorized: true;
+      userId: string;
+    }
+  | {
+      authorized: false;
+      result: ActionResult;
+    };
 
 // ---------------------------------------------
 // Helpers
@@ -39,8 +58,9 @@ function getErrorMessage(error: unknown): string {
   return "An unexpected error occurred.";
 }
 
-function getValidationError(error: z.ZodError) {
+function getValidationError(error: z.ZodError): ActionResult {
   return {
+    success: false,
     error: error.issues[0]?.message ?? "Invalid input.",
     issues: error.issues.map((issue) => ({
       field: issue.path.join("."),
@@ -49,17 +69,27 @@ function getValidationError(error: z.ZodError) {
   };
 }
 
-async function authorizeBatchAction(): Promise<ActionResult | null> {
+/**
+ * Authorizes admin or manager actions.
+ * Returns the authenticated user ID to avoid duplicate authorization calls.
+ */
+async function authorizeBatchAction(): Promise<BatchAuthorization> {
   const authorization = await requireAdminOrManager();
 
   if (!authorization.authorized) {
     return {
-      success: false,
-      error: authorization.message,
+      authorized: false,
+      result: {
+        success: false,
+        error: authorization.message,
+      },
     };
   }
 
-  return null;
+  return {
+    authorized: true,
+    userId: authorization.user.id,
+  };
 }
 
 function revalidateBatchPaths(id: string, slug?: string) {
@@ -74,6 +104,10 @@ function revalidateBatchPaths(id: string, slug?: string) {
   }
 }
 
+function validateId(id: string): boolean {
+  return typeof id === "string" && id.trim().length > 0;
+}
+
 // ---------------------------------------------
 // 1. Create Batch
 // ---------------------------------------------
@@ -82,40 +116,28 @@ export async function createBatchAction(
   formData: z.input<typeof createBatchSchema>,
 ): Promise<ActionResult> {
   try {
-    const authorizationError = await authorizeBatchAction();
+    const authorization = await authorizeBatchAction();
 
-    if (authorizationError) return authorizationError;
+    if (!authorization.authorized) {
+      return authorization.result;
+    }
 
     // Validate input
-
     const parsed = createBatchSchema.safeParse(formData);
 
     if (!parsed.success) {
-      return {
-        success: false,
-        ...getValidationError(parsed.error),
-      };
+      return getValidationError(parsed.error);
     }
 
-    // Create batch and teacher assignments atomically.
-
-    const authorization = await requireAdminOrManager();
-
-    if (!authorization.authorized) {
-      return {
-        success: false,
-        error: authorization.message,
-      };
-    }
-
+    // Create batch and teacher assignments
     const newBatch = await batchService.createBatch(
       parsed.data,
-      authorization.user.id,
+      authorization.userId,
     );
 
     // Revalidate affected pages
+    revalidateBatchPaths(newBatch.id, newBatch.slug);
 
-    revalidatePath("/admin/batches");
     revalidatePath(`/admin/examinations/${parsed.data.examinationId}`);
 
     return {
@@ -134,14 +156,16 @@ export async function createBatchAction(
 }
 
 // ---------------------------------------------
-// 2. Get All Batches (Admin)
+// 2. Get All Batches (Admin / Manager)
 // ---------------------------------------------
 
 export async function getAllBatchesAction(): Promise<ActionResult> {
   try {
-    const authorizationError = await authorizeBatchAction();
+    const authorization = await authorizeBatchAction();
 
-    if (authorizationError) return authorizationError;
+    if (!authorization.authorized) {
+      return authorization.result;
+    }
 
     const batches = await batchService.getAllBatches();
 
@@ -160,7 +184,7 @@ export async function getAllBatchesAction(): Promise<ActionResult> {
 }
 
 // ---------------------------------------------
-// 3. Get All Published Batches (Public/Student)
+// 3. Get All Published Batches (Public / Student)
 // ---------------------------------------------
 
 export async function getAllPublishedBatchesAction(): Promise<ActionResult> {
@@ -190,11 +214,13 @@ export async function updateBatchAction(
   formData: z.input<typeof updateBatchSchema>,
 ): Promise<ActionResult> {
   try {
-    const authorizationError = await authorizeBatchAction();
+    const authorization = await authorizeBatchAction();
 
-    if (authorizationError) return authorizationError;
+    if (!authorization.authorized) {
+      return authorization.result;
+    }
 
-    if (!id?.trim()) {
+    if (!validateId(id)) {
       return {
         success: false,
         error: "Batch ID is required.",
@@ -202,14 +228,10 @@ export async function updateBatchAction(
     }
 
     // Validate input
-
     const parsed = updateBatchSchema.safeParse(formData);
 
     if (!parsed.success) {
-      return {
-        success: false,
-        ...getValidationError(parsed.error),
-      };
+      return getValidationError(parsed.error);
     }
 
     if (Object.keys(parsed.data).length === 0) {
@@ -219,20 +241,24 @@ export async function updateBatchAction(
       };
     }
 
-    // Fetch current batch for slug revalidation.
-
+    // Fetch current batch for slug and examination revalidation
     const currentBatch = await batchService.getBatchById(id);
 
-    // Update batch and synchronize teachers if supplied.
-
+    // Update batch and synchronize teachers if supplied
     const updatedBatch = await batchService.updateBatch(id, parsed.data);
 
     revalidateBatchPaths(id, currentBatch.slug);
 
-    // Revalidate new slug if changed.
-
+    // Revalidate new slug if changed
     if (updatedBatch.slug !== currentBatch.slug) {
       revalidatePath(`/batch/${updatedBatch.slug}`);
+    }
+
+    // Revalidate examination pages if examination changed
+    revalidatePath(`/admin/examinations/${currentBatch.examinationId}`);
+
+    if (updatedBatch.examinationId !== currentBatch.examinationId) {
+      revalidatePath(`/admin/examinations/${updatedBatch.examinationId}`);
     }
 
     return {
@@ -259,11 +285,13 @@ export async function toggleBatchPublishStatusAction(
   isPublished: boolean,
 ): Promise<ActionResult> {
   try {
-    const authorizationError = await authorizeBatchAction();
+    const authorization = await authorizeBatchAction();
 
-    if (authorizationError) return authorizationError;
+    if (!authorization.authorized) {
+      return authorization.result;
+    }
 
-    if (!id?.trim()) {
+    if (!validateId(id)) {
       return {
         success: false,
         error: "Batch ID is required.",
@@ -277,15 +305,15 @@ export async function toggleBatchPublishStatusAction(
       };
     }
 
-    const batch = isPublished
+    const updatedBatch = isPublished
       ? await batchService.publishBatch(id)
       : await batchService.unpublishBatch(id);
 
-    revalidateBatchPaths(id, batch.slug);
+    revalidateBatchPaths(id, updatedBatch.slug);
 
     return {
       success: true,
-      data: batch,
+      data: updatedBatch,
       message: isPublished
         ? "Batch published successfully."
         : "Batch unpublished successfully.",
@@ -301,25 +329,29 @@ export async function toggleBatchPublishStatusAction(
 }
 
 // ---------------------------------------------
-// 6. Get Batches By Examination (Admin)
+// 6. Get Batches By Examination (Admin / Manager)
 // ---------------------------------------------
 
 export async function getBatchesByExaminationAction(
   examinationId: string,
 ): Promise<ActionResult> {
   try {
-    const authorizationError = await authorizeBatchAction();
+    const authorization = await authorizeBatchAction();
 
-    if (authorizationError) return authorizationError;
+    if (!authorization.authorized) {
+      return authorization.result;
+    }
 
-    if (!examinationId?.trim()) {
+    if (!validateId(examinationId)) {
       return {
         success: false,
         error: "Examination ID is required.",
       };
     }
 
-    const batches = await batchService.getBatchesByExamination(examinationId);
+    const batches = await batchService.getBatchesByExamination(
+      examinationId.trim(),
+    );
 
     return {
       success: true,
@@ -343,7 +375,7 @@ export async function getBatchBySlugAction(
   slug: string,
 ): Promise<ActionResult> {
   try {
-    if (!slug?.trim()) {
+    if (!validateId(slug)) {
       return {
         success: false,
         error: "Batch slug is required.",
@@ -372,11 +404,13 @@ export async function getBatchBySlugAction(
 
 export async function deleteBatchAction(id: string): Promise<ActionResult> {
   try {
-    const authorizationError = await authorizeBatchAction();
+    const authorization = await authorizeBatchAction();
 
-    if (authorizationError) return authorizationError;
+    if (!authorization.authorized) {
+      return authorization.result;
+    }
 
-    if (!id?.trim()) {
+    if (!validateId(id)) {
       return {
         success: false,
         error: "Batch ID is required.",
@@ -384,14 +418,13 @@ export async function deleteBatchAction(id: string): Promise<ActionResult> {
     }
 
     // This performs an unpublish operation, not physical deletion.
+    const updatedBatch = await batchService.unpublishBatch(id);
 
-    const batch = await batchService.unpublishBatch(id);
-
-    revalidateBatchPaths(id, batch.slug);
+    revalidateBatchPaths(id, updatedBatch.slug);
 
     return {
       success: true,
-      data: batch,
+      data: updatedBatch,
       message: "Batch unpublished successfully.",
     };
   } catch (error: unknown) {

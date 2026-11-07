@@ -1,6 +1,8 @@
+
 "use client";
 
 import { useMemo, useState } from "react";
+
 import {
   Search,
   MoreHorizontal,
@@ -9,12 +11,14 @@ import {
   RefreshCw,
   AlertTriangle,
   CalendarDays,
-  Users,
   GraduationCap,
+  CheckCircle2,
 } from "lucide-react";
-import { toast } from "sonner";
 
-import { useGetAllBatches, type Batch } from "@/hooks/academic/use-batches";
+import {
+  useGetAllBatches,
+  type Batch,
+} from "@/hooks/academic/use-batches";
 
 import BatchForm from "./batch-form";
 
@@ -47,11 +51,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-// --------------------------------------------------
+// -----------------------------------------------------------------------------
 // Helpers
-// --------------------------------------------------
+// -----------------------------------------------------------------------------
 
-function formatDate(date?: string | null) {
+function formatDate(date?: string | Date | null): string {
   if (!date) return "—";
 
   const parsedDate = new Date(date);
@@ -65,44 +69,118 @@ function formatDate(date?: string | null) {
   }).format(parsedDate);
 }
 
-function formatPrice(price?: string | number | null) {
+function formatPrice(price?: string | number | null): string {
   if (price === null || price === undefined || price === "") {
     return "—";
   }
+
+  const amount = Number(price);
+
+  if (!Number.isFinite(amount)) return "—";
 
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
     maximumFractionDigits: 0,
-  }).format(Number(price));
+  }).format(amount);
 }
 
-function getTeacherNames(batch: Batch) {
+function getTeacherNames(batch: Batch): string[] {
   return (
-    batch.teachers?.map((item) => item.teacher?.user?.name).filter(Boolean) ??
-    []
+    batch.teachers
+      ?.map((item) => item.teacher?.user?.name)
+      .filter((name): name is string => Boolean(name)) ?? []
   );
 }
 
-// --------------------------------------------------
+/**
+ * Calculates the display expiry date for validity-based batches.
+ *
+ * This is only for display. The calculated date is not persisted
+ * in the database when validityMonths is used.
+ */
+function getBatchExpiryDate(batch: Batch): Date | null {
+  if (batch.expiryDate) {
+    const expiryDate = new Date(batch.expiryDate);
+
+    return Number.isNaN(expiryDate.getTime())
+      ? null
+      : expiryDate;
+  }
+
+  if (
+    batch.validityMonths === null ||
+    batch.validityMonths === undefined
+  ) {
+    return null;
+  }
+
+  const startDate = new Date(batch.startDate);
+
+  if (Number.isNaN(startDate.getTime())) return null;
+
+  // Avoid JavaScript month overflow, e.g. January 31 + 1 month.
+  const day = startDate.getDate();
+
+  const expiryDate = new Date(startDate);
+  expiryDate.setDate(1);
+  expiryDate.setMonth(
+    expiryDate.getMonth() + batch.validityMonths,
+  );
+
+  const lastDayOfTargetMonth = new Date(
+    expiryDate.getFullYear(),
+    expiryDate.getMonth() + 1,
+    0,
+  ).getDate();
+
+  expiryDate.setDate(Math.min(day, lastDayOfTargetMonth));
+
+  return expiryDate;
+}
+
+function getBatchDurationLabel(batch: Batch): string {
+  if (batch.expiryDate) {
+    return "Fixed expiry";
+  }
+
+  if (batch.validityMonths !== null && batch.validityMonths !== undefined) {
+    return `${batch.validityMonths} months validity`;
+  }
+
+  return "Not configured";
+}
+
+// -----------------------------------------------------------------------------
 // Loading Skeleton
-// --------------------------------------------------
+// -----------------------------------------------------------------------------
 
 function BatchListSkeleton() {
   return (
-    <div className="space-y-3" aria-label="Loading batches" aria-busy="true">
+    <div
+      className="space-y-3"
+      aria-label="Loading batches"
+      aria-busy="true"
+    >
       {Array.from({ length: 5 }).map((_, index) => (
-        <Skeleton key={index} className="h-16 w-full rounded-md" />
+        <Skeleton
+          key={index}
+          className="h-16 w-full rounded-md"
+        />
       ))}
     </div>
   );
 }
 
-// --------------------------------------------------
+// -----------------------------------------------------------------------------
 // Empty State
-// --------------------------------------------------
+// -----------------------------------------------------------------------------
 
-function BatchEmptyState({ isSearching }: { isSearching: boolean }) {
+function BatchEmptyState({
+  isSearching,
+}: {
+  isSearching: boolean;
+}) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
       <div className="flex size-14 items-center justify-center rounded-full bg-muted">
@@ -111,12 +189,14 @@ function BatchEmptyState({ isSearching }: { isSearching: boolean }) {
 
       <div className="space-y-1">
         <h3 className="font-semibold text-foreground">
-          {isSearching ? "No matching batches" : "No batches yet"}
+          {isSearching
+            ? "No matching batches"
+            : "No batches yet"}
         </h3>
 
         <p className="max-w-sm text-sm text-muted-foreground">
           {isSearching
-            ? "Try searching with a different batch title, slug, teacher or status."
+            ? "Try searching with a different batch title, slug, feature, teacher or status."
             : "Batches will appear here when they are created."}
         </p>
       </div>
@@ -124,9 +204,9 @@ function BatchEmptyState({ isSearching }: { isSearching: boolean }) {
   );
 }
 
-// --------------------------------------------------
+// -----------------------------------------------------------------------------
 // Error State
-// --------------------------------------------------
+// -----------------------------------------------------------------------------
 
 function BatchErrorState({
   onRetry,
@@ -148,25 +228,41 @@ function BatchErrorState({
           Failed to load batches
         </h3>
 
-        <p className="text-sm text-muted-foreground">{message}</p>
+        <p className="text-sm text-muted-foreground">
+          {message}
+        </p>
       </div>
 
-      <Button variant="outline" onClick={onRetry} disabled={isFetching}>
+      <Button
+        variant="outline"
+        onClick={onRetry}
+        disabled={isFetching}
+      >
         <RefreshCw
-          className={`mr-2 size-4 ${isFetching ? "animate-spin" : ""}`}
+          className={`mr-2 size-4 ${
+            isFetching ? "animate-spin" : ""
+          }`}
         />
+
         {isFetching ? "Retrying..." : "Try again"}
       </Button>
     </div>
   );
 }
 
-// --------------------------------------------------
+// -----------------------------------------------------------------------------
 // Batch Status Badge
-// --------------------------------------------------
+// -----------------------------------------------------------------------------
 
-function BatchStatusBadge({ status }: { status: Batch["status"] }) {
-  const variants: Record<string, { label: string; className: string }> = {
+function BatchStatusBadge({
+  status,
+}: {
+  status: Batch["status"];
+}) {
+  const variants: Record<
+    string,
+    { label: string; className: string }
+  > = {
     UPCOMING: {
       label: "Upcoming",
       className: "border-blue-500/30 text-blue-600",
@@ -177,7 +273,8 @@ function BatchStatusBadge({ status }: { status: Batch["status"] }) {
     },
     COMPLETED: {
       label: "Completed",
-      className: "border-muted-foreground/30 text-muted-foreground",
+      className:
+        "border-muted-foreground/30 text-muted-foreground",
     },
     EXPIRED: {
       label: "Expired",
@@ -197,13 +294,21 @@ function BatchStatusBadge({ status }: { status: Batch["status"] }) {
   );
 }
 
-// --------------------------------------------------
+// -----------------------------------------------------------------------------
 // Publication Badge
-// --------------------------------------------------
+// -----------------------------------------------------------------------------
 
-function PublicationBadge({ isPublished }: { isPublished: boolean }) {
+function PublicationBadge({
+  isPublished,
+}: {
+  isPublished: boolean;
+}) {
   return isPublished ? (
-    <Badge variant="outline" className="border-emerald-500/30 text-emerald-600">
+    <Badge
+      variant="outline"
+      className="border-emerald-500/30 text-emerald-600"
+    >
+      <CheckCircle2 className="mr-1 size-3" />
       Published
     </Badge>
   ) : (
@@ -213,9 +318,50 @@ function PublicationBadge({ isPublished }: { isPublished: boolean }) {
   );
 }
 
-// --------------------------------------------------
+// -----------------------------------------------------------------------------
+// Batch Features
+// -----------------------------------------------------------------------------
+
+function BatchFeatures({
+  features,
+}: {
+  features?: string[];
+}) {
+  if (!features?.length) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        No features added
+      </p>
+    );
+  }
+
+  const visibleFeatures = features.slice(0, 2);
+  const remainingCount = features.length - visibleFeatures.length;
+
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      {visibleFeatures.map((feature, index) => (
+        <Badge
+          key={`${feature}-${index}`}
+          variant="secondary"
+          className="max-w-32 truncate text-xs font-normal"
+        >
+          {feature}
+        </Badge>
+      ))}
+
+      {remainingCount > 0 && (
+        <Badge variant="outline" className="text-xs">
+          +{remainingCount}
+        </Badge>
+      )}
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
 // Batch List Component
-// --------------------------------------------------
+// -----------------------------------------------------------------------------
 
 export default function BatchList() {
   // Fetch batches
@@ -230,12 +376,12 @@ export default function BatchList() {
 
   // Local states
   const [search, setSearch] = useState("");
+  const [selectedBatch, setSelectedBatch] =
+    useState<Batch | null>(null);
 
-  const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
-
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
   // Search and Filter
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
 
   const filteredBatches = useMemo(() => {
     const list = batches ?? [];
@@ -254,8 +400,10 @@ export default function BatchList() {
         batch.medium,
         batch.examinationId,
         teacherNames,
+        ...(batch.features ?? []),
         batch.isPublished ? "published" : "draft",
         batch.isFree ? "free" : "paid",
+        getBatchDurationLabel(batch),
       ];
 
       return searchableValues.some((value) =>
@@ -266,17 +414,17 @@ export default function BatchList() {
     });
   }, [batches, search]);
 
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
   // Refresh
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
 
   function handleRefresh() {
     void refetch();
   }
 
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
   // Render
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
 
   return (
     <>
@@ -289,11 +437,13 @@ export default function BatchList() {
               <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10">
                 <Layers className="size-5 text-primary" />
               </div>
+
               Batches
             </CardTitle>
 
             <CardDescription>
-              Manage batches, pricing, teachers, schedules and publication.
+              Manage batches, features, pricing, teachers,
+              schedules and publication.
             </CardDescription>
           </div>
 
@@ -331,7 +481,10 @@ export default function BatchList() {
 
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="rounded-full px-3 py-1">
+                  <Badge
+                    variant="secondary"
+                    className="rounded-full px-3 py-1"
+                  >
                     {filteredBatches.length}
                   </Badge>
 
@@ -367,16 +520,22 @@ export default function BatchList() {
               {/* Empty State / Table */}
 
               {filteredBatches.length === 0 ? (
-                <BatchEmptyState isSearching={Boolean(search.trim())} />
+                <BatchEmptyState
+                  isSearching={Boolean(search.trim())}
+                />
               ) : (
                 <div className="relative max-h-[600px] w-full max-w-full overflow-auto rounded-section border border-border">
-                  <Table className="min-w-[1250px] w-full">
+                  <Table className="min-w-[1350px] w-full">
                     {/* Table Header */}
 
                     <TableHeader className="sticky top-0 z-10 bg-muted shadow-sm">
                       <TableRow className="hover:bg-transparent">
                         <TableHead className="min-w-64 font-semibold">
                           Batch
+                        </TableHead>
+
+                        <TableHead className="min-w-40 font-semibold">
+                          Features
                         </TableHead>
 
                         <TableHead className="min-w-40 font-semibold">
@@ -387,7 +546,7 @@ export default function BatchList() {
                           Pricing
                         </TableHead>
 
-                        <TableHead className="min-w-32 font-semibold">
+                        <TableHead className="min-w-40 font-semibold">
                           Duration
                         </TableHead>
 
@@ -414,6 +573,7 @@ export default function BatchList() {
                     <TableBody>
                       {filteredBatches.map((batch) => {
                         const teacherNames = getTeacherNames(batch);
+                        const expiryDate = getBatchExpiryDate(batch);
 
                         return (
                           <TableRow
@@ -447,6 +607,12 @@ export default function BatchList() {
                                   </p>
                                 </div>
                               </div>
+                            </TableCell>
+
+                            {/* Features */}
+
+                            <TableCell>
+                              <BatchFeatures features={batch.features} />
                             </TableCell>
 
                             {/* Teachers */}
@@ -492,7 +658,9 @@ export default function BatchList() {
 
                             <TableCell>
                               {batch.isFree ? (
-                                <Badge variant="secondary">Free</Badge>
+                                <Badge variant="secondary">
+                                  Free
+                                </Badge>
                               ) : (
                                 <div className="space-y-1">
                                   <p className="font-semibold text-foreground">
@@ -524,11 +692,11 @@ export default function BatchList() {
                                     <span className="text-muted-foreground">
                                       End:{" "}
                                     </span>
-                                    {formatDate(batch.expiryDate)}
+                                    {formatDate(expiryDate)}
                                   </p>
 
                                   <p className="text-muted-foreground">
-                                    {batch.validityMonths ?? "—"} months
+                                    {getBatchDurationLabel(batch)}
                                   </p>
                                 </div>
                               </div>
@@ -575,7 +743,9 @@ export default function BatchList() {
 
                                 <DropdownMenuContent align="end">
                                   <DropdownMenuItem
-                                    onClick={() => setSelectedBatch(batch)}
+                                    onClick={() =>
+                                      setSelectedBatch(batch)
+                                    }
                                   >
                                     <Pencil className="mr-2 size-4" />
                                     Edit

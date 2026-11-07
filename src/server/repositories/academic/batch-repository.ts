@@ -1,13 +1,13 @@
 import { db } from "@/db";
-import { batch, teacherProfiles } from "@/db/schema/academic-schema";
-import { user } from "@/db/schema/auth-schema";
+import { batch } from "@/db/schema/academic-schema";
 import { and, eq } from "drizzle-orm";
 
-// ---------------------------------------------
-// Types
-// ---------------------------------------------
+/* -------------------------------------------------------------------------- */
+/* Types                                                                      */
+/* -------------------------------------------------------------------------- */
 
 export type Batch = typeof batch.$inferSelect;
+
 export type NewBatch = typeof batch.$inferInsert;
 
 export type UpdateBatch = Partial<Omit<NewBatch, "id" | "createdBy">>;
@@ -17,12 +17,15 @@ export type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export type DbExecutor = typeof db | DbTransaction;
 
-// ---------------------------------------------
-// Batch Repository
-// ---------------------------------------------
+/* -------------------------------------------------------------------------- */
+/* Batch Repository                                                           */
+/* -------------------------------------------------------------------------- */
 
 export class BatchRepository {
-  // Create batch
+  /* ------------------------------------------------------------------------ */
+  /* Create Batch                                                             */
+  /* ------------------------------------------------------------------------ */
+
   async create(data: NewBatch, executor: DbExecutor = db): Promise<Batch> {
     const [result] = await executor.insert(batch).values(data).returning();
 
@@ -33,17 +36,26 @@ export class BatchRepository {
     return result;
   }
 
-  // Find all batches
+  /* ------------------------------------------------------------------------ */
+  /* Find All Batches                                                         */
+  /* ------------------------------------------------------------------------ */
+
   async findAll(executor: DbExecutor = db): Promise<Batch[]> {
     return executor.select().from(batch);
   }
 
-  // Find all published batches
+  /* ------------------------------------------------------------------------ */
+  /* Find All Published Batches                                               */
+  /* ------------------------------------------------------------------------ */
+
   async findAllPublished(executor: DbExecutor = db): Promise<Batch[]> {
     return executor.select().from(batch).where(eq(batch.isPublished, true));
   }
 
-  // Find batch by ID
+  /* ------------------------------------------------------------------------ */
+  /* Find Batch By ID                                                         */
+  /* ------------------------------------------------------------------------ */
+
   async findById(
     id: string,
     executor: DbExecutor = db,
@@ -57,7 +69,10 @@ export class BatchRepository {
     return result;
   }
 
-  // Find published batch by ID
+  /* ------------------------------------------------------------------------ */
+  /* Find Published Batch By ID                                               */
+  /* ------------------------------------------------------------------------ */
+
   async findPublishedById(
     id: string,
     executor: DbExecutor = db,
@@ -71,7 +86,10 @@ export class BatchRepository {
     return result;
   }
 
-  // Find batch by slug
+  /* ------------------------------------------------------------------------ */
+  /* Find Batch By Slug                                                       */
+  /* ------------------------------------------------------------------------ */
+
   async findBySlug(
     slug: string,
     executor: DbExecutor = db,
@@ -85,7 +103,10 @@ export class BatchRepository {
     return result;
   }
 
-  // Find published batch by slug
+  /* ------------------------------------------------------------------------ */
+  /* Find Published Batch By Slug                                             */
+  /* ------------------------------------------------------------------------ */
+
   async findPublishedBySlug(
     slug: string,
     executor: DbExecutor = db,
@@ -99,7 +120,10 @@ export class BatchRepository {
     return result;
   }
 
-  // Find batches by examination
+  /* ------------------------------------------------------------------------ */
+  /* Find Batches By Examination                                              */
+  /* ------------------------------------------------------------------------ */
+
   async findByExaminationId(
     examinationId: string,
     executor: DbExecutor = db,
@@ -110,7 +134,10 @@ export class BatchRepository {
       .where(eq(batch.examinationId, examinationId));
   }
 
-  // Find published batches by examination
+  /* ------------------------------------------------------------------------ */
+  /* Find Published Batches By Examination                                    */
+  /* ------------------------------------------------------------------------ */
+
   async findPublishedByExaminationId(
     examinationId: string,
     executor: DbExecutor = db,
@@ -126,7 +153,10 @@ export class BatchRepository {
       );
   }
 
-  // Update batch
+  /* ------------------------------------------------------------------------ */
+  /* Update Batch                                                             */
+  /* ------------------------------------------------------------------------ */
+
   async update(
     id: string,
     data: UpdateBatch,
@@ -136,16 +166,30 @@ export class BatchRepository {
       throw new Error("At least one field is required to update a batch");
     }
 
+    const updateData: UpdateBatch = { ...data };
+
+    // Keep expiryDate and validityMonths mutually exclusive.
+    if (data.expiryDate !== undefined && data.expiryDate !== null) {
+      updateData.validityMonths = null;
+    }
+
+    if (data.validityMonths !== undefined && data.validityMonths !== null) {
+      updateData.expiryDate = null;
+    }
+
     const [result] = await executor
       .update(batch)
-      .set(data)
+      .set(updateData)
       .where(eq(batch.id, id))
       .returning();
 
     return result;
   }
 
-  // Publish batch
+  /* ------------------------------------------------------------------------ */
+  /* Publish Batch                                                            */
+  /* ------------------------------------------------------------------------ */
+
   async publish(
     id: string,
     executor: DbExecutor = db,
@@ -159,7 +203,10 @@ export class BatchRepository {
     return result;
   }
 
-  // Unpublish batch
+  /* ------------------------------------------------------------------------ */
+  /* Unpublish Batch                                                          */
+  /* ------------------------------------------------------------------------ */
+
   async unpublish(
     id: string,
     executor: DbExecutor = db,

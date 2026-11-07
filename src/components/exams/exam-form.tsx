@@ -12,9 +12,6 @@ import {
   Plus,
   Pencil,
   GraduationCap,
-  Tags,
-  FileText,
-  ToggleLeft,
 } from "lucide-react";
 
 // Hooks
