@@ -7,25 +7,16 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 
-import {
-  Loader2,
-  Plus,
-  Pencil,
-  GraduationCap,
-} from "lucide-react";
+import { Loader2, Plus, Pencil, GraduationCap } from "lucide-react";
 
-// Hooks
 import {
   useCreateExamination,
   useUpdateExamination,
 } from "@/hooks/academic/use-exams";
 
 import { useGetExamCategories } from "@/hooks/academic/use-exam-categories";
-
-// Validation
 import { createExaminationSchema } from "@/validations/academic/examination-validations";
 
-// UI
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -59,9 +50,7 @@ import {
 
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 
-// --------------------------------------------------
 // Types
-// --------------------------------------------------
 
 type ExamFormValues = z.input<typeof createExaminationSchema>;
 
@@ -69,13 +58,9 @@ interface ExamFormProps {
   initialData?: ExamFormValues & {
     id: string;
   };
-
   onSuccessCallback?: () => void;
-
   open?: boolean;
-
   onOpenChange?: (open: boolean) => void;
-
   hideTrigger?: boolean;
 }
 
@@ -86,9 +71,7 @@ type ExamCategory = {
   isActive: boolean;
 };
 
-// --------------------------------------------------
 // Default Values
-// --------------------------------------------------
 
 const getDefaultValues = (
   initialData?: ExamFormProps["initialData"],
@@ -99,9 +82,7 @@ const getDefaultValues = (
   isActive: initialData?.isActive ?? true,
 });
 
-// --------------------------------------------------
 // Slug Generator
-// --------------------------------------------------
 
 function generateSlug(value: string): string {
   return value
@@ -112,9 +93,7 @@ function generateSlug(value: string): string {
     .replace(/-+/g, "-");
 }
 
-// --------------------------------------------------
 // Component
-// --------------------------------------------------
 
 export default function ExamForm({
   initialData,
@@ -128,30 +107,16 @@ export default function ExamForm({
   const isControlled = controlledOpen !== undefined;
 
   const open = isControlled ? controlledOpen : internalOpen;
-
-  // Edit Mode
-
   const isEditing = Boolean(initialData);
-
-  // Slug Management
-
   const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(
     Boolean(initialData?.slug),
   );
-
-  // --------------------------------------------------
-  // Mutations
-  // --------------------------------------------------
 
   const createExaminationMutation = useCreateExamination();
   const updateExaminationMutation = useUpdateExamination();
 
   const isPending =
     createExaminationMutation.isPending || updateExaminationMutation.isPending;
-
-  // --------------------------------------------------
-  // Fetch Active Exam Categories
-  // --------------------------------------------------
 
   const {
     data: categories,
@@ -161,20 +126,12 @@ export default function ExamForm({
 
   const examCategories = (categories ?? []) as ExamCategory[];
 
-  // --------------------------------------------------
-  // React Hook Form
-  // --------------------------------------------------
-
   const form = useForm<ExamFormValues>({
     resolver: zodResolver(createExaminationSchema),
     defaultValues: getDefaultValues(initialData),
   });
 
   const examName = form.watch("name");
-
-  // --------------------------------------------------
-  // Reset Form
-  // --------------------------------------------------
 
   useEffect(() => {
     if (!open) return;
@@ -184,9 +141,7 @@ export default function ExamForm({
     setIsSlugManuallyEdited(Boolean(initialData?.slug));
   }, [initialData, open, form]);
 
-  // --------------------------------------------------
   // Auto Generate Slug
-  // --------------------------------------------------
 
   useEffect(() => {
     if (isSlugManuallyEdited || isEditing) return;
@@ -197,9 +152,7 @@ export default function ExamForm({
     });
   }, [examName, isSlugManuallyEdited, isEditing, form]);
 
-  // --------------------------------------------------
   // Submit Form
-  // --------------------------------------------------
 
   async function onSubmit(values: ExamFormValues) {
     try {
@@ -220,7 +173,6 @@ export default function ExamForm({
         if (!result) {
           throw new Error("Failed to create examination.");
         }
-
         toast.success("Examination created successfully.");
       }
 
@@ -235,9 +187,7 @@ export default function ExamForm({
     }
   }
 
-  // --------------------------------------------------
   // Dialog Actions
-  // --------------------------------------------------
 
   function handleOpenChange(nextOpen: boolean) {
     if (isPending) return;
@@ -254,14 +204,10 @@ export default function ExamForm({
     }
   }
 
-  // --------------------------------------------------
   // Render
-  // --------------------------------------------------
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      {/* Trigger */}
-
       {!hideTrigger && (
         <div className="mb-5 flex justify-end">
           <DialogTrigger
@@ -312,9 +258,7 @@ export default function ExamForm({
           className="space-y-6 border-t pt-6"
           noValidate
         >
-          {/* ====================================== */}
           {/* Exam Information */}
-          {/* ====================================== */}
 
           <section className="space-y-4">
             <div className="flex items-center gap-2 border-b pb-2">
@@ -477,11 +421,6 @@ export default function ExamForm({
                     }}
                   />
 
-                  <p className="text-xs text-muted-foreground">
-                    Automatically generated from exam name. You can edit it
-                    manually.
-                  </p>
-
                   {fieldState.error && (
                     <FieldError errors={[fieldState.error]} />
                   )}
@@ -490,9 +429,7 @@ export default function ExamForm({
             />
           </section>
 
-          {/* ====================================== */}
           {/* Exam Status */}
-          {/* ====================================== */}
 
           <section className="space-y-4">
             <div className="flex items-center gap-2 border-b pb-2">
@@ -533,9 +470,7 @@ export default function ExamForm({
             />
           </section>
 
-          {/* ====================================== */}
           {/* Form Actions */}
-          {/* ====================================== */}
 
           <DialogFooter className="gap-2 border-t pt-4 sm:gap-2">
             <Button

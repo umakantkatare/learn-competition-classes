@@ -14,7 +14,7 @@ import {
 import { useGetAllExaminations } from "@/hooks/academic/use-exams";
 import { useGetAllTeachers } from "@/hooks/academic/use-teachers";
 import { createBatchSchema } from "@/validations/academic/batch-validation";
-import { uploadFile, type UploadedFile } from "@/helper/imagekit/upload";
+import { uploadFile } from "@/helper/imagekit/upload";
 import BatchMediaUpload from "./batch-media-upload";
 
 import { Button } from "@/components/ui/button";
@@ -67,6 +67,7 @@ interface ExaminationOption {
   id: string;
   title?: string;
   name?: string;
+  isActive: boolean;
 }
 
 interface TeacherOption {
@@ -443,12 +444,18 @@ export default function BatchForm({
             control={form.control}
             name="examinationId"
             render={({ field, fieldState }) => {
-              const selected = examinations.find(
+              const activeExams = examinations.filter(
+                (exam) => exam.isActive === true,
+              );
+
+              const selected = activeExams.find(
                 (item) => item.id === field.value,
               );
+
               return (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel>Examination</FieldLabel>
+
                   <Popover
                     open={examinationOpen}
                     onOpenChange={setExaminationOpen}
@@ -467,26 +474,32 @@ export default function BatchForm({
                               selected?.name ??
                               "Select examination"}
                           </span>
+
                           <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
                         </Button>
                       }
                     />
+
                     <PopoverContent
                       className="w-[var(--anchor-width)] p-0"
                       align="start"
                     >
                       <Command>
                         <CommandInput placeholder="Search examination..." />
+
                         <CommandList>
                           {examinationQuery.isLoading ? (
                             <CommandEmpty>Loading examinations...</CommandEmpty>
-                          ) : examinations.length === 0 ? (
-                            <CommandEmpty>No examination found.</CommandEmpty>
+                          ) : activeExams.length === 0 ? (
+                            <CommandEmpty>
+                              No active examinations found.
+                            </CommandEmpty>
                           ) : (
                             <CommandGroup>
-                              {examinations.map((item) => {
+                              {activeExams.map((item) => {
                                 const label =
                                   item.title ?? item.name ?? item.id;
+
                                 return (
                                   <CommandItem
                                     key={item.id}
@@ -497,7 +510,11 @@ export default function BatchForm({
                                     }}
                                   >
                                     <Check
-                                      className={`mr-2 h-4 w-4 ${field.value === item.id ? "opacity-100" : "opacity-0"}`}
+                                      className={`mr-2 h-4 w-4 ${
+                                        field.value === item.id
+                                          ? "opacity-100"
+                                          : "opacity-0"
+                                      }`}
                                     />
                                     {label}
                                   </CommandItem>
@@ -509,6 +526,7 @@ export default function BatchForm({
                       </Command>
                     </PopoverContent>
                   </Popover>
+
                   <FieldError errors={[fieldState.error]} />
                 </Field>
               );

@@ -10,7 +10,6 @@ import {
   FileText,
   RefreshCw,
   AlertTriangle,
-  XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -95,14 +94,11 @@ function ExamEmptyState({
 }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-      <div className="flex size-14 items-center justify-center rounded-full bg-muted">
-        <FileText className="size-7 text-muted-foreground" />
-      </div>
 
       <div className="space-y-1">
-        <h3 className="font-semibold text-foreground">
+        <h1 className="font-semibold text-foreground text-2xl">
           {isSearching ? "No matching exams" : "No exams yet"}
-        </h3>
+        </h1>
 
         <p className="max-w-sm text-sm text-muted-foreground">
           {isSearching
