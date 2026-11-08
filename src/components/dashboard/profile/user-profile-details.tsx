@@ -63,6 +63,7 @@ import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
 import { uploadFile } from "@/helper/imagekit/upload";
 import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE } from "@/constants/image-size";
+import ChangePasswordForm from "@/components/auth/change-password";
 
 // --------------------------------------------------
 // Types
@@ -170,6 +171,7 @@ export function UserProfileDetails({ user }: { user: UserProfile }) {
   );
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState("");
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
 
   // Profile form
   const [form, setForm] = useState<ProfileForm>({
@@ -223,7 +225,7 @@ export function UserProfileDetails({ user }: { user: UserProfile }) {
     setUploadError("");
     setFormError("");
 
-    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+    if (!ALLOWED_IMAGE_TYPES.some((type) => type === file.type)) {
       setUploadError("Only JPEG, PNG, WebP, and AVIF images are supported.");
       return;
     }
@@ -441,8 +443,15 @@ export function UserProfileDetails({ user }: { user: UserProfile }) {
             onClick={openEditDialog}
             className="w-full shrink-0 rounded-[var(--radius-button)] bg-brand-primary font-medium text-black transition-all hover:bg-brand-primary-hover hover:text-white sm:w-auto"
           >
-            <Pencil className="mr-2 size-4" />
             Edit Profile
+          </Button>
+          <Button
+            onClick={() => setIsChangePasswordOpen(true)}
+            variant="outline"
+            className="w-full shrink-0 rounded-[var(--radius-button)] font-medium sm:w-auto"
+          >
+            <Shield className="mr-2 size-4" />
+            Change Password
           </Button>
         </CardContent>
       </Card>
@@ -515,26 +524,6 @@ export function UserProfileDetails({ user }: { user: UserProfile }) {
               label="Account Created"
               value={formatDate(user.createdAt)}
             />
-          </div>
-
-          <Separator className="bg-border" />
-
-          <div className="rounded-[var(--radius-button)] border border-border/80 bg-muted/40 p-4">
-            <div className="flex items-start gap-3">
-              <Shield className="mt-0.5 size-5 shrink-0 text-brand-dark dark:text-muted-foreground" />
-              <div className="space-y-1">
-                <p className="text-sm font-semibold text-text-primary dark:text-foreground">
-                  Account Permissions
-                </p>
-                <p className="text-sm text-text-secondary dark:text-muted-foreground">
-                  Your account has the{" "}
-                  <span className="font-semibold capitalize text-text-primary dark:text-foreground">
-                    {user.role}
-                  </span>{" "}
-                  role. Available features depend on your assigned permissions.
-                </p>
-              </div>
-            </div>
           </div>
         </CardContent>
       </Card>
@@ -822,6 +811,23 @@ export function UserProfileDetails({ user }: { user: UserProfile }) {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isChangePasswordOpen}
+        onOpenChange={setIsChangePasswordOpen}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto rounded-2xl border-border bg-card p-5 sm:max-w-md sm:p-6">
+          <DialogHeader className="space-y-1.5">
+            <DialogTitle className="flex items-center gap-2 text-lg font-bold">
+              Change Password
+            </DialogTitle>
+          </DialogHeader>
+
+          <ChangePasswordForm
+            onSuccess={() => setIsChangePasswordOpen(false)}
+          />
         </DialogContent>
       </Dialog>
 

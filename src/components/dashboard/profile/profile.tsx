@@ -1,4 +1,4 @@
-import { UserProfileDetails } from "../user-profile-details";
+import { UserProfileDetails } from "./user-profile-details";
 
 interface ProfileProps {
   userName: string;
