@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Image from "next/image";
 import {
   Search,
   MoreHorizontal,
@@ -9,6 +10,7 @@ import {
   Tags,
   RefreshCw,
   ImageIcon,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -19,9 +21,12 @@ import {
 
 import type { ExamCategory } from "@/types/exam-category";
 
+// UI Components
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+
 import {
   Card,
   CardContent,
@@ -29,6 +34,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+
 import {
   Table,
   TableBody,
@@ -37,12 +43,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,18 +61,21 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Skeleton } from "@/components/ui/skeleton";
-import Image from "next/image";
 
+// Types
 type ExamCategoryTableProps = {
   onEdit?: (category: ExamCategory) => void;
   canManage?: boolean;
 };
+
 interface CategoryLogoProps {
   name: string;
   logo?: string | null;
 }
 
+// ---------------------------------------------
+// Category Logo
+// ---------------------------------------------
 
 export function CategoryLogo({ name, logo }: CategoryLogoProps) {
   const [hasError, setHasError] = useState(false);
@@ -72,11 +83,11 @@ export function CategoryLogo({ name, logo }: CategoryLogoProps) {
   if (!logo || hasError) {
     return (
       <div
-        className="flex size-12 shrink-0 items-center justify-center rounded-lg border border-dashed bg-muted"
+        className="flex size-9 shrink-0 items-center justify-center rounded-full border border-border bg-primary/5"
         aria-label={`No logo available for ${name}`}
       >
         <ImageIcon
-          className="size-5 text-muted-foreground"
+          className="size-4 text-muted-foreground"
           aria-hidden="true"
         />
       </div>
@@ -88,14 +99,14 @@ export function CategoryLogo({ name, logo }: CategoryLogoProps) {
       href={logo}
       target="_blank"
       rel="noopener noreferrer"
-      className="relative flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted"
+      className="relative flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-background"
       aria-label={`Open logo for ${name}`}
     >
       <Image
         src={logo}
         alt={`${name} logo`}
         fill
-        sizes="48px"
+        sizes="36px"
         className="object-contain p-1"
         onError={() => setHasError(true)}
       />
@@ -103,15 +114,192 @@ export function CategoryLogo({ name, logo }: CategoryLogoProps) {
   );
 }
 
+// ---------------------------------------------
+// Loading Skeleton
+// ---------------------------------------------
+
+function CategoryListSkeleton() {
+  return (
+    <div
+      className="space-y-3"
+      aria-label="Loading exam categories"
+      aria-busy="true"
+    >
+      {Array.from({ length: 5 }).map((_, index) => (
+        <Skeleton key={index} className="h-14 w-full rounded-md" />
+      ))}
+    </div>
+  );
+}
+
+// ---------------------------------------------
+// Empty State
+// ---------------------------------------------
+
+function CategoryEmptyState({ isSearching }: { isSearching: boolean }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+      <div className="flex size-14 items-center justify-center rounded-full bg-muted">
+        <Tags className="size-7 text-muted-foreground" />
+      </div>
+
+      <div className="space-y-1">
+        <h3 className="font-semibold text-foreground">
+          {isSearching ? "No matching categories" : "No exam categories yet"}
+        </h3>
+
+        <p className="max-w-sm text-sm text-muted-foreground">
+          {isSearching
+            ? "Try searching with a different category name or slug."
+            : "Categories will appear here when they are created."}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------
+// Error State
+// ---------------------------------------------
+
+function CategoryErrorState({
+  onRetry,
+  isFetching,
+  message,
+}: {
+  onRetry: () => void;
+  isFetching: boolean;
+  message: string;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
+      <div className="flex size-14 items-center justify-center rounded-full bg-destructive/10">
+        <RefreshCw className="size-7 text-destructive" />
+      </div>
+
+      <div className="space-y-1">
+        <h3 className="font-semibold text-foreground">
+          Failed to load exam categories
+        </h3>
+
+        <p className="text-sm text-muted-foreground">{message}</p>
+      </div>
+
+      <Button
+        variant="outline"
+        onClick={onRetry}
+        disabled={isFetching}
+        className="rounded-button"
+      >
+        <RefreshCw
+          className={`mr-2 size-4 ${isFetching ? "animate-spin" : ""}`}
+        />
+        {isFetching ? "Retrying..." : "Try again"}
+      </Button>
+    </div>
+  );
+}
+
+// ---------------------------------------------
+// Category Status Badge
+// ---------------------------------------------
+
+function CategoryStatusBadge({ isActive }: { isActive: boolean }) {
+  return isActive ? (
+    <Badge variant="outline" className="gap-1 text-emerald-600">
+      Active
+    </Badge>
+  ) : (
+    <Badge variant="outline" className="gap-1 text-muted-foreground">
+      Inactive
+    </Badge>
+  );
+}
+
+// ---------------------------------------------
+// Deactivate Confirmation Dialog
+// ---------------------------------------------
+
+function DeactivateCategoryDialog({
+  category,
+  isDeactivating,
+  onClose,
+  onConfirm,
+}: {
+  category: ExamCategory | null;
+  isDeactivating: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <AlertDialog
+      open={Boolean(category)}
+      onOpenChange={(open) => {
+        if (!open && !isDeactivating) {
+          onClose();
+        }
+      }}
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <div className="mb-2 flex size-11 items-center justify-center rounded-full bg-destructive/10">
+            <AlertTriangle className="size-5 text-destructive" />
+          </div>
+
+          <AlertDialogTitle>Deactivate Exam Category?</AlertDialogTitle>
+
+          <AlertDialogDescription>
+            Are you sure you want to deactivate{" "}
+            <span className="font-semibold text-foreground">
+              {category?.name}
+            </span>
+            ?
+            <br />
+            Existing records will not be deleted. The category will no longer be
+            available for new selections.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isDeactivating} onClick={onClose}>
+            Cancel
+          </AlertDialogCancel>
+
+          <AlertDialogAction
+            disabled={isDeactivating}
+            onClick={(event) => {
+              event.preventDefault();
+              onConfirm();
+            }}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            {isDeactivating ? (
+              <>
+                <RefreshCw className="mr-2 size-4 animate-spin" />
+                Deactivating...
+              </>
+            ) : (
+              <>
+                <Ban className="mr-2 size-4" />
+                Deactivate Category
+              </>
+            )}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+// ---------------------------------------------
+// Exam Category Table
+// ---------------------------------------------
+
 export function ExamCategoryTable({
   onEdit,
   canManage = false,
 }: ExamCategoryTableProps) {
-  const [search, setSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<ExamCategory | null>(
-    null,
-  );
-
+  // Fetch categories
   const {
     data: categories,
     isPending,
@@ -121,28 +309,50 @@ export function ExamCategoryTable({
     isFetching,
   } = useGetExamCategories(false);
 
+  // Deactivate mutation
   const deactivateMutation = useDeactivateExamCategory();
 
+  const isDeactivating = deactivateMutation.isPending;
+
+  // Local states
+  const [search, setSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<ExamCategory | null>(
+    null,
+  );
+
+  // -------------------------------------------
+  // Search and Filter
+  // -------------------------------------------
+
   const filteredCategories = useMemo(() => {
-    const list: ExamCategory[] = categories ?? [];
+    const list = categories ?? [];
     const query = search.trim().toLowerCase();
 
-    if (!query) {
-      return list;
-    }
+    if (!query) return list;
 
-    return list.filter((category) => {
-      const name = String(category.name ?? "").toLowerCase();
-      const slug = String(category.slug ?? "").toLowerCase();
-
-      return name.includes(query) || slug.includes(query);
-    });
+    return list.filter((category) =>
+      [category.name, category.slug].some((value) =>
+        String(value ?? "")
+          .toLowerCase()
+          .includes(query),
+      ),
+    );
   }, [categories, search]);
 
+  // -------------------------------------------
+  // Refresh
+  // -------------------------------------------
+
+  function handleRefresh() {
+    void refetch();
+  }
+
+  // -------------------------------------------
+  // Deactivate Category
+  // -------------------------------------------
+
   async function handleDeactivate() {
-    if (!selectedCategory || deactivateMutation.isPending) {
-      return;
-    }
+    if (!selectedCategory || isDeactivating) return;
 
     try {
       await deactivateMutation.mutateAsync(selectedCategory.id);
@@ -159,32 +369,39 @@ export function ExamCategoryTable({
     }
   }
 
+  // -------------------------------------------
+  // Render
+  // -------------------------------------------
+
   return (
     <>
-      <Card className="border-border/70 shadow-sm">
+      <Card className="rounded-card border-border/70 bg-card shadow-sm">
+        {/* Header */}
+
         <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
-            <CardTitle className="flex items-center gap-2 text-xl">
-              <Tags className="size-5 text-primary" />
+            <CardTitle className="flex items-center gap-2 text-xl font-semibold">
+              <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10">
+                <Tags className="size-5 text-primary" />
+              </div>
               Exam Categories
             </CardTitle>
 
             <CardDescription>
-              Manage examination categories across LCC.
+              Manage examination categories, logos and slugs.
             </CardDescription>
           </div>
 
+          {/* Search */}
+
           <div className="relative w-full sm:max-w-xs">
-            <Search
-              className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-              aria-hidden="true"
-            />
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
 
             <Input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search by name or slug..."
-              className="pl-9"
+              placeholder="Search categories..."
+              className="h-10 rounded-input bg-background pl-9"
               aria-label="Search exam categories"
             />
           </div>
@@ -192,112 +409,123 @@ export function ExamCategoryTable({
 
         <CardContent>
           {isPending ? (
-            <div
-              className="space-y-3"
-              aria-label="Loading exam categories"
-              aria-busy="true"
-            >
-              {Array.from({ length: 5 }).map((_, index) => (
-                <Skeleton key={index} className="h-14 w-full" />
-              ))}
-            </div>
+            <CategoryListSkeleton />
           ) : isError ? (
-            <div className="flex flex-col items-center gap-3 py-12 text-center">
-              <p className="text-sm text-destructive">
-                {error instanceof Error
+            <CategoryErrorState
+              message={
+                error instanceof Error
                   ? error.message
-                  : "Failed to load exam categories."}
-              </p>
-
-              <Button
-                variant="outline"
-                onClick={() => void refetch()}
-                disabled={isFetching}
-              >
-                <RefreshCw
-                  className={`mr-2 size-4 ${isFetching ? "animate-spin" : ""}`}
-                />
-                {isFetching ? "Retrying..." : "Try again"}
-              </Button>
-            </div>
+                  : "Something went wrong while fetching categories."
+              }
+              onRetry={handleRefresh}
+              isFetching={isFetching}
+            />
           ) : (
             <>
-              <div className="mb-3 flex items-center justify-between gap-3 text-sm text-muted-foreground">
-                <span>
-                  {filteredCategories.length}{" "}
-                  {filteredCategories.length === 1 ? "category" : "categories"}{" "}
-                  found
-                </span>
+              {/* Toolbar */}
 
-                {isFetching && <span aria-live="polite">Updating...</span>}
+              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="rounded-full px-3 py-1">
+                    {filteredCategories.length}
+                  </Badge>
+
+                  <span className="text-sm text-muted-foreground">
+                    {filteredCategories.length === 1
+                      ? "Category found"
+                      : "Categories found"}
+                  </span>
+
+                  {isFetching && (
+                    <span className="text-xs text-muted-foreground">
+                      Updating...
+                    </span>
+                  )}
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isFetching}
+                  onClick={handleRefresh}
+                  className="w-fit rounded-button"
+                >
+                  <RefreshCw
+                    className={`mr-2 size-4 ${
+                      isFetching ? "animate-spin" : ""
+                    }`}
+                  />
+                  Refresh
+                </Button>
               </div>
 
+              {/* Empty State / Table */}
+
               {filteredCategories.length === 0 ? (
-                <div className="flex flex-col items-center gap-2 py-12 text-center">
-                  <Tags className="size-10 text-muted-foreground/50" />
-
-                  <p className="font-medium">
-                    {search.trim()
-                      ? "No matching categories"
-                      : "No exam categories yet"}
-                  </p>
-
-                  <p className="text-sm text-muted-foreground">
-                    {search.trim()
-                      ? "Try another search term."
-                      : "Create an exam category to get started."}
-                  </p>
-                </div>
+                <CategoryEmptyState isSearching={Boolean(search.trim())} />
               ) : (
-                <div className="overflow-x-auto rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="min-w-52">Category</TableHead>
+                <div className="relative max-h-[500px] w-full max-w-full overflow-auto rounded-section border border-border">
+                  <Table className="w-full min-w-[650px]">
+                    {/* Table Header */}
 
-                        <TableHead className="min-w-48">Slug</TableHead>
+                    <TableHeader className="sticky top-0 z-10 bg-muted shadow-sm">
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="min-w-64 font-semibold">
+                          Exam Category
+                        </TableHead>
 
-                        <TableHead className="min-w-28">Logo</TableHead>
+                        <TableHead className="min-w-48 font-semibold">
+                          Category Slug
+                        </TableHead>
 
-                        <TableHead className="min-w-28">Status</TableHead>
+                        <TableHead className="min-w-28 font-semibold">
+                          Status
+                        </TableHead>
 
                         {canManage && (
-                          <TableHead className="w-16 text-right">
+                          <TableHead className="w-16 text-right font-semibold">
                             Actions
                           </TableHead>
                         )}
                       </TableRow>
                     </TableHeader>
 
+                    {/* Table Body */}
+
                     <TableBody>
                       {filteredCategories.map((category) => (
-                        <TableRow key={category.id}>
-                          <TableCell className="font-medium">
-                            {category.name}
+                        <TableRow
+                          key={category.id}
+                          className="transition-colors hover:bg-accent/40"
+                        >
+                          {/* Category Name + Logo */}
+
+                          <TableCell className="font-medium whitespace-nowrap">
+                            <div className="flex items-center gap-3">
+                              <CategoryLogo
+                                name={category.name}
+                                logo={category.logo}
+                              />
+
+                              <span>{category.name || "—"}</span>
+                            </div>
                           </TableCell>
 
-                          <TableCell>
-                            <code className="rounded bg-muted px-2 py-1 text-xs">
-                              {category.slug}
-                            </code>
-                          </TableCell>
+                          {/* Category Slug */}
 
                           <TableCell>
-                            <CategoryLogo
-                              name={category.name}
-                              logo={category.logo}
-                            />
+                            <span className="rounded-md bg-muted px-2 py-1 font-mono text-xs text-muted-foreground">
+                              {category.slug || "—"}
+                            </span>
                           </TableCell>
 
+                          {/* Status */}
+
                           <TableCell>
-                            <Badge
-                              variant={
-                                category.isActive ? "default" : "secondary"
-                              }
-                            >
-                              {category.isActive ? "Active" : "Inactive"}
-                            </Badge>
+                            <CategoryStatusBadge isActive={category.isActive} />
                           </TableCell>
+
+                          {/* Actions */}
 
                           {canManage && (
                             <TableCell className="text-right">
@@ -307,6 +535,7 @@ export function ExamCategoryTable({
                                     <Button
                                       variant="ghost"
                                       size="icon"
+                                      className="size-8"
                                       aria-label={`Actions for ${category.name}`}
                                     >
                                       <MoreHorizontal className="size-4" />
@@ -315,6 +544,8 @@ export function ExamCategoryTable({
                                 />
 
                                 <DropdownMenuContent align="end">
+                                  {/* Edit */}
+
                                   <DropdownMenuItem
                                     onClick={() => onEdit?.(category)}
                                   >
@@ -322,12 +553,14 @@ export function ExamCategoryTable({
                                     Edit
                                   </DropdownMenuItem>
 
+                                  {/* Deactivate */}
+
                                   {category.isActive && (
                                     <DropdownMenuItem
-                                      className="text-destructive focus:text-destructive"
                                       onClick={() =>
                                         setSelectedCategory(category)
                                       }
+                                      className="text-destructive focus:text-destructive"
                                     >
                                       <Ban className="mr-2 size-4" />
                                       Deactivate
@@ -348,43 +581,14 @@ export function ExamCategoryTable({
         </CardContent>
       </Card>
 
-      <AlertDialog
-        open={Boolean(selectedCategory)}
-        onOpenChange={(open) => {
-          if (!open && !deactivateMutation.isPending) {
-            setSelectedCategory(null);
-          }
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Deactivate exam category?</AlertDialogTitle>
+      {/* Deactivate Confirmation Dialog */}
 
-            <AlertDialogDescription>
-              <strong>{selectedCategory?.name}</strong> will be deactivated.
-              Existing records will not be deleted. You can reactivate this
-              category later if your application supports reactivation.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deactivateMutation.isPending}>
-              Cancel
-            </AlertDialogCancel>
-
-            <AlertDialogAction
-              disabled={deactivateMutation.isPending}
-              onClick={(event) => {
-                event.preventDefault();
-                void handleDeactivate();
-              }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {deactivateMutation.isPending ? "Deactivating..." : "Deactivate"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeactivateCategoryDialog
+        category={selectedCategory}
+        isDeactivating={isDeactivating}
+        onClose={() => setSelectedCategory(null)}
+        onConfirm={handleDeactivate}
+      />
     </>
   );
 }
