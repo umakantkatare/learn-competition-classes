@@ -23,6 +23,7 @@ export const createExamCategorySchema = z.object({
   slug: slugSchema,
 
   logo: z.string().url("Invalid icon URL").optional().nullable(),
+  logoFileId: z.string().trim().nullable().optional(),
 
   isActive: z.boolean().default(true),
 });

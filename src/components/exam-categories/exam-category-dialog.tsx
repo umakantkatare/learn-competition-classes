@@ -1,12 +1,14 @@
 "use client";
 
-import Image from "next/image";
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
-
+import { useEffect, useState, useRef } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { ImagePlus, Loader2, X } from "lucide-react";
+import { Loader2, Tags } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 
 import {
   Dialog,
@@ -24,10 +26,6 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-
 import {
   useCreateExamCategory,
   useUpdateExamCategory,
@@ -41,11 +39,18 @@ import {
 
 import { uploadFile } from "@/helper/imagekit/upload";
 
+import ExamCategoryLogoUpload from "./exam-category-logo-upload";
+
+// -----------------------------------------------------------------------------
+// Types
+// -----------------------------------------------------------------------------
+
 type ExamCategory = {
   id: string;
   name: string;
   slug: string;
   logo?: string | null;
+  logoFileId?: string | null;
   isActive: boolean;
 };
 
@@ -54,6 +59,7 @@ type ExamCategoryPayload = {
   slug: string;
   isActive: boolean;
   logo: string | null;
+  logoFileId: string | null;
 };
 
 interface ExamCategoryDialogProps {
@@ -62,48 +68,46 @@ interface ExamCategoryDialogProps {
   category?: ExamCategory | null;
 }
 
+// -----------------------------------------------------------------------------
+// Constants
+// -----------------------------------------------------------------------------
+
 const defaultValues: CreateExamCategoryInput = {
   name: "",
   slug: "",
   isActive: true,
 };
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
+// -----------------------------------------------------------------------------
+// Component
+// -----------------------------------------------------------------------------
 
-const ALLOWED_IMAGE_TYPES = new Set([
-  "image/png",
-  "image/jpeg",
-  "image/webp",
-  "image/svg+xml",
-]);
+function generateSlug(value: string): string {
+  return value
+    .toLowerCase()
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
 
 export function ExamCategoryDialog({
   open,
   onOpenChange,
   category,
 }: ExamCategoryDialogProps) {
-  const isEditing = Boolean(category);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoRemoved, setLogoRemoved] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   const createMutation = useCreateExamCategory();
   const updateMutation = useUpdateExamCategory();
 
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [fileError, setFileError] = useState<string | null>(null);
-
-  const [previewUrl, setPreviewUrl] = useState<string | null>(
-    category?.logo ?? null,
-  );
-
-  const [removeExistingIcon, setRemoveExistingIcon] = useState(false);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const objectUrlRef = useRef<string | null>(null);
-
+  const isEditing = Boolean(category);
   const isPending = createMutation.isPending || updateMutation.isPending;
-
   const isBusy = isPending || isUploading;
 
   const form = useForm<
@@ -112,42 +116,31 @@ export function ExamCategoryDialog({
     CreateExamCategoryOutput
   >({
     resolver: zodResolver(createExamCategorySchema),
-    defaultValues: {
-      name: category?.name ?? "",
-      slug: category?.slug ?? "",
-      isActive: category?.isActive ?? true,
-    },
+    defaultValues,
   });
 
-  /**
-   * Releases a temporary browser object URL.
-   * Remote ImageKit URLs must not be revoked.
-   */
-  function releaseObjectUrl() {
-    if (objectUrlRef.current) {
-      URL.revokeObjectURL(objectUrlRef.current);
-      objectUrlRef.current = null;
-    }
+  const name = form.watch("name");
+
+  const previousName = useRef(category?.name ?? "");
+
+  useEffect(() => {
+    if (name === previousName.current) return;
+
+    previousName.current = name;
+
+    form.setValue("slug", generateSlug(name ?? ""), {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+  }, [name, form]);
+
+  function resetMediaState() {
+    setLogoFile(null);
+    setLogoRemoved(false);
   }
 
-  /**
-   * Cleanup only: no synchronous state updates inside this effect.
-   */
-  useEffect(() => {
-    return () => {
-      if (objectUrlRef.current) {
-        URL.revokeObjectURL(objectUrlRef.current);
-        objectUrlRef.current = null;
-      }
-    };
-  }, []);
-
-  /**
-   * Reset the form when opening or closing the dialog.
-   * This runs in an event handler, not in an effect.
-   */
   function resetForm() {
-    releaseObjectUrl();
+    previousName.current = category?.name ?? "";
 
     form.reset({
       name: category?.name ?? "",
@@ -155,108 +148,70 @@ export function ExamCategoryDialog({
       isActive: category?.isActive ?? true,
     });
 
-    setSelectedFile(null);
-    setFileError(null);
-    setPreviewUrl(category?.logo ?? null);
-    setRemoveExistingIcon(false);
-    setUploadProgress(0);
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    resetMediaState();
   }
 
-  /**
-   * Validate the selected image and generate its preview.
-   */
-  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.currentTarget.files?.[0];
+  useEffect(() => {
+    if (!open) return;
 
-    if (!file) return;
+    resetForm();
+  }, [open, category?.id]);
 
-    setFileError(null);
+  function handleOpenChange(nextOpen: boolean) {
+    if (isBusy) return;
 
-    if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
-      setFileError("Choose a PNG, JPG, WEBP, or SVG image.");
-
-      event.currentTarget.value = "";
-      return;
+    if (!nextOpen) {
+      resetForm();
     }
 
-    if (file.size > MAX_FILE_SIZE) {
-      setFileError("Image size must not exceed 5 MB.");
-
-      event.currentTarget.value = "";
-      return;
-    }
-
-    releaseObjectUrl();
-
-    const objectUrl = URL.createObjectURL(file);
-
-    objectUrlRef.current = objectUrl;
-
-    setSelectedFile(file);
-    setPreviewUrl(objectUrl);
-    setRemoveExistingIcon(false);
-    setUploadProgress(0);
+    onOpenChange(nextOpen);
   }
 
-  /**
-   * Remove the selected image or existing category icon.
-   */
-  function handleRemoveImage() {
-    releaseObjectUrl();
-
-    setSelectedFile(null);
-    setFileError(null);
-    setPreviewUrl(null);
-    setRemoveExistingIcon(true);
-    setUploadProgress(0);
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  }
-
-  /**
-   * Create or update an exam category.
-   */
   async function onSubmit(values: CreateExamCategoryOutput) {
-    if (fileError || isBusy) return;
+    if (isBusy) return;
 
-    setIsUploading(Boolean(selectedFile));
-    setUploadProgress(0);
+    setIsUploading(true);
 
     try {
-      let logo: string | null = category?.logo ?? null;
+      let logo: string | null = logoRemoved ? null : (category?.logo ?? null);
+      let logoFileId: string | null = logoRemoved
+        ? null
+        : (category?.logoFileId ?? null);
 
-      if (selectedFile) {
-        const uploaded = await uploadFile({
-          file: selectedFile,
-          folder: "/exam-categories",
-          tags: ["exam-category", "icon"],
-          onProgress: setUploadProgress,
+      if (logoFile) {
+        const uploadedLogo = await uploadFile({
+          file: logoFile,
+          fileName: logoFile.name,
+          folder: "exam-categories",
+          tags: ["exam-category", "logo"],
+          // onProgress: (progress) => {
+          //   setUploadProgress({
+          //     logo: Math.round(progress),
+          //   });
+          // },
         });
 
-        if (!uploaded.url) {
-          throw new Error("Image upload failed. Please try again.");
+        if (!uploadedLogo.url || !uploadedLogo.fileId) {
+          throw new Error("Category logo upload failed.");
         }
 
-        logo = uploaded.url;
-      } else if (removeExistingIcon) {
-        logo = null;
+        logo = uploadedLogo.url;
+        logoFileId = uploadedLogo.fileId;
       }
+
+      // API Payload
 
       const payload: ExamCategoryPayload = {
         name: values.name.trim(),
         slug: values.slug.trim(),
         isActive: values.isActive,
         logo,
+        logoFileId,
       };
 
-      // Mutations send JSON, not FormData.
-      if (category) {
+      // Update Category
+
+      if (isEditing && category) {
         await updateMutation.mutateAsync({
           id: category.id,
           data: payload,
@@ -272,6 +227,8 @@ export function ExamCategoryDialog({
       resetForm();
       onOpenChange(false);
     } catch (error: unknown) {
+      console.error("Exam category submission failed:", error);
+
       toast.error(
         error instanceof Error
           ? error.message
@@ -279,198 +236,103 @@ export function ExamCategoryDialog({
       );
     } finally {
       setIsUploading(false);
-      setUploadProgress(0);
     }
   }
 
-  /**
-   * Handle opening and closing through the dialog UI.
-   */
-  function handleOpenChange(nextOpen: boolean) {
-    if (isBusy) return;
-
-    resetForm();
-    onOpenChange(nextOpen);
-  }
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[500px]">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>
-            {isEditing ? "Edit Exam Category" : "Create Exam Category"}
+          <DialogTitle className="flex items-center gap-2">
+            <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10">
+              <Tags className="size-5 text-primary" />
+            </div>
+
+            {isEditing ? "Update Exam Category" : "Create Exam Category"}
           </DialogTitle>
 
           <DialogDescription>
             {isEditing
-              ? "Update the exam category details and icon."
-              : "Add a new exam category with its name, slug, and optional icon."}
+              ? "Update the category details and logo."
+              : "Create a new exam category with its name, slug and logo."}
           </DialogDescription>
         </DialogHeader>
 
         <form
           onSubmit={form.handleSubmit(onSubmit)}
-          className="space-y-5"
+          className="space-y-6"
           noValidate
         >
-          {/* Category name */}
-          <Controller
-            control={form.control}
-            name="name"
-            render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor="name">
-                  Category Name <span className="text-destructive">*</span>
-                </FieldLabel>
+          {/* Basic Information */}
 
-                <Input
-                  {...field}
-                  id="name"
-                  placeholder="e.g. Government Exams"
-                  autoComplete="off"
-                  disabled={isBusy}
-                  aria-invalid={fieldState.invalid}
-                />
+          <section className="space-y-4">
+            <h3 className="text-sm font-semibold">Basic Information</h3>
 
-                {fieldState.error && <FieldError errors={[fieldState.error]} />}
-              </Field>
-            )}
-          />
+            {/* Category Name */}
 
-          {/* Category slug */}
-          <Controller
-            control={form.control}
-            name="slug"
-            render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor="slug">
-                  Slug <span className="text-destructive">*</span>
-                </FieldLabel>
+            <Controller
+              control={form.control}
+              name="name"
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor="name">Category Name</FieldLabel>
 
-                <Input
-                  {...field}
-                  id="slug"
-                  placeholder="e.g. government-exams"
-                  autoComplete="off"
-                  disabled={isBusy}
-                  aria-invalid={fieldState.invalid}
-                />
-
-                <FieldDescription>
-                  A URL-friendly identifier for this category.
-                </FieldDescription>
-
-                {fieldState.error && <FieldError errors={[fieldState.error]} />}
-              </Field>
-            )}
-          />
-
-          {/* Category icon */}
-          <Field data-invalid={Boolean(fileError)}>
-            <FieldLabel>Category Icon</FieldLabel>
-
-            <div className="space-y-3">
-              {previewUrl ? (
-                <div className="relative flex min-h-36 items-center justify-center rounded-lg border border-dashed bg-muted/30 p-4">
-                  <Image
-                    src={previewUrl}
-                    alt="Category icon preview"
-                    width={96}
-                    height={96}
-                    unoptimized
-                    className="h-24 w-24 rounded-md object-contain"
+                  <Input
+                    {...field}
+                    id="name"
+                    placeholder="e.g. Teaching"
+                    autoComplete="off"
+                    disabled={isBusy}
+                    aria-invalid={fieldState.invalid}
                   />
 
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="icon"
-                    className="absolute right-2 top-2 h-8 w-8"
-                    onClick={handleRemoveImage}
+                  <FieldError errors={[fieldState.error]} />
+                </Field>
+              )}
+            />
+
+            {/* Category Slug */}
+
+            <Controller
+              control={form.control}
+              name="slug"
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor="slug">Category Slug</FieldLabel>
+
+                  <Input
+                    {...field}
+                    id="slug"
+                    placeholder="e.g. teaching"
+                    autoComplete="off"
+                    readOnly
                     disabled={isBusy}
-                    aria-label="Remove category icon"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isBusy}
-                  className="flex min-h-36 w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed bg-muted/20 p-6 text-center transition-colors hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <span className="rounded-full bg-background p-3 shadow-sm">
-                    <ImagePlus className="h-6 w-6" />
-                  </span>
-
-                  <span className="text-sm font-medium">
-                    Click to upload an icon
-                  </span>
-
-                  <span className="text-xs text-muted-foreground">
-                    PNG, JPG, WEBP, or SVG · Maximum 5 MB
-                  </span>
-                </button>
+                    className="bg-muted"
+                    aria-invalid={fieldState.invalid}
+                  />
+                  <FieldError errors={[fieldState.error]} />
+                </Field>
               )}
+            />
+          </section>
 
-              <Input
-                ref={fileInputRef}
-                type="file"
-                accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                className="hidden"
-                disabled={isBusy}
-                onChange={handleFileChange}
-                aria-label="Choose category icon"
-                aria-invalid={Boolean(fileError)}
-              />
+          {/* Category Media */}
 
-              {selectedFile && (
-                <p className="break-all text-xs text-muted-foreground">
-                  {selectedFile.name} · {(selectedFile.size / 1024).toFixed(1)}{" "}
-                  KB
-                </p>
-              )}
+          <ExamCategoryLogoUpload
+            logoFileId={logoFile}
+            logoUrl={category?.logo ?? null}
+            logoRemoved={logoRemoved}
+            onLogoChange={setLogoFile}
+            onLogoRemove={setLogoRemoved}
+            disabled={isBusy}
+          />
 
-              {isUploading && (
-                <div className="space-y-1" role="status" aria-live="polite">
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>Uploading icon…</span>
-                    <span>{uploadProgress}%</span>
-                  </div>
+          {/* Active Status */}
 
-                  <div
-                    className="h-2 overflow-hidden rounded-full bg-muted"
-                    role="progressbar"
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-valuenow={uploadProgress}
-                  >
-                    <div
-                      className="h-full rounded-full bg-primary transition-all"
-                      style={{
-                        width: `${uploadProgress}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {fileError && (
-                <p role="alert" className="text-sm text-destructive">
-                  {fileError}
-                </p>
-              )}
-
-              <FieldDescription>
-                {isEditing
-                  ? "Choose a new image to replace the existing icon, or remove it to clear the saved icon URL."
-                  : "Choose an image to represent this exam category. Image upload is optional."}
-              </FieldDescription>
-            </div>
-          </Field>
-
-          {/* Active status */}
           <Controller
             control={form.control}
             name="isActive"
@@ -498,8 +360,9 @@ export function ExamCategoryDialog({
             )}
           />
 
-          {/* Form actions */}
-          <DialogFooter className="gap-2 sm:gap-0">
+          {/* Form Actions */}
+
+          <DialogFooter className="gap-2">
             <Button
               type="button"
               variant="outline"
@@ -512,11 +375,12 @@ export function ExamCategoryDialog({
             <Button type="submit" disabled={isBusy}>
               {isBusy ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {isUploading ? "Uploading…" : "Saving…"}
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+
+                  {isUploading ? "Uploading logo..." : "Saving..."}
                 </>
               ) : isEditing ? (
-                "Save Changes"
+                "Update Category"
               ) : (
                 "Create Category"
               )}

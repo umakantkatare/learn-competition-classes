@@ -1,23 +1,26 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-
 import {
   getExamCategoriesAction,
   createExamCategoryAction,
   updateExamCategoryAction,
   deactivateExamCategoryAction,
 } from "@/actions/academic/exam-category-actions";
-import { ExamCategory } from "@/types/exam-category";
+
+import type { ExamCategory } from "@/types/exam-category";
+
+// Types
 
 export type ExamCategoryPayload = {
   name: string;
   slug: string;
   isActive: boolean;
   logo: string | null;
+  logoFileId: string | null;
 };
 
-// ─── Query Keys ─────────────────────────────────────────────────
+// Query Keys
 
 export const examCategoryKeys = {
   all: ["examCategories"] as const,
@@ -28,7 +31,7 @@ export const examCategoryKeys = {
     [...examCategoryKeys.lists(), { onlyActive }] as const,
 };
 
-// ─── GET: Exam Categories ───────────────────────────────────────
+// GET: Exam Categories
 
 export function useGetExamCategories(onlyActive = false) {
   return useQuery<ExamCategory[]>({
@@ -48,7 +51,7 @@ export function useGetExamCategories(onlyActive = false) {
   });
 }
 
-// ─── CREATE: Exam Category ──────────────────────────────────────
+// CREATE: Exam Category
 
 export function useCreateExamCategory() {
   const queryClient = useQueryClient();
@@ -72,7 +75,7 @@ export function useCreateExamCategory() {
   });
 }
 
-// ─── UPDATE: Exam Category ──────────────────────────────────────
+// UPDATE: Exam Category
 
 export function useUpdateExamCategory() {
   const queryClient = useQueryClient();
@@ -102,7 +105,7 @@ export function useUpdateExamCategory() {
   });
 }
 
-// ─── DEACTIVATE: Exam Category ──────────────────────────────────
+// DEACTIVATE: Exam Category
 
 export function useDeactivateExamCategory() {
   const queryClient = useQueryClient();

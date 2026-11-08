@@ -7,7 +7,6 @@ import {
   MoreHorizontal,
   Pencil,
   Ban,
-  Tags,
   RefreshCw,
   ImageIcon,
   AlertTriangle,
@@ -21,7 +20,6 @@ import {
 
 import type { ExamCategory } from "@/types/exam-category";
 
-// UI Components
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -139,9 +137,6 @@ function CategoryListSkeleton() {
 function CategoryEmptyState({ isSearching }: { isSearching: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-      <div className="flex size-14 items-center justify-center rounded-full bg-muted">
-        <Tags className="size-7 text-muted-foreground" />
-      </div>
 
       <div className="space-y-1">
         <h3 className="font-semibold text-foreground">
@@ -381,14 +376,11 @@ export function ExamCategoryTable({
         <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
             <CardTitle className="flex items-center gap-2 text-xl font-semibold">
-              <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10">
-                <Tags className="size-5 text-primary" />
-              </div>
               Exam Categories
             </CardTitle>
 
             <CardDescription>
-              Manage examination categories, logos and slugs.
+              Manage examination categories,
             </CardDescription>
           </div>
 

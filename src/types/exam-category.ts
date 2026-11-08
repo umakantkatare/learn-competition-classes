@@ -3,6 +3,7 @@ export type ExamCategory = {
   name: string;
   slug: string;
   logo: string | null;
+  logoFileId: string | null;
   isActive: boolean;
   createdAt: Date | string;
   updatedAt: Date | string;

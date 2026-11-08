@@ -2,7 +2,7 @@ import {
   ExamCategoryRepository,
   NewExamCategory,
   UpdateExamCategory,
-} from "../../repositories/academic/exam-category-repository";
+} from "@/server/repositories/academic/exam-category-repository";
 
 export class ExamCategoryService {
   private readonly categoryRepo: ExamCategoryRepository;

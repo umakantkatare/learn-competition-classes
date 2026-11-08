@@ -9,7 +9,7 @@ import { requireAdminOrManager } from "@/lib/authorize";
 import {
   createExamCategorySchema,
   updateExamCategorySchema,
-} from "@/validations/academic/academic-validations";
+} from "@/validations/academic/exam-category-validation";
 
 const examCategoryService = new ExamCategoryService();
 
@@ -26,6 +26,7 @@ export type ExamCategoryPayload = {
   slug: string;
   isActive: boolean;
   logo: string | null;
+  logoFileId: string | null;
 };
 
 function getErrorMessage(error: unknown): string {
