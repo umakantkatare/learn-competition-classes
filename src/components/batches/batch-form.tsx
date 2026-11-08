@@ -590,9 +590,6 @@ export default function BatchForm({
           <section className="space-y-3">
             <div>
               <h3 className="text-sm font-semibold">Batch Features</h3>
-              <p className="text-sm text-muted-foreground">
-                Add the key benefits and facilities included in this batch.
-              </p>
             </div>
             <div className="flex gap-2">
               <Input
@@ -641,12 +638,6 @@ export default function BatchForm({
           </section>
 
           <section className="space-y-4">
-            <div>
-              <h3 className="text-sm font-semibold">Media</h3>
-              <p className="text-sm text-muted-foreground">
-                Upload a batch thumbnail and an optional preview video.
-              </p>
-            </div>
             <BatchMediaUpload
               thumbnailFile={thumbnailFile}
               previewVideoFile={previewVideoFile}
@@ -922,28 +913,6 @@ export default function BatchForm({
             />
           </section>
 
-          <section className="space-y-4">
-            <h3 className="text-sm font-semibold">Publishing</h3>
-            <Controller
-              control={form.control}
-              name="isPublished"
-              render={({ field }) => (
-                <Field className="flex flex-row items-center justify-between rounded-lg border p-3">
-                  <div className="space-y-1">
-                    <FieldLabel>Publish Batch</FieldLabel>
-                    <FieldDescription>
-                      Published batches can be visible to students.
-                    </FieldDescription>
-                  </div>
-                  <Switch
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                  />
-                </Field>
-              )}
-            />
-          </section>
-
           <section className="space-y-3">
             <div>
               <h3 className="text-sm font-semibold">Assign Teachers</h3>
@@ -1007,6 +976,28 @@ export default function BatchForm({
                   </Field>
                 );
               }}
+            />
+          </section>
+
+          <section className="space-y-4">
+            <h3 className="text-sm font-semibold">Publishing</h3>
+            <Controller
+              control={form.control}
+              name="isPublished"
+              render={({ field }) => (
+                <Field className="flex flex-row items-center justify-between rounded-lg border p-3">
+                  <div className="space-y-1">
+                    <FieldLabel>Publish Batch</FieldLabel>
+                    <FieldDescription>
+                      Published batches can be visible to students.
+                    </FieldDescription>
+                  </div>
+                  <Switch
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                </Field>
+              )}
             />
           </section>
 

@@ -13,11 +13,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 
-import { ImagePlus, Video, X, Upload, FileVideo } from "lucide-react";
+import { ImagePlus, Video as VideoIcon, X, FileVideo } from "lucide-react";
 
-// -----------------------------------------------------------------------------
+import { Image, Video } from "@imagekit/next";
+
 // Types
-// -----------------------------------------------------------------------------
 
 interface BatchMediaUploadProps {
   thumbnailFile: File | null;
@@ -38,45 +38,32 @@ interface BatchMediaUploadProps {
   disabled?: boolean;
 }
 
-// -----------------------------------------------------------------------------
 // Helpers
-// -----------------------------------------------------------------------------
 
 function formatFileSize(size: number): string {
   return `${(size / (1024 * 1024)).toFixed(2)} MB`;
 }
 
-// -----------------------------------------------------------------------------
 // Component
-// -----------------------------------------------------------------------------
 
 export default function BatchMediaUpload({
   thumbnailFile,
   previewVideoFile,
-
   thumbnailUrl,
   previewVideoUrl,
-
   thumbnailRemoved,
   previewVideoRemoved,
-
   onThumbnailChange,
   onPreviewVideoChange,
-
   onThumbnailRemove,
   onPreviewVideoRemove,
-
   disabled = false,
 }: BatchMediaUploadProps) {
   const [thumbnailError, setThumbnailError] = useState<string | null>(null);
   const [videoError, setVideoError] = useState<string | null>(null);
-
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
 
-  // ---------------------------------------------------------------------------
-  // Preview URLs
-  // ---------------------------------------------------------------------------
 
   useEffect(() => {
     if (!thumbnailFile) {
@@ -104,9 +91,6 @@ export default function BatchMediaUpload({
     return () => URL.revokeObjectURL(objectUrl);
   }, [previewVideoFile]);
 
-  // ---------------------------------------------------------------------------
-  // Thumbnail Handler
-  // ---------------------------------------------------------------------------
 
   function handleThumbnailChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] ?? null;
@@ -137,9 +121,7 @@ export default function BatchMediaUpload({
     event.target.value = "";
   }
 
-  // ---------------------------------------------------------------------------
   // Preview Video Handler
-  // ---------------------------------------------------------------------------
 
   function handlePreviewVideoChange(
     event: React.ChangeEvent<HTMLInputElement>,
@@ -172,9 +154,7 @@ export default function BatchMediaUpload({
     event.target.value = "";
   }
 
-  // ---------------------------------------------------------------------------
   // Remove Handlers
-  // ---------------------------------------------------------------------------
 
   function handleRemoveThumbnail() {
     setThumbnailError(null);
@@ -198,24 +178,12 @@ export default function BatchMediaUpload({
     onPreviewVideoRemove(true);
   }
 
-  // ---------------------------------------------------------------------------
   // Render
-  // ---------------------------------------------------------------------------
 
   return (
     <section className="space-y-5">
-      <div>
-        <h3 className="text-sm font-semibold">Batch Media</h3>
-
-        <p className="text-sm text-muted-foreground">
-          Upload a thumbnail and preview video for your batch.
-        </p>
-      </div>
-
       <div className="grid gap-6 sm:grid-cols-2">
-        {/* ---------------------------------------------------------------- */}
         {/* Thumbnail */}
-        {/* ---------------------------------------------------------------- */}
 
         <Field>
           <FieldLabel>Batch Thumbnail</FieldLabel>
@@ -226,12 +194,34 @@ export default function BatchMediaUpload({
             <>
               {thumbnailPreview || thumbnailUrl ? (
                 <div className="relative overflow-hidden rounded-lg border bg-muted">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={thumbnailPreview ?? thumbnailUrl!}
-                    alt="Batch thumbnail preview"
-                    className="h-44 w-full object-cover"
-                  />
+                  {thumbnailPreview ? (
+                    // Local thumbnail preview
+                    <img
+                      src={thumbnailPreview}
+                      alt="Batch thumbnail preview"
+                      className="h-44 w-full object-cover"
+                    />
+                  ) : (
+                    // Existing ImageKit thumbnail
+                    <Image
+                      urlEndpoint={
+                        process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT!
+                      }
+                      src={thumbnailUrl!}
+                      alt="Batch thumbnail preview"
+                      width={600}
+                      height={300}
+                      className="h-44 w-full object-cover"
+                      transformation={[
+                        {
+                          width: 600,
+                          height: 300,
+                          quality: 80,
+                          format: "webp",
+                        },
+                      ]}
+                    />
+                  )}
 
                   <Button
                     type="button"
@@ -311,9 +301,7 @@ export default function BatchMediaUpload({
           )}
         </Field>
 
-        {/* ---------------------------------------------------------------- */}
         {/* Preview Video */}
-        {/* ---------------------------------------------------------------- */}
 
         <Field>
           <FieldLabel>Preview Video</FieldLabel>
@@ -324,11 +312,26 @@ export default function BatchMediaUpload({
             <>
               {videoPreview || previewVideoUrl ? (
                 <div className="relative overflow-hidden rounded-lg border bg-muted">
-                  <video
-                    src={videoPreview ?? previewVideoUrl ?? undefined}
-                    controls
-                    className="h-44 w-full bg-black object-contain"
-                  />
+                  {videoPreview ? (
+                    // Local video preview
+                    <video
+                      src={videoPreview}
+                      controls
+                      className="h-44 w-full bg-black object-contain"
+                    />
+                  ) : (
+                    // Existing ImageKit video
+                    <Video
+                      urlEndpoint={
+                        process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT!
+                      }
+                      src={previewVideoUrl!}
+                      controls
+                      width={600}
+                      height={300}
+                      className="h-44 w-full bg-black object-contain"
+                    />
+                  )}
 
                   <Button
                     type="button"
@@ -362,7 +365,7 @@ export default function BatchMediaUpload({
 
           {previewVideoRemoved && (
             <div className="flex h-44 flex-col items-center justify-center gap-2 rounded-lg border border-dashed">
-              <Video className="h-8 w-8 text-muted-foreground" />
+              <VideoIcon className="h-8 w-8 text-muted-foreground" />
 
               <p className="text-sm text-muted-foreground">
                 Preview video removed
