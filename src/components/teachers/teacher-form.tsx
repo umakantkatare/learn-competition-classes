@@ -219,7 +219,7 @@ export default function TeacherForm({
 
     if (isUploading || isPending) return;
 
-    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+    if (!ALLOWED_IMAGE_TYPES.some((type) => type === file.type)) {
       toast.error("Only JPEG, PNG and WebP images are allowed.");
       return;
     }

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useMemo, useState } from "react";
@@ -15,10 +14,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 
-import {
-  useGetAllBatches,
-  type Batch,
-} from "@/hooks/academic/use-batches";
+import { useGetAllBatches, type Batch } from "@/hooks/academic/use-batches";
 
 import BatchForm from "./batch-form";
 
@@ -103,15 +99,10 @@ function getBatchExpiryDate(batch: Batch): Date | null {
   if (batch.expiryDate) {
     const expiryDate = new Date(batch.expiryDate);
 
-    return Number.isNaN(expiryDate.getTime())
-      ? null
-      : expiryDate;
+    return Number.isNaN(expiryDate.getTime()) ? null : expiryDate;
   }
 
-  if (
-    batch.validityMonths === null ||
-    batch.validityMonths === undefined
-  ) {
+  if (batch.validityMonths === null || batch.validityMonths === undefined) {
     return null;
   }
 
@@ -123,9 +114,7 @@ function getBatchExpiryDate(batch: Batch): Date | null {
 
   const expiryDate = new Date(startDate);
   expiryDate.setDate(1);
-  expiryDate.setMonth(
-    expiryDate.getMonth() + batch.validityMonths,
-  );
+  expiryDate.setMonth(expiryDate.getMonth() + batch.validityMonths);
 
   const lastDayOfTargetMonth = new Date(
     expiryDate.getFullYear(),
@@ -156,16 +145,9 @@ function getBatchDurationLabel(batch: Batch): string {
 
 function BatchListSkeleton() {
   return (
-    <div
-      className="space-y-3"
-      aria-label="Loading batches"
-      aria-busy="true"
-    >
+    <div className="space-y-3" aria-label="Loading batches" aria-busy="true">
       {Array.from({ length: 5 }).map((_, index) => (
-        <Skeleton
-          key={index}
-          className="h-16 w-full rounded-md"
-        />
+        <Skeleton key={index} className="h-16 w-full rounded-md" />
       ))}
     </div>
   );
@@ -175,19 +157,12 @@ function BatchListSkeleton() {
 // Empty State
 // -----------------------------------------------------------------------------
 
-function BatchEmptyState({
-  isSearching,
-}: {
-  isSearching: boolean;
-}) {
+function BatchEmptyState({ isSearching }: { isSearching: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-    
       <div className="space-y-1">
         <h1 className="font-semibold text-foreground text-2xl">
-          {isSearching
-            ? "No matching batches"
-            : "No batches yet"}
+          {isSearching ? "No matching batches" : "No batches yet"}
         </h1>
 
         <p className="max-w-sm text-sm text-muted-foreground">
@@ -224,20 +199,12 @@ function BatchErrorState({
           Failed to load batches
         </h3>
 
-        <p className="text-sm text-muted-foreground">
-          {message}
-        </p>
+        <p className="text-sm text-muted-foreground">{message}</p>
       </div>
 
-      <Button
-        variant="outline"
-        onClick={onRetry}
-        disabled={isFetching}
-      >
+      <Button variant="outline" onClick={onRetry} disabled={isFetching}>
         <RefreshCw
-          className={`mr-2 size-4 ${
-            isFetching ? "animate-spin" : ""
-          }`}
+          className={`mr-2 size-4 ${isFetching ? "animate-spin" : ""}`}
         />
 
         {isFetching ? "Retrying..." : "Try again"}
@@ -250,15 +217,8 @@ function BatchErrorState({
 // Batch Status Badge
 // -----------------------------------------------------------------------------
 
-function BatchStatusBadge({
-  status,
-}: {
-  status: Batch["status"];
-}) {
-  const variants: Record<
-    string,
-    { label: string; className: string }
-  > = {
+function BatchStatusBadge({ status }: { status: Batch["status"] }) {
+  const variants: Record<string, { label: string; className: string }> = {
     UPCOMING: {
       label: "Upcoming",
       className: "border-blue-500/30 text-blue-600",
@@ -269,8 +229,7 @@ function BatchStatusBadge({
     },
     COMPLETED: {
       label: "Completed",
-      className:
-        "border-muted-foreground/30 text-muted-foreground",
+      className: "border-muted-foreground/30 text-muted-foreground",
     },
     EXPIRED: {
       label: "Expired",
@@ -294,16 +253,9 @@ function BatchStatusBadge({
 // Publication Badge
 // -----------------------------------------------------------------------------
 
-function PublicationBadge({
-  isPublished,
-}: {
-  isPublished: boolean;
-}) {
+function PublicationBadge({ isPublished }: { isPublished: boolean }) {
   return isPublished ? (
-    <Badge
-      variant="outline"
-      className="border-emerald-500/30 text-emerald-600"
-    >
+    <Badge variant="outline" className="border-emerald-500/30 text-emerald-600">
       <CheckCircle2 className="mr-1 size-3" />
       Published
     </Badge>
@@ -318,17 +270,9 @@ function PublicationBadge({
 // Batch Features
 // -----------------------------------------------------------------------------
 
-function BatchFeatures({
-  features,
-}: {
-  features?: string[];
-}) {
+function BatchFeatures({ features }: { features?: string[] }) {
   if (!features?.length) {
-    return (
-      <p className="text-xs text-muted-foreground">
-        No features added
-      </p>
-    );
+    return <p className="text-xs text-muted-foreground">No features added</p>;
   }
 
   const visibleFeatures = features.slice(0, 2);
@@ -372,8 +316,7 @@ export default function BatchList() {
 
   // Local states
   const [search, setSearch] = useState("");
-  const [selectedBatch, setSelectedBatch] =
-    useState<Batch | null>(null);
+  const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
 
   // ---------------------------------------------------------------------------
   // Search and Filter
@@ -433,13 +376,12 @@ export default function BatchList() {
               <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10">
                 <Layers className="size-5 text-primary" />
               </div>
-
               Batches
             </CardTitle>
 
             <CardDescription>
-              Manage batches, features, pricing, teachers,
-              schedules and publication.
+              Manage batches, features, pricing, teachers, schedules and
+              publication.
             </CardDescription>
           </div>
 
@@ -477,10 +419,7 @@ export default function BatchList() {
 
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-2">
-                  <Badge
-                    variant="secondary"
-                    className="rounded-full px-3 py-1"
-                  >
+                  <Badge variant="secondary" className="rounded-full px-3 py-1">
                     {filteredBatches.length}
                   </Badge>
 
@@ -516,9 +455,7 @@ export default function BatchList() {
               {/* Empty State / Table */}
 
               {filteredBatches.length === 0 ? (
-                <BatchEmptyState
-                  isSearching={Boolean(search.trim())}
-                />
+                <BatchEmptyState isSearching={Boolean(search.trim())} />
               ) : (
                 <div className="relative max-h-[600px] w-full max-w-full overflow-auto rounded-section border border-border">
                   <Table className="min-w-[1350px] w-full">
@@ -654,9 +591,7 @@ export default function BatchList() {
 
                             <TableCell>
                               {batch.isFree ? (
-                                <Badge variant="secondary">
-                                  Free
-                                </Badge>
+                                <Badge variant="secondary">Free</Badge>
                               ) : (
                                 <div className="space-y-1">
                                   <p className="font-semibold text-foreground">
@@ -739,9 +674,7 @@ export default function BatchList() {
 
                                 <DropdownMenuContent align="end">
                                   <DropdownMenuItem
-                                    onClick={() =>
-                                      setSelectedBatch(batch)
-                                    }
+                                    onClick={() => setSelectedBatch(batch)}
                                   >
                                     <Pencil className="mr-2 size-4" />
                                     Edit
