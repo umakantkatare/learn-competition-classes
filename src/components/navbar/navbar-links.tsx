@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+
 import {
   NavigationMenu,
   NavigationMenuItem,
@@ -9,6 +10,7 @@ import {
   NavigationMenuList,
   NavigationMenuTrigger,
 } from "@/components/ui/navigation-menu";
+
 import NavbarDropdown from "./navbar-dropdowm";
 
 const navLinks = [
@@ -17,19 +19,14 @@ const navLinks = [
     href: "/",
   },
   {
-    label: "Courses",
-    href: "/courses",
+    label: "Batches",
+    href: "/batches",
     dropdown: true,
   },
   {
     label: "Live Classes",
     href: "/live-classes",
   },
-  // {
-  //   label: "Test Series",
-  //   href: "/test-series",
-  //   dropdown: true,
-  // },
   {
     label: "About",
     href: "/about",
@@ -38,46 +35,71 @@ const navLinks = [
     label: "Contact",
     href: "/contact",
   },
-];
+] as const;
 
 export default function NavbarLinks() {
   const pathname = usePathname();
+
+  const isActiveRoute = (href: string) => {
+    if (href === "/") {
+      return pathname === "/";
+    }
+
+    return pathname === href || pathname.startsWith(`${href}/`);
+  };
 
   return (
     <nav aria-label="Main navigation">
       <NavigationMenu className="max-w-none">
         <NavigationMenuList className="gap-6 lg:gap-8 xl:gap-10">
           {navLinks.map((item) => {
-            const isActive =
-              item.href === "/"
-                ? pathname === "/"
-                : pathname.startsWith(item.href);
+            const isActive = isActiveRoute(item.href);
 
-            const linkClassName = `relative flex h-full items-center
-              whitespace-nowrap text-base font-medium transition-colors
-              duration-200 lg:text-lg ${
+            const linkClassName = `
+              relative flex h-10 items-center
+              whitespace-nowrap rounded-none
+              bg-transparent px-0 py-0
+              text-base font-medium
+              transition-colors duration-200
+              lg:text-lg
+              ${
                 isActive
                   ? "text-[#EFA400]"
                   : "text-[#171717] hover:text-[#EFA400]"
-              }`;
+              }
+            `;
+
+            const activeIndicator = isActive ? (
+              <span
+                aria-hidden="true"
+                className="
+                  absolute -bottom-0.5 left-0
+                  h-1 w-full rounded-t-full
+                  bg-[#F5A800]
+                "
+              />
+            ) : null;
 
             return (
               <NavigationMenuItem key={item.href}>
-                {item.dropdown ? (
+                {"dropdown" in item && item.dropdown ? (
                   <>
                     <NavigationMenuTrigger
-                      className={`${linkClassName} rounded-none bg-transparent
-                        px-0 py-0 hover:bg-transparent focus:bg-transparent
-                        data-popup-open:bg-transparent data-open:bg-transparent`}
+                      className={`
+                        ${linkClassName}
+                        shadow-none
+                        hover:bg-transparent
+                        focus:bg-transparent
+                        data-[state=open]:bg-transparent
+                        data-[state=open]:text-[#EFA400]
+                        [&_svg]:transition-transform
+                      `}
                     >
                       {item.label}
-                      {isActive && (
-                        <span className="absolute -bottom-0.5 left-0 h-1 w-full rounded-t-full bg-[#F5A800]" />
-                      )}
+                      {activeIndicator}
                     </NavigationMenuTrigger>
-                    <NavbarDropdown
-                      type={item.href === "/courses" ? "courses" : "test-series"}
-                    />
+
+                    <NavbarDropdown type="courses" />
                   </>
                 ) : (
                   <NavigationMenuLink
@@ -87,13 +109,11 @@ export default function NavbarLinks() {
                         aria-current={isActive ? "page" : undefined}
                       />
                     }
-                    className={linkClassName}
                     active={isActive}
+                    className={linkClassName}
                   >
                     {item.label}
-                    {isActive && (
-                      <span className="absolute -bottom-0.5 left-0 h-1 w-full rounded-t-full bg-[#F5A800]" />
-                    )}
+                    {activeIndicator}
                   </NavigationMenuLink>
                 )}
               </NavigationMenuItem>
