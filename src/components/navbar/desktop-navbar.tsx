@@ -2,7 +2,6 @@
 
 import Logo from "../common/logo";
 import NavbarLinks from "./navbar-links";
-import NavbarSearch from "./navbar-search";
 import NavbarActions from "./navbar-actions";
 import NavbarNotifications from "./navbar-notifications";
 import NavbarUserMenu from "./navbar-userMenu";
@@ -20,8 +19,6 @@ export default function DesktopNavbar() {
       <NavbarLinks />
 
       <div className="flex shrink-0 items-center gap-4">
-        <NavbarSearch />
-
         {user ? (
           <>
             <div className="h-10 w-px bg-gray-200" aria-hidden="true" />

@@ -1,100 +1,52 @@
-import { defineRelations } from "drizzle-orm";
-import { pgTable, text, timestamp, boolean, index } from "drizzle-orm/pg-core";
+import { randomUUID } from "node:crypto";
+import {
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  integer,
+  jsonb,
+  index,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 
-export const user = pgTable("user", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  email: text("email").notNull().unique(),
-  emailVerified: boolean("email_verified").default(false).notNull(),
-  image: text("avatar"),
-  avatarFileId: text("avatar_file_id"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at")
-    .defaultNow()
-    .$onUpdate(() => /* @__PURE__ */ new Date())
-    .notNull(),
-  role: text("role"),
-  banned: boolean("banned").default(false),
-  banReason: text("ban_reason"),
-  banExpires: timestamp("ban_expires"),
-  phoneNumber: text("phone_number").unique(),
-});
+export const webhookEventStatusEnum = pgEnum("webhook_event_status", [
+  "PROCESSING",
+  "PROCESSED",
+  "FAILED",
+]);
 
-export const session = pgTable(
-  "session",
+export const webhookEvents = pgTable(
+  "webhook_events",
   {
-    id: text("id").primaryKey(),
-    expiresAt: timestamp("expires_at").notNull(),
-    token: text("token").notNull().unique(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
-      .$onUpdate(() => /* @__PURE__ */ new Date())
-      .notNull(),
-    ipAddress: text("ip_address"),
-    userAgent: text("user_agent"),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    impersonatedBy: text("impersonated_by"),
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => randomUUID()),
+
+    eventId: text("event_id").notNull(),
+
+    eventType: text("event_type").notNull(),
+
+    status: webhookEventStatusEnum("status").default("PROCESSING").notNull(),
+
+    payload: jsonb("payload").$type<Record<string, unknown>>(),
+
+    attempts: integer("attempts").default(1).notNull(),
+
+    errorMessage: text("error_message"),
+
+    receivedAt: timestamp("received_at").defaultNow().notNull(),
+
+    processedAt: timestamp("processed_at"),
+
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
-  (table) => [index("session_userId_idx").on(table.userId)],
+  (table) => [
+    uniqueIndex("webhook_events_event_id_unique").on(table.eventId),
+    index("webhook_events_status_idx").on(table.status),
+    index("webhook_events_received_at_idx").on(table.receivedAt),
+  ],
 );
 
-export const account = pgTable(
-  "account",
-  {
-    id: text("id").primaryKey(),
-    accountId: text("account_id").notNull(),
-    providerId: text("provider_id").notNull(),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    accessToken: text("access_token"),
-    refreshToken: text("refresh_token"),
-    idToken: text("id_token"),
-    accessTokenExpiresAt: timestamp("access_token_expires_at"),
-    refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
-    scope: text("scope"),
-    password: text("password"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
-      .$onUpdate(() => /* @__PURE__ */ new Date())
-      .notNull(),
-  },
-  (table) => [index("account_userId_idx").on(table.userId)],
-);
-
-export const verification = pgTable(
-  "verification",
-  {
-    id: text("id").primaryKey(),
-    identifier: text("identifier").notNull(),
-    value: text("value").notNull(),
-    expiresAt: timestamp("expires_at").notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
-      .defaultNow()
-      .$onUpdate(() => /* @__PURE__ */ new Date())
-      .notNull(),
-  },
-  (table) => [index("verification_identifier_idx").on(table.identifier)],
-);
-
-export const relations = defineRelations({ user, session, account }, (r) => ({
-  user: {
-    sessions: r.many.session(),
-    accounts: r.many.account(),
-  },
-  session: {
-    user: r.one.user({
-      from: r.session.userId,
-      to: r.user.id,
-    }),
-  },
-  account: {
-    user: r.one.user({
-      from: r.account.userId,
-      to: r.user.id,
-    }),
-  },
-}));
+export type WebhookEvent = typeof webhookEvents.$inferSelect;
+export type NewWebhookEvent = typeof webhookEvents.$inferInsert;

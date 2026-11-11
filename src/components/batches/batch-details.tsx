@@ -1,63 +1,65 @@
 "use client";
 
-import React from "react";
+import type { ElementType, ReactNode } from "react";
 import {
-  ArrowLeft,
-  BookOpen,
-  CalendarCheck,
   CalendarDays,
-  CheckCircle2,
+  CalendarCheck,
   Clock,
-  Globe,
   GraduationCap,
-  Hash,
-  Layers,
-  Pencil,
-  PlayCircle,
-  ShieldCheck,
+  CheckCircle2,
   Users,
-  Video,
+  Globe,
+  ShieldCheck,
 } from "lucide-react";
 
-import type { Batch } from "@/hooks/academic/use-batches";
+import { useGetBatchBySlug } from "@/hooks/academic/use-batches";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-// --------------------------------------------------
-// Props
-// --------------------------------------------------
+import { statusLabels, statusStyles } from "@/components/batches/batch-card";
+import Image from "next/image";
+import RazorpayCheckoutButton from "../payments/checkout-button";
+
+type Batch = NonNullable<ReturnType<typeof useGetBatchBySlug>["data"]>;
 
 interface BatchDetailsProps {
   batch: Batch;
-  onBack?: () => void;
-  onEdit?: (batch: Batch) => void;
+  onEnroll?: () => void;
 }
 
-// --------------------------------------------------
-// Helpers
-// --------------------------------------------------
+const dateFormatter = new Intl.DateTimeFormat("en-IN", {
+  day: "2-digit",
+  month: "long",
+  year: "numeric",
+});
+
+const currencyFormatter = new Intl.NumberFormat("en-IN", {
+  style: "currency",
+  currency: "INR",
+  maximumFractionDigits: 0,
+});
 
 function formatDate(date?: string | Date | null): string {
   if (!date) return "—";
 
-  const parsedDate = new Date(date);
+  const parsedDate = date instanceof Date ? date : new Date(date);
 
   if (Number.isNaN(parsedDate.getTime())) return "—";
 
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(parsedDate);
+  return dateFormatter.format(parsedDate);
+}
+
+function getNumericPrice(price?: string | number | null): number {
+  if (price === null || price === undefined || price === "") {
+    return 0;
+  }
+
+  const amount = Number(price);
+
+  return Number.isFinite(amount) && amount > 0 ? amount : 0;
 }
 
 function formatPrice(price?: string | number | null): string {
@@ -67,600 +69,512 @@ function formatPrice(price?: string | number | null): string {
 
   const amount = Number(price);
 
-  if (!Number.isFinite(amount)) return "—";
+  if (!Number.isFinite(amount) || amount < 0) return "—";
 
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(amount);
+  return currencyFormatter.format(amount);
 }
 
-// --------------------------------------------------
-// Reusable Components
-// --------------------------------------------------
+function formatSubjects(subject?: string | string[] | null): string {
+  if (!subject) return "";
 
-function SectionHeading({
-  icon: Icon,
+  const normalize = (items: string[]) =>
+    items
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .join(", ");
+
+  if (Array.isArray(subject)) {
+    return normalize(subject);
+  }
+
+  const value = subject.trim();
+
+  if (!value) return "";
+
+  if (value.startsWith("[") && value.endsWith("]")) {
+    try {
+      const parsed: unknown = JSON.parse(value);
+
+      if (
+        Array.isArray(parsed) &&
+        parsed.every((item) => typeof item === "string")
+      ) {
+        return normalize(parsed);
+      }
+    } catch {
+      // Continue with the original value.
+    }
+  }
+
+  if (value.startsWith("{") && value.endsWith("}")) {
+    return normalize(
+      value
+        .slice(1, -1)
+        .split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/)
+        .map((item) =>
+          item
+            .trim()
+            .replace(/^"(.*)"$/, "$1")
+            .replace(/\\"/g, '"'),
+        ),
+    );
+  }
+
+  return value;
+}
+
+function getInitials(name?: string | null): string {
+  if (!name?.trim()) return "T";
+
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.charAt(0))
+    .join("")
+    .toUpperCase();
+}
+
+function SectionTitle({
   title,
   description,
 }: {
-  icon: React.ElementType;
   title: string;
   description?: string;
 }) {
   return (
-    <div className="flex items-start gap-3">
-      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-        <Icon className="size-4" />
-      </div>
+    <div className="space-y-1">
+      <h2 className="text-lg font-semibold tracking-tight sm:text-xl">
+        {title}
+      </h2>
 
-      <div className="space-y-1">
-        <h3 className="text-base font-semibold tracking-tight">{title}</h3>
-
-        {description && (
-          <p className="text-sm text-muted-foreground">{description}</p>
-        )}
-      </div>
+      {description && (
+        <p className="text-sm text-muted-foreground">{description}</p>
+      )}
     </div>
   );
 }
 
-function DetailItem({
+function InfoItem({
+  icon: Icon,
   label,
   value,
-  icon: Icon,
 }: {
+  icon: ElementType;
   label: string;
-  value: React.ReactNode;
-  icon?: React.ElementType;
+  value: ReactNode;
 }) {
   return (
-    <div className="min-w-0 space-y-2">
-      <p className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-        {Icon && <Icon className="size-3.5" />}
-        {label}
-      </p>
+    <div className="flex min-w-0 items-start gap-3 rounded-lg border p-4">
+      <Icon className="mt-0.5 size-5 shrink-0 text-primary" />
 
-      <div className="break-words text-sm font-semibold">{value || "—"}</div>
+      <div className="min-w-0 space-y-1">
+        <p className="text-xs text-muted-foreground">{label}</p>
+
+        <div className="break-words text-sm font-medium">{value}</div>
+      </div>
     </div>
   );
 }
 
-function StatusBadge({ status }: { status: Batch["status"] }) {
-  const styles: Record<Batch["status"], string> = {
-    UPCOMING:
-      "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-400",
-    ONGOING:
-      "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-    COMPLETED: "border-muted-foreground/30 bg-muted text-muted-foreground",
-  };
+function TeacherCard({
+  teacher,
+}: {
+  teacher: Batch["teachers"][number]["teacher"];
+}) {
+  if (!teacher) return null;
+
+  const name = teacher.user?.name || "Unknown Teacher";
 
   return (
-    <Badge variant="outline" className={styles[status]}>
-      {status}
-    </Badge>
+    <div className="flex min-w-0 gap-3 rounded-xl border bg-card p-4 transition-colors hover:bg-muted/40">
+      <Avatar className="size-12 shrink-0 border">
+        <AvatarImage src={teacher.user?.image ?? undefined} alt={name} />
+
+        <AvatarFallback>{getInitials(name)}</AvatarFallback>
+      </Avatar>
+
+      <div className="min-w-0 flex-1 space-y-2">
+        <div>
+          <h3 className="truncate text-sm font-semibold">{name}</h3>
+
+          <p className="truncate text-xs text-muted-foreground">
+            {teacher.user?.email || "—"}
+          </p>
+        </div>
+
+        <Badge variant="secondary" className="max-w-full whitespace-normal">
+          {formatSubjects(teacher.subject) || "Subject not specified"}
+        </Badge>
+
+        <div className="space-y-1 text-xs text-muted-foreground">
+          <p>{teacher.experienceYears ?? 0} years experience</p>
+
+          {teacher.qualification && (
+            <p className="line-clamp-2">{teacher.qualification}</p>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
-function PublicationBadge({ isPublished }: { isPublished: boolean }) {
-  return isPublished ? (
-    <Badge
-      variant="outline"
-      className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-    >
-      <CheckCircle2 className="mr-1 size-3" />
-      Published
-    </Badge>
-  ) : (
-    <Badge variant="outline" className="text-muted-foreground">
-      Draft
-    </Badge>
+function BatchThumbnail({ batch }: { batch: Batch }) {
+  const statusLabel = statusLabels[batch.status] ?? batch.status;
+
+  const statusClass =
+    statusStyles[batch.status] ??
+    "border-border bg-muted text-muted-foreground";
+
+  return (
+    <div className="relative aspect-video overflow-hidden rounded-xl border bg-muted">
+      {batch.thumbnail ? (
+        <Image
+          src={batch.thumbnail}
+          alt={`${batch.title} thumbnail`}
+          fill
+          priority
+          sizes="(max-width: 1024px) 100vw, 66vw"
+          className="object-cover"
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center">
+          <GraduationCap className="size-16 text-muted-foreground/40" />
+        </div>
+      )}
+
+      {batch.medium && (
+        <Badge className="absolute left-3 top-3 border border-border/50 bg-background/95 px-3 py-1 capitalize text-foreground shadow-sm backdrop-blur">
+          {batch.medium.toLowerCase()}
+        </Badge>
+      )}
+
+      <Badge
+        variant="outline"
+        className={`absolute right-3 top-3 border px-3 py-1 font-semibold shadow-sm ${statusClass}`}
+      >
+        {statusLabel}
+      </Badge>
+    </div>
   );
 }
 
-// --------------------------------------------------
-// Main Component
-// --------------------------------------------------
+function BatchFeatures({ features }: { features: string[] }) {
+  return (
+    <section className="space-y-4">
+      <SectionTitle
+        title="What You'll Get"
+        description="Explore the features and benefits included in this batch."
+      />
 
-export default function BatchDetails({
-  batch,
-  onBack,
-  onEdit,
-}: BatchDetailsProps) {
-  const teachers = batch.teachers ?? [];
-  const features = batch.features ?? [];
+      {features.length > 0 ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {features.map((feature, index) => (
+            <div
+              key={`${feature}-${index}`}
+              className="flex items-start gap-3 rounded-lg border bg-card p-3"
+            >
+              <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-emerald-600" />
 
-  const displayPrice = batch.isFree ? "Free" : formatPrice(batch.discountPrice);
+              <span className="break-words text-sm leading-relaxed">
+                {feature}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">No features available.</p>
+      )}
+    </section>
+  );
+}
 
-  const duration =
-    batch.validityMonths != null
-      ? `${batch.validityMonths} Months`
-      : "Not configured";
-
-  // Show only one: explicit expiry date takes priority.
+function BatchSchedule({ batch }: { batch: Batch }) {
   const hasExpiryDate = Boolean(batch.expiryDate);
   const hasValidity = batch.validityMonths != null;
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6 pb-10">
-      {/* ------------------------------------------- */}
-      {/* Header */}
-      {/* ------------------------------------------- */}
+    <section className="space-y-4">
+      <SectionTitle
+        title="Batch Schedule"
+        description="Important dates and batch validity."
+      />
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          {onBack && (
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={onBack}
-              aria-label="Go back"
-            >
-              <ArrowLeft className="size-4" />
-            </Button>
-          )}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <InfoItem
+          icon={CalendarDays}
+          label="Start Date"
+          value={formatDate(batch.startDate)}
+        />
 
-          <div className="space-y-1">
-            <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
-              Batch Details
-            </h1>
+        {hasExpiryDate ? (
+          <InfoItem
+            icon={CalendarCheck}
+            label="Expiry Date"
+            value={formatDate(batch.expiryDate)}
+          />
+        ) : hasValidity ? (
+          <InfoItem
+            icon={Clock}
+            label="Validity"
+            value={`${batch.validityMonths} Months`}
+          />
+        ) : null}
 
-            <p className="text-sm text-muted-foreground">
-              Manage and review your batch information.
-            </p>
-          </div>
+        <InfoItem
+          icon={Globe}
+          label="Medium"
+          value={batch.medium || "Not specified"}
+        />
+
+        <InfoItem
+          icon={ShieldCheck}
+          label="Batch Status"
+          value={statusLabels[batch.status] ?? batch.status}
+        />
+      </div>
+    </section>
+  );
+}
+
+function BatchTeachers({ batch }: { batch: Batch }) {
+  const teachers = batch.teachers ?? [];
+
+  return (
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <SectionTitle
+          title="Meet Your Teachers"
+          description="Learn from experienced educators."
+        />
+
+        <Badge variant="secondary">{teachers.length} Teachers</Badge>
+      </div>
+
+      {teachers.length > 0 ? (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {teachers.map((item) => {
+            const teacher = item.teacher;
+
+            if (!teacher) return null;
+
+            return (
+              <TeacherCard
+                key={item.teacherId || teacher.id}
+                teacher={teacher}
+              />
+            );
+          })}
         </div>
+      ) : (
+        <div className="rounded-xl border border-dashed p-8 text-center">
+          <Users className="mx-auto mb-3 size-9 text-muted-foreground/40" />
 
-        {onEdit && (
-          <Button onClick={() => onEdit(batch)} className="w-full sm:w-auto">
-            <Pencil className="mr-2 size-4" />
-            Edit Batch
-          </Button>
+          <p className="text-sm font-medium">Teacher information unavailable</p>
+
+          <p className="mt-1 text-xs text-muted-foreground">
+            Teacher details will appear here when assigned.
+          </p>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function BatchEnrollmentCard({
+  batch,
+  onEnroll,
+}: {
+  batch: Batch;
+  onEnroll?: () => void;
+}) {
+  const originalPrice = getNumericPrice(batch.originalPrice);
+  const discountPrice = getNumericPrice(batch.discountPrice);
+
+  const hasDiscount =
+    !batch.isFree && originalPrice > 0 && discountPrice < originalPrice;
+
+  const discount = hasDiscount
+    ? Math.round(((originalPrice - discountPrice) / originalPrice) * 100)
+    : 0;
+
+  const hasExpiryDate = Boolean(batch.expiryDate);
+  const hasValidity = batch.validityMonths != null;
+
+  const statusLabel = statusLabels[batch.status] ?? batch.status;
+
+  const statusClass =
+    statusStyles[batch.status] ??
+    "border-border bg-muted text-muted-foreground";
+
+  const isCompleted = batch.status === "COMPLETED";
+
+  return (
+    <div className="space-y-5 rounded-xl border bg-card p-5 lg:sticky lg:top-6">
+      {/* Batch Price */}
+      <div className="space-y-2">
+        <p className="text-sm text-muted-foreground">Batch Fee</p>
+
+        {batch.isFree ? (
+          <div className="space-y-2">
+            <p className="text-3xl font-bold text-emerald-600">FREE</p>
+
+            <Badge variant="secondary">Free Enrollment</Badge>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-baseline gap-2">
+              <span className="text-3xl font-bold tracking-tight">
+                {formatPrice(batch.discountPrice)}
+              </span>
+
+              {hasDiscount && (
+                <span className="text-sm text-muted-foreground line-through">
+                  {formatPrice(batch.originalPrice)}
+                </span>
+              )}
+            </div>
+
+            {discount > 0 && (
+              <Badge
+                variant="secondary"
+                className="border-emerald-500/20 bg-emerald-500/10 text-emerald-600"
+              >
+                Save {discount}%
+              </Badge>
+            )}
+          </div>
         )}
       </div>
 
-      {/* ------------------------------------------- */}
-      {/* Batch Overview */}
-      {/* ------------------------------------------- */}
+      <Separator />
 
-      <div className="grid gap-5 lg:grid-cols-[1fr_300px]">
-        {/* Thumbnail */}
+      {/* Batch Information */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-sm text-muted-foreground">Medium</span>
 
-        <Card className="overflow-hidden">
-          <div className="relative aspect-video overflow-hidden bg-muted sm:aspect-[16/7] lg:aspect-auto lg:min-h-[320px]">
-            {batch.thumbnail ? (
-              <img
-                src={batch.thumbnail}
-                alt={batch.title}
-                className="size-full object-cover"
-              />
-            ) : (
-              <div className="flex size-full min-h-64 items-center justify-center">
-                <Layers className="size-16 text-muted-foreground/30" />
-              </div>
-            )}
+          <span className="text-sm font-medium capitalize">
+            {batch.medium || "Not specified"}
+          </span>
+        </div>
 
-            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-5 pt-16 sm:p-6 sm:pt-20">
-              <div className="mb-3 flex flex-wrap gap-2">
-                <StatusBadge status={batch.status} />
-                <PublicationBadge isPublished={batch.isPublished} />
-              </div>
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-sm text-muted-foreground">Status</span>
 
-              <h2 className="text-xl font-bold text-white sm:text-2xl">
-                {batch.title}
-              </h2>
+          <Badge variant="outline" className={statusClass}>
+            {statusLabel}
+          </Badge>
+        </div>
 
-              <p className="mt-1 text-xs text-white/70">{batch.slug}</p>
-            </div>
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-sm text-muted-foreground">Start Date</span>
+
+          <span className="text-right text-sm font-medium">
+            {formatDate(batch.startDate)}
+          </span>
+        </div>
+
+        {hasExpiryDate ? (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm text-muted-foreground">Expiry Date</span>
+
+            <span className="text-right text-sm font-medium">
+              {formatDate(batch.expiryDate)}
+            </span>
           </div>
-        </Card>
+        ) : hasValidity ? (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm text-muted-foreground">Validity</span>
 
-        {/* Pricing Summary */}
-
-        <Card className="flex flex-col">
-          <CardHeader className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Badge variant="secondary">{batch.medium}</Badge>
-
-              <Globe className="size-4 text-muted-foreground" />
-            </div>
-
-            <div className="space-y-2">
-              <CardTitle className="text-lg leading-snug">
-                {batch.title}
-              </CardTitle>
-
-              <CardDescription>
-                Batch pricing and enrollment information.
-              </CardDescription>
-            </div>
-          </CardHeader>
-
-          <CardContent className="flex flex-1 flex-col space-y-5">
-            <Separator />
-
-            {/* Pricing */}
-
-            <div className="space-y-2">
-              <p className="text-xs text-muted-foreground">
-                {batch.isFree ? "Enrollment Price" : "Discounted Price"}
-              </p>
-
-              <div className="flex flex-wrap items-baseline gap-2">
-                <span className="text-3xl font-bold tracking-tight">
-                  {displayPrice}
-                </span>
-
-                {!batch.isFree && (
-                  <span className="text-sm text-muted-foreground line-through">
-                    {formatPrice(batch.originalPrice)}
-                  </span>
-                )}
-              </div>
-
-              {batch.isFree && <Badge variant="secondary">Free Batch</Badge>}
-            </div>
-
-            <Separator />
-
-            {/* Batch Information */}
-
-            <div className="space-y-4">
-              <DetailItem
-                label="Start Date"
-                icon={CalendarDays}
-                value={formatDate(batch.startDate)}
-              />
-
-              {/* Expiry Date OR Validity */}
-
-              {hasExpiryDate ? (
-                <DetailItem
-                  label="Expiry Date"
-                  icon={CalendarCheck}
-                  value={formatDate(batch.expiryDate)}
-                />
-              ) : hasValidity ? (
-                <DetailItem label="Validity" icon={Clock} value={duration} />
-              ) : null}
-
-              <DetailItem
-                label="Assigned Teachers"
-                icon={Users}
-                value={`${teachers.length} Teachers`}
-              />
-            </div>
-
-            {/* Publication Information */}
-
-            <div className="mt-auto rounded-lg border bg-muted/40 p-3">
-              <div className="flex items-center gap-2 text-sm font-medium">
-                <ShieldCheck className="size-4 text-primary" />
-                Publication Status
-              </div>
-
-              <p className="mt-1 text-xs text-muted-foreground">
-                {batch.isPublished
-                  ? "This batch is published and available according to its visibility settings."
-                  : "This batch is currently saved as a draft."}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+            <span className="text-sm font-medium">
+              {batch.validityMonths} Months
+            </span>
+          </div>
+        ) : null}
       </div>
 
-      {/* ------------------------------------------- */}
-      {/* Description */}
-      {/* ------------------------------------------- */}
+      <Separator />
 
-      <Card>
-        <CardContent className="space-y-4 p-5 sm:p-6">
-          <SectionHeading
-            icon={BookOpen}
-            title="About This Batch"
-            description="Batch overview and course description."
-          />
+      {/* Enrollment */}
+      {isCompleted ? (
+        <Button className="w-full" size="lg" disabled>
+          Enrollment Closed
+        </Button>
+      ) : batch.isFree ? (
+        <Button className="w-full" size="lg" onClick={onEnroll}>
+          Enroll for Free
+        </Button>
+      ) : (
+        <RazorpayCheckoutButton
+          batchId={batch.id}
+          batchTitle={batch.title}
+          className="w-full"
+        >
+          Enroll Now
+        </RazorpayCheckoutButton>
+      )}
 
-          <Separator />
-
-          <div className="whitespace-pre-line text-sm leading-7 text-muted-foreground">
-            {batch.description || "No description available."}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ------------------------------------------- */}
-      {/* Features */}
-      {/* ------------------------------------------- */}
-
-      <Card>
-        <CardContent className="space-y-5 p-5 sm:p-6">
-          <SectionHeading
-            icon={CheckCircle2}
-            title="Batch Features"
-            description="Features and benefits included in this batch."
-          />
-
-          <Separator />
-
-          {features.length > 0 ? (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {features.map((feature, index) => (
-                <div
-                  key={`${feature}-${index}`}
-                  className="flex items-start gap-3 rounded-lg border bg-muted/20 p-3 transition-colors hover:bg-muted/50"
-                >
-                  <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                    <CheckCircle2 className="size-4 text-primary" />
-                  </div>
-
-                  <p className="pt-1 text-sm font-medium leading-relaxed">
-                    {feature}
-                  </p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="py-5 text-center text-sm text-muted-foreground">
-              No features added to this batch.
-            </p>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* ------------------------------------------- */}
-      {/* Schedule & Validity */}
-      {/* ------------------------------------------- */}
-
-      <Card>
-        <CardContent className="space-y-5 p-5 sm:p-6">
-          <SectionHeading
-            icon={CalendarDays}
-            title="Schedule & Validity"
-            description="Batch timeline and validity configuration."
-          />
-
-          <Separator />
-
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            <DetailItem
-              label="Start Date"
-              icon={CalendarDays}
-              value={formatDate(batch.startDate)}
-            />
-
-            {/* Expiry Date OR Validity */}
-
-            {hasExpiryDate ? (
-              <DetailItem
-                label="Expiry Date"
-                icon={CalendarCheck}
-                value={formatDate(batch.expiryDate)}
-              />
-            ) : hasValidity ? (
-              <DetailItem
-                label="Validity Period"
-                icon={Clock}
-                value={duration}
-              />
-            ) : null}
-
-            <DetailItem
-              label="Batch Status"
-              value={<StatusBadge status={batch.status} />}
-            />
-
-            <DetailItem label="Medium" icon={Globe} value={batch.medium} />
-
-            <DetailItem
-              label="Publication"
-              value={<PublicationBadge isPublished={batch.isPublished} />}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ------------------------------------------- */}
-      {/* Assigned Teachers */}
-      {/* ------------------------------------------- */}
-
-      <Card>
-        <CardContent className="space-y-5 p-5 sm:p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <SectionHeading
-              icon={GraduationCap}
-              title="Assigned Teachers"
-              description="Teachers assigned to this batch."
-            />
-
-            <Badge variant="secondary">{teachers.length} Teachers</Badge>
-          </div>
-
-          <Separator />
-
-          {teachers.length > 0 ? (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {teachers.map((item) => {
-                const teacher = item.teacher;
-                const user = teacher?.user;
-
-                if (!teacher) return null;
-
-                return (
-                  <div
-                    key={teacher.id}
-                    className="flex min-w-0 gap-3 rounded-xl border bg-muted/20 p-4 transition-colors hover:bg-muted/50"
-                  >
-                    {user?.image ? (
-                      <img
-                        src={user.image}
-                        alt={user.name}
-                        className="size-12 shrink-0 rounded-full border object-cover"
-                      />
-                    ) : (
-                      <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                        <GraduationCap className="size-6 text-primary" />
-                      </div>
-                    )}
-
-                    <div className="min-w-0 flex-1 space-y-2">
-                      <div>
-                        <p className="truncate text-sm font-semibold">
-                          {user?.name || "Unknown Teacher"}
-                        </p>
-
-                        <p className="truncate text-xs text-muted-foreground">
-                          {user?.email || "—"}
-                        </p>
-                      </div>
-
-                      <Badge variant="secondary">
-                        {teacher.subject || "Subject not specified"}
-                      </Badge>
-
-                      <div className="space-y-1 text-xs text-muted-foreground">
-                        <p>{teacher.experienceYears ?? 0} years experience</p>
-
-                        {teacher.qualification && (
-                          <p className="line-clamp-2">
-                            {teacher.qualification}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-10 text-center">
-              <Users className="mb-3 size-10 text-muted-foreground/40" />
-
-              <p className="text-sm font-medium">No teachers assigned</p>
-
-              <p className="mt-1 text-xs text-muted-foreground">
-                Teachers assigned to this batch will appear here.
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* ------------------------------------------- */}
-      {/* Batch Media */}
-      {/* ------------------------------------------- */}
-
-      <Card>
-        <CardContent className="space-y-5 p-5 sm:p-6">
-          <SectionHeading
-            icon={Video}
-            title="Batch Media"
-            description="Batch thumbnail and promotional preview."
-          />
-
-          <Separator />
-
-          <div className="grid gap-5 md:grid-cols-2">
-            {/* Thumbnail */}
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="text-sm font-semibold">Thumbnail</h4>
-
-                <Badge variant="outline">Image</Badge>
-              </div>
-
-              {batch.thumbnail ? (
-                <img
-                  src={batch.thumbnail}
-                  alt={`${batch.title} thumbnail`}
-                  className="aspect-video w-full rounded-xl border bg-muted object-cover"
-                />
-              ) : (
-                <div className="flex aspect-video items-center justify-center rounded-xl border bg-muted">
-                  <Layers className="size-12 text-muted-foreground/30" />
-                </div>
-              )}
-            </div>
-
-            {/* Preview Video */}
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="text-sm font-semibold">Preview Video</h4>
-
-                <Badge variant="outline">Video</Badge>
-              </div>
-
-              {batch.previewVideo ? (
-                <div className="overflow-hidden rounded-xl border bg-black">
-                  <video
-                    src={batch.previewVideo}
-                    controls
-                    preload="metadata"
-                    className="aspect-video w-full"
-                  />
-                </div>
-              ) : (
-                <div className="flex aspect-video flex-col items-center justify-center gap-2 rounded-xl border bg-muted">
-                  <PlayCircle className="size-10 text-muted-foreground/30" />
-
-                  <p className="text-xs text-muted-foreground">
-                    No preview video available
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ------------------------------------------- */}
-      {/* Additional Information */}
-      {/* ------------------------------------------- */}
-
-      <Card>
-        <CardContent className="space-y-5 p-5 sm:p-6">
-          <SectionHeading
-            icon={Hash}
-            title="Additional Information"
-            description="Batch identification and audit information."
-          />
-
-          <Separator />
-
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            <DetailItem
-              label="Batch ID"
-              icon={Hash}
-              value={<span className="font-mono text-xs">{batch.id}</span>}
-            />
-
-            <DetailItem
-              label="Examination ID"
-              icon={BookOpen}
-              value={
-                <span className="font-mono text-xs">{batch.examinationId}</span>
-              }
-            />
-
-            <DetailItem label="Medium" icon={Globe} value={batch.medium} />
-
-            <DetailItem
-              label="Created At"
-              icon={CalendarDays}
-              value={formatDate(batch.createdAt)}
-            />
-
-            <DetailItem
-              label="Last Updated"
-              icon={Clock}
-              value={formatDate(batch.updatedAt)}
-            />
-          </div>
-        </CardContent>
-      </Card>
+      <p className="text-center text-xs text-muted-foreground">
+        Secure enrollment and payment.
+      </p>
     </div>
   );
 }
+
+export function BatchDetails({ batch, onEnroll }: BatchDetailsProps) {
+  const features = batch.features ?? [];
+
+  return (
+    <div className="mx-auto w-full max-w-7xl space-y-6 p-4 pb-12 md:p-6">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+        {/* Main Content */}
+
+        <main className="min-w-0 space-y-7 lg:col-span-2">
+          <BatchThumbnail batch={batch} />
+
+          {/* Basic Information */}
+
+          <section className="space-y-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="secondary">{batch.medium}</Badge>
+
+              <Badge variant="outline">
+                <ShieldCheck className="mr-1 size-3" />
+                {batch.isPublished ? "Published" : "Draft"}
+              </Badge>
+            </div>
+
+            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl md:text-4xl">
+              {batch.title}
+            </h1>
+
+            <p className="whitespace-pre-line break-words text-sm leading-7 text-muted-foreground sm:text-base">
+              {batch.description || "No description available."}
+            </p>
+          </section>
+
+          <Separator />
+
+          <BatchFeatures features={features} />
+
+          <Separator />
+
+          <BatchSchedule batch={batch} />
+
+          <Separator />
+
+          <BatchTeachers batch={batch} />
+        </main>
+
+        {/* Enrollment Sidebar */}
+
+        <aside className="min-w-0">
+          <BatchEnrollmentCard batch={batch} onEnroll={onEnroll} />
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+export default BatchDetails;

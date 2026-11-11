@@ -1,12 +1,15 @@
 import "server-only";
 
 import { razorpay } from "@/lib/razorpay";
+
 import {
   PaymentRepository,
   type Payment,
 } from "@/server/repositories/academic/payment-repository";
+
 import { OrderRepository } from "@/server/repositories/academic/order-repository";
 import { EnrollmentService } from "@/server/services/academic/enrollment-service";
+import { WebhookEventRepository } from "@/server/repositories/academic/webhook-event-repository";
 
 type RazorpayWebhookEventType =
   "payment.captured" | "payment.failed" | "order.paid";
@@ -37,13 +40,13 @@ interface RazorpayWebhookPayload {
   };
 }
 
-interface ProcessWebhookEventInput {
+export interface ProcessWebhookEventInput {
   eventId: string;
   eventType: string;
   payload?: Record<string, unknown>;
 }
 
-interface ProcessWebhookEventResult {
+export interface ProcessWebhookEventResult {
   success: true;
   message: string;
   duplicate?: boolean;
@@ -65,83 +68,111 @@ export class RazorpayWebhookService {
     private readonly paymentRepo = new PaymentRepository(),
     private readonly orderRepo = new OrderRepository(),
     private readonly enrollmentService = new EnrollmentService(),
+    private readonly webhookEventRepo = new WebhookEventRepository(),
   ) {}
+
+  // ---------------------------------------------------------------------------
+  // Event processing and idempotency
+  // ---------------------------------------------------------------------------
 
   async processEvent(
     input: ProcessWebhookEventInput,
   ): Promise<ProcessWebhookEventResult> {
     this.validateInput(input);
 
-    const payload = input.payload as RazorpayWebhookPayload | undefined;
+    const claim = await this.webhookEventRepo.claimEvent({
+      eventId: input.eventId,
+      eventType: input.eventType,
+      payload: input.payload,
+    });
 
-    switch (input.eventType as RazorpayWebhookEventType) {
-      case "payment.captured": {
-        const payment = payload?.payment?.entity;
+    if (!claim.claimed) {
+      return {
+        success: true,
+        message:
+          claim.event?.status === "PROCESSED"
+            ? "Webhook event was already processed."
+            : "Webhook event is already being processed.",
+        duplicate: true,
+      };
+    }
 
-        if (!payment) {
-          throw new RazorpayWebhookError(
-            "Payment entity is missing.",
-            400,
-            "PAYMENT_ENTITY_MISSING",
-          );
+    try {
+      const payload = input.payload as RazorpayWebhookPayload | undefined;
+
+      switch (input.eventType as RazorpayWebhookEventType) {
+        case "payment.captured": {
+          const payment = payload?.payment?.entity;
+
+          this.validatePaymentEntity(payment);
+          await this.processCapturedPayment(payment);
+          break;
         }
 
-        await this.processCapturedPayment(payment);
+        case "payment.failed": {
+          const payment = payload?.payment?.entity;
 
-        return {
-          success: true,
-          message: "Captured payment processed.",
-        };
-      }
-
-      case "payment.failed": {
-        const payment = payload?.payment?.entity;
-
-        if (!payment) {
-          throw new RazorpayWebhookError(
-            "Payment entity is missing.",
-            400,
-            "PAYMENT_ENTITY_MISSING",
-          );
+          this.validatePaymentEntity(payment);
+          await this.processFailedPayment(payment);
+          break;
         }
 
-        await this.processFailedPayment(payment);
+        case "order.paid": {
+          const order = payload?.order?.entity;
 
-        return {
-          success: true,
-          message: "Failed payment event processed.",
-        };
-      }
-
-      case "order.paid": {
-        const order = payload?.order?.entity;
-
-        if (!order) {
-          throw new RazorpayWebhookError(
-            "Order entity is missing.",
-            400,
-            "ORDER_ENTITY_MISSING",
-          );
+          this.validateOrderEntity(order);
+          await this.processPaidOrder(order);
+          break;
         }
 
-        await this.processPaidOrder(order);
-
-        return {
-          success: true,
-          message: "Paid order event processed.",
-        };
+        default: {
+          // Unknown event types are acknowledged and marked processed.
+          break;
+        }
       }
 
-      default:
-        return {
-          success: true,
-          message: "Unsupported event ignored.",
-        };
+      const processed = await this.webhookEventRepo.markProcessed(
+        input.eventId,
+      );
+
+      if (!processed) {
+        throw new Error("Failed to mark webhook event as processed.");
+      }
+
+      return {
+        success: true,
+        message: "Webhook event processed successfully.",
+      };
+    } catch (error) {
+      try {
+        await this.webhookEventRepo.markFailed(
+          input.eventId,
+          error instanceof Error
+            ? error.message
+            : "Unknown webhook processing error.",
+        );
+      } catch (markError) {
+        console.error("[RAZORPAY_WEBHOOK_MARK_FAILED_ERROR]", markError);
+      }
+
+      throw error;
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Input validation
+  // ---------------------------------------------------------------------------
+
   private validateInput(input: ProcessWebhookEventInput): void {
-    if (!input.eventId?.trim()) {
+    if (!input || typeof input !== "object") {
+      throw new RazorpayWebhookError(
+        "Invalid webhook input.",
+        400,
+        "INVALID_WEBHOOK_INPUT",
+      );
+    }
+
+    if (typeof input.eventId !== "string" || !input.eventId.trim()) {
       throw new RazorpayWebhookError(
         "Webhook event ID is required.",
         400,
@@ -149,7 +180,7 @@ export class RazorpayWebhookService {
       );
     }
 
-    if (!input.eventType?.trim()) {
+    if (typeof input.eventType !== "string" || !input.eventType.trim()) {
       throw new RazorpayWebhookError(
         "Webhook event type is required.",
         400,
@@ -158,14 +189,59 @@ export class RazorpayWebhookService {
     }
   }
 
+  private validatePaymentEntity(
+    payment: RazorpayPaymentEntity | undefined,
+  ): asserts payment is RazorpayPaymentEntity {
+    if (
+      !payment ||
+      typeof payment.id !== "string" ||
+      !payment.id.trim() ||
+      typeof payment.order_id !== "string" ||
+      !payment.order_id.trim() ||
+      !Number.isSafeInteger(payment.amount) ||
+      payment.amount <= 0 ||
+      typeof payment.currency !== "string" ||
+      typeof payment.status !== "string"
+    ) {
+      throw new RazorpayWebhookError(
+        "Invalid payment entity in webhook payload.",
+        400,
+        "INVALID_PAYMENT_ENTITY",
+      );
+    }
+  }
+
+  private validateOrderEntity(
+    order: RazorpayOrderEntity | undefined,
+  ): asserts order is RazorpayOrderEntity {
+    if (
+      !order ||
+      typeof order.id !== "string" ||
+      !order.id.trim() ||
+      !Number.isSafeInteger(order.amount) ||
+      order.amount <= 0 ||
+      typeof order.currency !== "string" ||
+      typeof order.status !== "string"
+    ) {
+      throw new RazorpayWebhookError(
+        "Invalid order entity in webhook payload.",
+        400,
+        "INVALID_ORDER_ENTITY",
+      );
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Captured payment
+  // ---------------------------------------------------------------------------
+
   private async processCapturedPayment(
     payment: RazorpayPaymentEntity,
   ): Promise<void> {
+    const razorpayOrderId = payment.order_id;
+
     if (
-      !payment.id ||
-      !payment.order_id ||
-      !Number.isSafeInteger(payment.amount) ||
-      payment.amount <= 0 ||
+      !razorpayOrderId ||
       payment.currency !== "INR" ||
       payment.status !== "captured" ||
       payment.captured !== true
@@ -177,13 +253,12 @@ export class RazorpayWebhookService {
       );
     }
 
-    // Fetch the payment from Razorpay rather than relying
-    // exclusively on the webhook payload.
+    // Verify the payment directly with Razorpay.
     const verifiedPayment = await razorpay.payments.fetch(payment.id);
 
     if (
       verifiedPayment.id !== payment.id ||
-      verifiedPayment.order_id !== payment.order_id ||
+      verifiedPayment.order_id !== razorpayOrderId ||
       verifiedPayment.amount !== payment.amount ||
       verifiedPayment.currency !== "INR" ||
       verifiedPayment.status !== "captured" ||
@@ -196,7 +271,7 @@ export class RazorpayWebhookService {
       );
     }
 
-    const order = await this.orderRepo.findByRazorpayOrderId(payment.order_id);
+    const order = await this.orderRepo.findByRazorpayOrderId(razorpayOrderId);
 
     if (!order) {
       throw new RazorpayWebhookError(
@@ -206,16 +281,13 @@ export class RazorpayWebhookService {
       );
     }
 
-    const expectedAmount = this.toPaise(order.amount);
+    this.validatePaymentAmount(payment.amount, order.amount);
 
-    if (
-      expectedAmount !== payment.amount ||
-      order.razorpayOrderId !== payment.order_id
-    ) {
+    if (order.razorpayOrderId !== razorpayOrderId) {
       throw new RazorpayWebhookError(
-        "Payment amount does not match the local order.",
-        400,
-        "PAYMENT_AMOUNT_MISMATCH",
+        "Razorpay order ID does not match the local order.",
+        409,
+        "RAZORPAY_ORDER_MISMATCH",
       );
     }
 
@@ -225,23 +297,44 @@ export class RazorpayWebhookService {
 
     if (existingPayment) {
       this.assertPaymentMatchesOrder(existingPayment, order);
+      this.assertStoredPaymentAmount(existingPayment, order.amount);
 
       if (existingPayment.status === "SUCCESS") {
-        // Retry enrollment if payment/order processing succeeded
-        // earlier but enrollment activation failed.
+        // Recover from a previous partial failure:
+        // payment saved, but order or enrollment update failed.
+        await this.ensureOrderPaid(order);
         await this.ensureEnrollment(order);
-
         return;
       }
-    } else {
-      // The order may already be paid by a different payment.
-      if (order.status === "PAID") {
-        throw new RazorpayWebhookError(
-          "Order is already paid by another payment.",
-          409,
-          "ORDER_ALREADY_PAID",
-        );
+    }
+
+    // A separate captured payment against an already-paid order
+    // is a duplicate charge. Record it for refund reconciliation.
+    if (order.status === "PAID" && !existingPayment) {
+      const duplicatePayment = await this.paymentRepo.create({
+        orderId: order.id,
+        userId: order.userId,
+        razorpayPaymentId: payment.id,
+        razorpaySignature: null,
+        amount: order.amount,
+        status: "SUCCESS",
+      });
+
+      if (!duplicatePayment) {
+        throw new Error("Failed to record duplicate captured payment.");
       }
+
+      console.error("[RAZORPAY_DUPLICATE_CAPTURE]", {
+        orderId: order.id,
+        razorpayOrderId,
+        razorpayPaymentId: payment.id,
+        amount: payment.amount,
+        actionRequired: "REFUND_RECONCILIATION",
+      });
+
+      // Do not enroll twice. A refund/reconciliation workflow
+      // must handle this captured payment separately.
+      return;
     }
 
     if (order.status !== "PENDING" && order.status !== "PAID") {
@@ -271,30 +364,24 @@ export class RazorpayWebhookService {
     }
 
     if (!savedPayment) {
-      throw new Error("Failed to persist the successful payment.");
+      throw new Error("Failed to persist successful payment.");
     }
 
-    if (order.status !== "PAID") {
-      const updatedOrder = await this.orderRepo.update(order.id, {
-        status: "PAID",
-      });
-
-      if (!updatedOrder) {
-        throw new Error("Payment saved, but the order update failed.");
-      }
-    }
-
+    await this.ensureOrderPaid(order);
     await this.ensureEnrollment(order);
   }
+
+  // ---------------------------------------------------------------------------
+  // Failed payment
+  // ---------------------------------------------------------------------------
 
   private async processFailedPayment(
     payment: RazorpayPaymentEntity,
   ): Promise<void> {
+    const razorpayOrderId = payment.order_id;
+
     if (
-      !payment.id ||
-      !payment.order_id ||
-      !Number.isSafeInteger(payment.amount) ||
-      payment.amount <= 0 ||
+      !razorpayOrderId ||
       payment.currency !== "INR" ||
       payment.status !== "failed"
     ) {
@@ -305,7 +392,7 @@ export class RazorpayWebhookService {
       );
     }
 
-    const order = await this.orderRepo.findByRazorpayOrderId(payment.order_id);
+    const order = await this.orderRepo.findByRazorpayOrderId(razorpayOrderId);
 
     if (!order) {
       throw new RazorpayWebhookError(
@@ -315,13 +402,7 @@ export class RazorpayWebhookService {
       );
     }
 
-    if (this.toPaise(order.amount) !== payment.amount) {
-      throw new RazorpayWebhookError(
-        "Payment amount does not match the local order.",
-        400,
-        "PAYMENT_AMOUNT_MISMATCH",
-      );
-    }
+    this.validatePaymentAmount(payment.amount, order.amount);
 
     const existingPayment = await this.paymentRepo.findByRazorpayPaymentId(
       payment.id,
@@ -330,18 +411,18 @@ export class RazorpayWebhookService {
     if (existingPayment) {
       this.assertPaymentMatchesOrder(existingPayment, order);
 
-      // A late failed event must never downgrade a successful payment.
-      if (existingPayment.status === "SUCCESS") {
-        return;
-      }
-
+      // Never downgrade a successful payment.
       // A duplicate failed event must not create another record.
       return;
     }
 
-    // Client-reported failure details are not used here.
-    // Only the signed webhook payload is being processed.
-    await this.paymentRepo.create({
+    // A late failure event must not create a failed record
+    // after another payment has paid this order.
+    if (order.status !== "PENDING") {
+      return;
+    }
+
+    const failedPayment = await this.paymentRepo.create({
       orderId: order.id,
       userId: order.userId,
       razorpayPaymentId: payment.id,
@@ -349,18 +430,20 @@ export class RazorpayWebhookService {
       amount: order.amount,
       status: "FAILED",
     });
+
+    if (!failedPayment) {
+      throw new Error("Failed to persist failed payment.");
+    }
   }
+
+  // ---------------------------------------------------------------------------
+  // Paid order reconciliation
+  // ---------------------------------------------------------------------------
 
   private async processPaidOrder(
     razorpayOrder: RazorpayOrderEntity,
   ): Promise<void> {
-    if (
-      !razorpayOrder.id ||
-      !Number.isSafeInteger(razorpayOrder.amount) ||
-      razorpayOrder.amount <= 0 ||
-      razorpayOrder.currency !== "INR" ||
-      razorpayOrder.status !== "paid"
-    ) {
+    if (razorpayOrder.currency !== "INR" || razorpayOrder.status !== "paid") {
       throw new RazorpayWebhookError(
         "Paid order details are invalid.",
         400,
@@ -378,21 +461,10 @@ export class RazorpayWebhookService {
       );
     }
 
-    if (this.toPaise(order.amount) !== razorpayOrder.amount) {
-      throw new RazorpayWebhookError(
-        "Order amount does not match the local order.",
-        400,
-        "ORDER_AMOUNT_MISMATCH",
-      );
-    }
+    this.validatePaymentAmount(razorpayOrder.amount, order.amount);
 
-    /*
-     * An order.paid event does not, by itself, identify which payment
-     * should be stored in the local payments table.
-     *
-     * Fetch the provider's payments and process a captured payment
-     * through the same verification path.
-     */
+    // The order.paid event does not identify a specific payment.
+    // Fetch provider payments and reconcile captured payments.
     const result = await razorpay.orders.fetchPayments(razorpayOrder.id);
 
     const capturedPayments = result.items.filter(
@@ -433,21 +505,38 @@ export class RazorpayWebhookService {
     }
   }
 
-  private assertPaymentMatchesOrder(
-    payment: Payment,
-    order: {
-      id: string;
-      userId: string;
-    },
-  ): void {
-    if (payment.orderId !== order.id || payment.userId !== order.userId) {
+  // ---------------------------------------------------------------------------
+  // Order reconciliation
+  // ---------------------------------------------------------------------------
+
+  private async ensureOrderPaid(order: {
+    id: string;
+    status: string;
+  }): Promise<void> {
+    if (order.status === "PAID") {
+      return;
+    }
+
+    if (order.status !== "PENDING") {
       throw new RazorpayWebhookError(
-        "Payment record does not match the order.",
+        "Order cannot be marked as paid.",
         409,
-        "PAYMENT_ORDER_MISMATCH",
+        "ORDER_NOT_PAYABLE",
       );
     }
+
+    const updatedOrder = await this.orderRepo.update(order.id, {
+      status: "PAID",
+    });
+
+    if (!updatedOrder) {
+      throw new Error("Payment was saved, but order status update failed.");
+    }
   }
+
+  // ---------------------------------------------------------------------------
+  // Enrollment reconciliation
+  // ---------------------------------------------------------------------------
 
   private async ensureEnrollment(order: {
     id: string;
@@ -459,11 +548,61 @@ export class RazorpayWebhookService {
       order.batchId,
     );
 
-    if (!hasAccess) {
-      await this.enrollmentService.enrollStudent(
-        order.userId,
-        order.batchId,
-        order.id,
+    if (hasAccess) {
+      return;
+    }
+
+    await this.enrollmentService.enrollStudent(
+      order.userId,
+      order.batchId,
+      order.id,
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Consistency validation
+  // ---------------------------------------------------------------------------
+
+  private assertPaymentMatchesOrder(
+    payment: Payment,
+    order: {
+      id: string;
+      userId: string;
+    },
+  ): void {
+    if (payment.orderId !== order.id || payment.userId !== order.userId) {
+      throw new RazorpayWebhookError(
+        "Payment record does not match the local order.",
+        409,
+        "PAYMENT_ORDER_MISMATCH",
+      );
+    }
+  }
+
+  private assertStoredPaymentAmount(
+    payment: Payment,
+    orderAmount: string | number,
+  ): void {
+    if (Number(payment.amount) !== Number(orderAmount)) {
+      throw new RazorpayWebhookError(
+        "Stored payment amount does not match the order.",
+        409,
+        "EXISTING_PAYMENT_AMOUNT_MISMATCH",
+      );
+    }
+  }
+
+  private validatePaymentAmount(
+    receivedAmount: number,
+    orderAmount: string | number,
+  ): void {
+    const expectedAmount = this.toPaise(orderAmount);
+
+    if (receivedAmount !== expectedAmount) {
+      throw new RazorpayWebhookError(
+        "Payment amount does not match the local order.",
+        400,
+        "PAYMENT_AMOUNT_MISMATCH",
       );
     }
   }
@@ -480,6 +619,7 @@ export class RazorpayWebhookService {
     }
 
     const [rupees, fraction = ""] = value.split(".");
+
     const paise = Number(rupees) * 100 + Number(fraction.padEnd(2, "0"));
 
     if (!Number.isSafeInteger(paise) || paise <= 0) {
