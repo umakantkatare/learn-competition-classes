@@ -1,121 +1,96 @@
+
 "use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  BookOpen,
-  FileText,
-  Landmark,
-  TrainFront,
-  ShieldCheck,
-  ChevronRight,
-  ClipboardList,
-  GraduationCap,
-} from "lucide-react";
+
 import {
   NavigationMenuContent,
   NavigationMenuLink,
 } from "@/components/ui/navigation-menu";
 
 const courseItems = [
-  {
-    title: "All Courses",
-    href: "/batches",
-    icon: BookOpen,
-  },
-  {
-    title: "SSC Courses",
-    href: "/courses/ssc",
-    icon: FileText,
-  },
-  {
-    title: "Banking Courses",
-    href: "/courses/banking",
-    icon: Landmark,
-  },
-  {
-    title: "Railway Courses",
-    href: "/courses/railway",
-    icon: TrainFront,
-  },
-  {
-    title: "MP Police Courses",
-    href: "/courses/mp-police",
-    icon: ShieldCheck,
-  },
-];
+  { title: "All Courses", href: "/batches" },
+  { title: "SSC Courses", href: "/courses/ssc" },
+  { title: "Banking Courses", href: "/courses/banking" },
+  { title: "Railway Courses", href: "/courses/railway" },
+  { title: "MP Police Courses", href: "/courses/mp-police" },
+] as const;
 
 const testSeriesItems = [
-  {
-    title: "All Test Series",
-    href: "/test-series",
-    icon: ClipboardList,
-  },
-  {
-    title: "SSC Test Series",
-    href: "/test-series/ssc",
-    icon: FileText,
-  },
-  {
-    title: "Banking Test Series",
-    href: "/test-series/banking",
-    icon: Landmark,
-  },
-  {
-    title: "Railway Test Series",
-    href: "/test-series/railway",
-    icon: TrainFront,
-  },
-  {
-    title: "MP Police Test Series",
-    href: "/test-series/mp-police",
-    icon: GraduationCap,
-  },
-];
+  { title: "All Test Series", href: "/test-series" },
+  { title: "SSC Test Series", href: "/test-series/ssc" },
+  { title: "Banking Test Series", href: "/test-series/banking" },
+  { title: "Railway Test Series", href: "/test-series/railway" },
+  { title: "MP Police Test Series", href: "/test-series/mp-police" },
+] as const;
 
 interface NavbarDropdownProps {
   type: "courses" | "test-series";
 }
 
-export default function NavbarDropdown({ type }: NavbarDropdownProps) {
-  const items = type === "courses" ? courseItems : testSeriesItems;
+export default function NavbarDropdown({
+  type,
+}: NavbarDropdownProps) {
   const pathname = usePathname();
+
+  const items =
+    type === "courses" ? courseItems : testSeriesItems;
+
+  const isActiveRoute = (href: string) =>
+    pathname === href || pathname.startsWith(`${href}/`);
 
   return (
     <NavigationMenuContent
-      className="w-80 overflow-hidden rounded-2xl border border-gray-100
-        bg-white p-3 shadow-xl"
+      className="
+        w-80 max-w-[calc(100vw-2rem)]
+        overflow-hidden rounded-xl
+        border border-border
+        bg-popover p-2
+        text-popover-foreground
+        shadow-xl shadow-black/10
+      "
     >
+
+      {/* Navigation Items */}
       <div className="flex flex-col gap-1">
         {items.map((item) => {
-          const Icon = item.icon;
-          const isActive =
-            item.href === "/"
-              ? pathname === "/"
-              : pathname.startsWith(item.href);
+          const isActive = isActiveRoute(item.href);
 
           return (
             <NavigationMenuLink
               key={item.href}
-              render={<Link href={item.href} />}
+              render={
+                <Link
+                  href={item.href}
+                  aria-current={isActive ? "page" : undefined}
+                />
+              }
               active={isActive}
-              className="group/item flex items-center justify-between gap-3
-                rounded-xl px-4 py-3.5 text-sm font-medium text-gray-800
-                transition-colors hover:bg-amber-50 hover:text-[#EFA400]"
+              className={`
+                flex w-full items-center
+                rounded-lg px-3 py-3
+                text-sm font-medium
+                !bg-transparent
+                outline-none
+                transition-colors duration-200
+
+                ${
+                  isActive
+                    ? "text-brand-primary"
+                    : "text-foreground/80 hover:text-brand-primary"
+                }
+
+                hover:!bg-transparent
+                focus:!bg-transparent
+                data-[active]:!bg-transparent
+
+                focus-visible:ring-2
+                focus-visible:ring-ring
+                focus-visible:ring-offset-2
+              `}
             >
-              <span className="flex items-center gap-4">
-                <Icon size={22} strokeWidth={1.8} className="shrink-0" />
-
-                <span>{item.title}</span>
-              </span>
-
-              <ChevronRight
-                size={18}
-                className="shrink-0 text-gray-500
-                    transition-transform
-                    group-hover/item:translate-x-1
-                    group-hover/item:text-[#EFA400]"
-              />
+              {item.title}
             </NavigationMenuLink>
           );
         })}

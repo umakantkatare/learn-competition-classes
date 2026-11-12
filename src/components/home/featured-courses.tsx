@@ -1,46 +1,48 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, GraduationCap, RefreshCw } from "lucide-react";
+import { ArrowRight, RefreshCw } from "lucide-react";
 
 import { BatchCard } from "@/components/batches/batch-card";
 import { useGetPublishedBatches } from "@/hooks/academic/use-batches";
-
 import { Button } from "@/components/ui/button";
 
-const FEATURED_BATCH_LIMIT = 3;
+const DEFAULT_FEATURED_BATCH_LIMIT = 3;
+
+type FeaturedCoursesProps = {
+  limit?: number;
+};
 
 function BatchCardSkeleton() {
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-      <div className="mx-3 mt-3 aspect-[16/9] animate-pulse rounded-lg bg-slate-200" />
+    <div className="overflow-hidden rounded-xl border border-border bg-card">
+      <div className="mx-3 mt-3 aspect-[16/9] animate-pulse rounded-lg bg-muted" />
 
       <div className="space-y-4 p-4">
-        <div className="h-5 w-3/4 animate-pulse rounded bg-slate-200" />
-        <div className="h-4 w-1/2 animate-pulse rounded bg-slate-100" />
-        <div className="h-8 animate-pulse rounded bg-slate-200" />
-        <div className="h-10 animate-pulse rounded bg-slate-100" />
+        <div className="h-5 w-3/4 animate-pulse rounded bg-muted" />
+        <div className="h-4 w-1/2 animate-pulse rounded bg-muted/70" />
+        <div className="h-8 animate-pulse rounded bg-muted" />
+        <div className="h-10 animate-pulse rounded bg-muted/70" />
       </div>
     </div>
   );
 }
 
-
-function FeaturedCoursesSkeleton() {
+function FeaturedCoursesSkeleton({ limit }: { limit: number }) {
   return (
-    <section className="bg-[#fffdf8] px-4 py-10 sm:px-6 lg:px-8">
+    <section className="bg-background px-4 py-10 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl space-y-6">
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
           <div className="space-y-2">
-            <div className="h-8 w-48 animate-pulse rounded bg-slate-200" />
-            <div className="h-1 w-12 rounded-full bg-slate-200" />
+            <div className="h-8 w-48 animate-pulse rounded bg-muted" />
+            <div className="h-1 w-12 rounded-full bg-muted" />
           </div>
 
-          <div className="h-5 w-64 animate-pulse rounded bg-slate-200" />
+          <div className="h-5 w-64 animate-pulse rounded bg-muted" />
         </div>
 
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: FEATURED_BATCH_LIMIT }).map((_, index) => (
+          {Array.from({ length: limit }).map((_, index) => (
             <BatchCardSkeleton key={index} />
           ))}
         </div>
@@ -57,17 +59,17 @@ function FeaturedCoursesError({
   isFetching: boolean;
 }) {
   return (
-    <section className="bg-[#fffdf8] px-4 py-12 sm:px-6 lg:px-8">
-      <div className="mx-auto flex max-w-7xl flex-col items-center justify-center gap-3 rounded-xl border border-dashed p-10 text-center">
-        <div className="flex size-14 items-center justify-center rounded-full bg-red-50">
-          <RefreshCw className="size-7 text-red-500" />
+    <section className="bg-background px-4 py-12 sm:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-7xl flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card p-10 text-center">
+        <div className="flex size-14 items-center justify-center rounded-full bg-destructive/10">
+          <RefreshCw className="size-7 text-destructive" />
         </div>
 
-        <h3 className="text-lg font-semibold text-slate-800">
+        <h3 className="text-lg font-semibold text-foreground">
           Unable to load courses
         </h3>
 
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-muted-foreground">
           Something went wrong while fetching available batches. Please try
           again.
         </p>
@@ -83,19 +85,15 @@ function FeaturedCoursesError({
   );
 }
 
-// --------------------------------------------------
-// Empty State
-// --------------------------------------------------
-
 function FeaturedCoursesEmpty() {
   return (
-    <section className="bg-[#fffdf8] px-4 py-12 sm:px-6 lg:px-8">
-      <div className="mx-auto flex max-w-7xl flex-col items-center justify-center gap-3 rounded-xl border border-dashed p-10 text-center">
-        <h3 className="text-lg font-semibold text-slate-800">
+    <section className="bg-background px-4 py-12 sm:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-7xl flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card p-10 text-center">
+        <h3 className="text-lg font-semibold text-foreground">
           No Courses Available
         </h3>
 
-        <p className="max-w-md text-sm text-slate-500">
+        <p className="max-w-md text-sm text-muted-foreground">
           New batches will be available soon. Stay tuned!
         </p>
 
@@ -112,11 +110,9 @@ function FeaturedCoursesEmpty() {
   );
 }
 
-// --------------------------------------------------
-// Featured Courses
-// --------------------------------------------------
-
-export function FeaturedCourses() {
+export function FeaturedCourses({
+  limit = DEFAULT_FEATURED_BATCH_LIMIT,
+}: FeaturedCoursesProps) {
   const {
     data: batches = [],
     isLoading,
@@ -126,7 +122,7 @@ export function FeaturedCourses() {
   } = useGetPublishedBatches();
 
   if (isLoading) {
-    return <FeaturedCoursesSkeleton />;
+    return <FeaturedCoursesSkeleton limit={limit} />;
   }
 
   if (isError) {
@@ -138,19 +134,19 @@ export function FeaturedCourses() {
     );
   }
 
-  const featuredBatches = batches.slice(0, FEATURED_BATCH_LIMIT);
+  const featuredBatches = batches.slice(0, limit);
 
   if (featuredBatches.length === 0) {
     return <FeaturedCoursesEmpty />;
   }
 
   return (
-    <section className="bg-[#fffdf8] px-4 py-10 sm:px-6 lg:px-8">
+    <section className="bg-background px-4 py-10 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
         {/* Section Heading */}
         <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div className="shrink-0">
-            <h2 className="text-2xl font-extrabold tracking-tight text-[#171717] sm:text-3xl">
+            <h2 className="text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
               Featured <span className="text-primary">Courses</span>
             </h2>
 
@@ -158,13 +154,13 @@ export function FeaturedCourses() {
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3 sm:justify-end">
-            <p className="text-xs text-slate-500 sm:text-sm">
+            <p className="text-xs text-muted-foreground sm:text-sm">
               Comprehensive courses designed for your success.
             </p>
 
             <Link
               href="/batches"
-              className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-primary transition-colors hover:scale-95"
+              className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-primary transition-colors hover:opacity-80"
             >
               View All
               <ArrowRight className="size-4" />

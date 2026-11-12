@@ -1,5 +1,5 @@
 import DesktopNavbar from "./desktop-navbar";
-import MobileNavbar from './mobile-navbar';
+import MobileNavbar from "./mobile-navbar";
 
 export default function Navbar() {
   return (
@@ -8,7 +8,8 @@ export default function Navbar() {
         <DesktopNavbar />
       </div>
 
-      <div className="md:hidden">
+      {/* Mobile Navbar */}
+      <div className="block md:hidden">
         <MobileNavbar />
       </div>
     </header>

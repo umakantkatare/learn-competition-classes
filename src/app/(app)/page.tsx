@@ -1,5 +1,4 @@
 import { HeroSection } from "@/components/home/hero-section";
-import { StatsBar } from "@/components/home/stats-bar";
 import { PopularExams } from "@/components/home/popular-exams";
 import { FeaturedCourses } from "@/components/home/featured-courses";
 import { WhyChooseUs } from "@/components/home/why-choose-us";
@@ -11,7 +10,6 @@ export default function HomePage() {
   return (
     <main className="bg-[#fffdf8]">
       <HeroSection />
-      <StatsBar />
       <PopularExams />
       <FeaturedCourses />
       <WhyChooseUs />

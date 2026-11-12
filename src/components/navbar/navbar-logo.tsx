@@ -10,25 +10,69 @@ export default function NavbarLogo({ compact = false }: NavbarLogoProps) {
     <Link
       href="/"
       aria-label="LCC Institute Home"
-      className="flex shrink-0 items-center gap-3"
+      className="
+        group flex shrink-0 items-center
+        gap-2 sm:gap-3
+        rounded-lg outline-none
+        focus-visible:ring-2
+        focus-visible:ring-ring
+        focus-visible:ring-offset-2
+      "
     >
       {/* Institute Logo */}
-      <Image
-        src="/images/LCC-logo.webp"
-        alt="LCC Institute Logo"
-        width={compact ? 56 : 100}
-        height={compact ? 56 : 100}
-        priority
-        className="h-14 w-14 object-contain sm:h-16 sm:w-16 lg:h-24 lg:w-24 rounded-full"
-      />
+      <div
+        className={`
+          relative shrink-0 overflow-hidden
+          ${compact ? "size-10 sm:size-12" : "size-12 sm:size-14 lg:size-16"}
+        `}
+      >
+        <Image
+          src="/images/LCC-logo.webp"
+          alt="LCC Institute Logo"
+          fill
+          priority
+          sizes={
+            compact
+              ? "48px"
+              : "(max-width: 640px) 48px, (max-width: 1024px) 56px, 64px"
+          }
+          className="
+            rounded-full object-contain
+            transition-transform duration-300
+            group-hover:scale-105
+          "
+        />
+      </div>
 
       {/* Institute Name */}
-      <div className="flex flex-col">
-        <span className="whitespace-nowrap text-lg font-bold tracking-tight text-[#171717] sm:text-xl lg:text-3xl">
+      <div className="flex min-w-0 flex-col">
+        <span
+          className={`
+            whitespace-nowrap font-bold
+            tracking-tight text-foreground
+            transition-colors
+            group-hover:text-brand-primary
+            ${
+              compact
+                ? "text-base sm:text-lg"
+                : "text-base sm:text-xl lg:text-2xl"
+            }
+          `}
+        >
           LCC Institute
         </span>
 
-        <span className="whitespace-nowrap text-xs font-medium text-gray-600 sm:text-sm lg:text-base">
+        <span
+          className={`
+            whitespace-nowrap font-medium
+            text-muted-foreground
+            ${
+              compact
+                ? "text-[10px] sm:text-xs"
+                : "text-[10px] sm:text-xs lg:text-sm"
+            }
+          `}
+        >
           Learn Competition Classes
         </span>
       </div>

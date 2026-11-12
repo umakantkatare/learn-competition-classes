@@ -1,7 +1,14 @@
 import Image from "next/image";
-import { Star, Quote } from "lucide-react";
+import { Quote } from "lucide-react";
 
-const testimonials = [
+type Testimonial = {
+  name: string;
+  selection: string;
+  image: string;
+  review: string;
+};
+
+const testimonials: Testimonial[] = [
   {
     name: "Rahul Sharma",
     selection: "SSC CGL",
@@ -27,73 +34,63 @@ const testimonials = [
 
 export function SuccessStories() {
   return (
-    <section className="bg-[#fffdf8] px-4 py-12 sm:px-6 lg:px-8">
+    <section className="bg-background px-4 py-12 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
         {/* Section Heading */}
         <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
-            <p className="text-sm font-bold uppercase tracking-wider text-[#ef4b13]">
-              Student Testimonials
-            </p>
-
-            <h2 className="mt-2 text-2xl font-extrabold tracking-tight text-[#171717] sm:text-3xl">
-              Our Students, <span className="text-[#ef4b13]">Our Pride</span>
+            <h2 className="mt-2 text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
+              Our Students, <span className="text-primary">Our Pride</span>
             </h2>
 
-            <div className="mt-3 h-1 w-12 rounded-full bg-[#ef4b13]" />
+            <div className="mt-3 h-1 w-12 rounded-full bg-primary" />
           </div>
-
-          <p className="max-w-lg text-sm leading-6 text-slate-500">
-            Every success story reflects dedication, consistent effort, and the
-            guidance of our faculty.
-          </p>
         </div>
 
         {/* Testimonial Cards */}
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 items-stretch gap-5 md:grid-cols-2 lg:grid-cols-3">
           {testimonials.map((student) => (
             <article
               key={student.name}
-              className="relative flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-orange-200 hover:shadow-lg sm:p-6"
+              className="
+                group relative flex h-full flex-col
+                rounded-2xl border border-border bg-card
+                p-5 shadow-sm
+                transition-all duration-300
+                hover:-translate-y-1
+                hover:border-primary/30
+                hover:shadow-md
+                sm:p-6
+              "
             >
               {/* Quote Icon */}
-              <div className="absolute right-5 top-5 flex size-10 items-center justify-center rounded-full bg-orange-50">
-                <Quote className="size-5 text-[#ef4b13]" />
-              </div>
-
-              {/* Rating */}
-              <div className="flex gap-1">
-                {Array.from({ length: 5 }).map((_, index) => (
-                  <Star
-                    key={index}
-                    className="size-4 fill-amber-400 text-amber-400"
-                  />
-                ))}
+              <div className="absolute right-5 top-5 flex size-10 items-center justify-center rounded-full bg-primary/10">
+                <Quote className="size-5 text-primary" />
               </div>
 
               {/* Review */}
-              <p className="mt-5 flex-1 text-sm leading-7 text-slate-600">
+              <p className="flex-1 pr-8 text-sm leading-7 text-muted-foreground">
                 &ldquo;{student.review}&rdquo;
               </p>
 
               {/* Student Details */}
-              <div className="mt-6 flex items-center gap-3 border-t border-slate-100 pt-5">
-                <div className="relative size-12 shrink-0 overflow-hidden rounded-full bg-orange-50">
+              <div className="mt-6 flex items-center gap-3 border-t border-border pt-5">
+                <div className="relative size-12 shrink-0 overflow-hidden rounded-full border border-border bg-muted">
                   <Image
                     src={student.image}
-                    alt={student.name}
+                    alt={`${student.name} testimonial`}
                     fill
                     sizes="48px"
-                    className="object-cover"
+                    className="object-cover transition-transform duration-300 group-hover:scale-110"
                   />
                 </div>
 
                 <div className="min-w-0">
-                  <h3 className="truncate text-sm font-bold text-[#17375e]">
+                  <h3 className="truncate text-sm font-bold text-foreground">
                     {student.name}
                   </h3>
 
-                  <p className="mt-1 text-xs font-medium text-emerald-700">
+                  <p className="mt-1 text-xs font-medium text-primary">
                     Selected: {student.selection}
                   </p>
                 </div>

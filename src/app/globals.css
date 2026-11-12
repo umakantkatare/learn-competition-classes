@@ -94,7 +94,7 @@
 
   /* Brand palette */
   --brand-primary: #f5a800;
-  --brand-primary-hover: #e7000b;
+  --brand-primary-hover: #d69300;
   --brand-dark: #15493f;
 
   /* Application surfaces */
@@ -274,7 +274,16 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Exam Marquee */
+.exam-marquee {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
+
 .exam-marquee-track {
+  width: max-content;
   animation: exam-scroll 35s linear infinite;
   will-change: transform;
 }
@@ -292,6 +301,7 @@
   from {
     transform: translateX(0);
   }
+
   to {
     transform: translateX(-50%);
   }
@@ -301,13 +311,27 @@
   from {
     transform: translateX(-50%);
   }
+
   to {
     transform: translateX(0);
   }
 }
 
+/* Mobile */
+@media (max-width: 640px) {
+  .exam-marquee-track {
+    animation-duration: 28s;
+  }
+
+  .exam-marquee-reverse {
+    animation-duration: 32s;
+  }
+}
+
+/* Reduced Motion */
 @media (prefers-reduced-motion: reduce) {
   .exam-marquee-track {
     animation: none;
+    will-change: auto;
   }
 }

@@ -1,87 +1,66 @@
-
 "use client";
 
-import { useEffect } from "react";
 import Link from "next/link";
 import { X } from "lucide-react";
+
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+
 import MobileNavLinks from "./mobile-navLinks";
 import MobileNavActions from "./mobile-navActions";
-
+import NavbarActions from "./navbar-actions";
+import NavbarLinks from "./navbar-links";
 
 interface MobileSidebarProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-export default function MobileSidebar({
-  isOpen,
-  onClose,
-}: MobileSidebarProps) {
-  // Prevent background scrolling when sidebar is open
-  useEffect(() => {
-    document.body.style.overflow = isOpen ? "hidden" : "";
-
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [isOpen]);
-
-  // Close sidebar when Escape key is pressed
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isOpen, onClose]);
-
+export default function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        aria-hidden="true"
-        onClick={onClose}
-        className={`fixed inset-0 z-[60] bg-black/40
-          transition-opacity duration-300 md:hidden
-          ${
-            isOpen
-              ? "visible opacity-100"
-              : "invisible opacity-0"
-          }`}
-      />
-
-      {/* Sidebar */}
-      <aside
-        id="mobile-sidebar"
-        aria-label="Mobile navigation"
-        aria-hidden={!isOpen}
-        className={`fixed right-0 top-0 z-[70]
-          flex h-dvh w-[85%] max-w-sm
-          flex-col bg-white shadow-2xl
-          transition-transform duration-300 ease-in-out
+    <Sheet
+      open={isOpen}
+      onOpenChange={(open: boolean) => {
+        if (!open) onClose();
+      }}
+    >
+      <SheetContent
+        side="left"
+        showCloseButton={false}
+        className="
+          flex h-dvh
+          w-[85%] max-w-[380px]
+          flex-col gap-0
+          overflow-hidden
+          border-r border-border
+          bg-background p-0
+          text-foreground
+          shadow-2xl
           md:hidden
-          ${
-            isOpen
-              ? "translate-x-0"
-              : "translate-x-full"
-          }`}
+        "
       >
-        {/* Sidebar Header */}
-        <div className="flex items-center justify-between
-          border-b border-gray-100 px-5 py-4">
+        {/* Accessible Title */}
+        <SheetTitle className="sr-only">
+          LCC Institute Mobile Navigation
+        </SheetTitle>
 
+        {/* Sidebar Header */}
+        <div
+          className="
+          flex shrink-0 items-center
+          justify-between gap-3
+          border-b border-border
+          px-5 py-4
+        "
+        >
           <Link
             href="/"
             onClick={onClose}
-            className="text-lg font-bold text-[#171717]"
+            className="
+              text-lg font-bold
+              tracking-tight text-foreground
+              transition-colors
+              hover:text-brand-primary
+            "
           >
             LCC Institute
           </Link>
@@ -90,24 +69,46 @@ export default function MobileSidebar({
             type="button"
             onClick={onClose}
             aria-label="Close navigation menu"
-            className="flex h-10 w-10 items-center
-              justify-center rounded-full
-              hover:bg-amber-50"
+            className="
+              flex size-10 shrink-0
+              items-center justify-center
+              rounded-full
+              text-muted-foreground
+              transition-colors
+              hover:text-brand-primary
+              focus-visible:outline-none
+              focus-visible:ring-2
+              focus-visible:ring-ring
+            "
           >
-            <X size={24} />
+            <X size={22} strokeWidth={1.8} />
           </button>
         </div>
 
         {/* Sidebar Navigation */}
-        <div className="flex-1 overflow-y-auto px-5 py-6">
-          <MobileNavLinks onNavigate={onClose} />
+        <div
+          className="
+          min-h-0 flex-1
+          overflow-y-auto overscroll-contain
+          px-5 py-6
+        "
+        >
+          {/* <MobileNavLinks onNavigate={onClose} /> */}
+          <NavbarLinks onNavigate={onClose}/>
         </div>
 
-        {/* Sidebar Authentication Actions */}
-        <div className="border-t border-gray-100 p-5">
-          <MobileNavActions onNavigate={onClose} />
+        {/* Authentication Actions */}
+        <div
+          className="
+          shrink-0 border-t border-border
+          bg-background p-5
+          pb-[max(1.25rem,env(safe-area-inset-bottom))]
+        "
+        >
+          {/* <MobileNavActions onNavigate={onClose} /> */}
+          <NavbarActions onNavigate={onClose}/>
         </div>
-      </aside>
-    </>
+      </SheetContent>
+    </Sheet>
   );
 }

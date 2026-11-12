@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Loader2, LogIn, UserPlus } from "lucide-react";
+import { Loader2, } from "lucide-react";
 
 import { authClient } from "@/lib/auth-client";
 import { SignOutButton } from "../auth/sign-out-button";
@@ -53,7 +53,6 @@ export default function MobileNavActions({
           text-sm font-semibold text-[#171717]
           transition-colors hover:bg-amber-50"
       >
-        <LogIn size={18} />
         Login
       </Link>
 
@@ -64,7 +63,6 @@ export default function MobileNavActions({
           gap-2 rounded-full bg-[#F5A800] text-sm font-semibold
           text-black shadow-sm transition-colors hover:bg-amber-500"
       >
-        <UserPlus size={18} />
         Sign Up
       </Link>
     </div>
