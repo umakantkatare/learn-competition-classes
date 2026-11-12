@@ -19,7 +19,7 @@ const navLinks = [
     href: "/",
   },
   {
-    label: "Batches",
+    label: "Courses",
     href: "/batches",
     dropdown: true,
   },

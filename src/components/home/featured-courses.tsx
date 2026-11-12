@@ -164,7 +164,7 @@ export function FeaturedCourses() {
 
             <Link
               href="/batches"
-              className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-red-600 transition-colors hover:text-orange-700"
+              className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-primary transition-colors hover:scale-95"
             >
               View All
               <ArrowRight className="size-4" />

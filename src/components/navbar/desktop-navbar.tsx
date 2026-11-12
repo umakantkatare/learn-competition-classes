@@ -21,11 +21,11 @@ export default function DesktopNavbar() {
       <div className="flex shrink-0 items-center gap-4">
         {user ? (
           <>
-            <div className="h-10 w-px bg-gray-200" aria-hidden="true" />
+            {/* <div className="h-10 w-px bg-gray-200" aria-hidden="true" /> */}
 
-            <NavbarNotifications unreadCount={0} />
+            {/* <NavbarNotifications unreadCount={0} /> */}
 
-            <div className="h-10 w-px bg-gray-200" aria-hidden="true" />
+            {/* <div className="h-10 w-px bg-gray-200" aria-hidden="true" /> */}
 
             <NavbarUserMenu
               name={user.name}

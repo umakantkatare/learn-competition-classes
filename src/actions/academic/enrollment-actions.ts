@@ -41,7 +41,7 @@ async function getSession() {
 
 async function requireAdmin(): Promise<boolean> {
   const session = await getSession();
-  return session?.user?.role === "ADMIN";
+  return session?.user?.role === "admin";
 }
 
 // 1. Manual enrollment: ADMIN only.
@@ -58,7 +58,7 @@ export async function createEnrollmentAction(
       };
     }
 
-    if (session.user.role !== "ADMIN") {
+    if (session.user.role !== "admin") {
       return {
         success: false,
         error: "Only admins can manually enroll students.",

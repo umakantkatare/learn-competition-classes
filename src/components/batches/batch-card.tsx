@@ -2,17 +2,13 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { CalendarDays, GraduationCap, } from "lucide-react";
+import { CalendarDays, GraduationCap } from "lucide-react";
 
 import type { Batch } from "@/hooks/academic/use-batches";
-
-// Types
 
 interface BatchCardProps {
   batch: Batch;
 }
-
-// Constants
 
 const currencyFormatter = new Intl.NumberFormat("en-IN", {
   maximumFractionDigits: 0,
@@ -24,7 +20,7 @@ const dateFormatter = new Intl.DateTimeFormat("en-IN", {
   year: "numeric",
 });
 
- export const statusStyles: Record<Batch["status"], string> = {
+export const statusStyles: Record<Batch["status"], string> = {
   UPCOMING:
     "border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300",
 
@@ -200,19 +196,12 @@ export function BatchCard({ batch }: BatchCardProps) {
 
         {/* Footer Actions */}
 
-        <div className="mt-auto mt-5 flex items-center justify-between gap-3 border-t border-border pt-4">
+        <div className="mt-auto border-t border-border pt-4">
           <Link
             href={batchUrl}
-            className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+            className="flex h-10 w-full items-center justify-center rounded-full border border-primary/30 bg-primary px-6 text-sm font-semibold text-black transition-all duration-200 hover:border-primary hover:bg-primary/5 active:scale-[0.98]"
           >
             View Details
-          </Link>
-
-          <Link
-            href={batchUrl}
-            className="inline-flex h-10 items-center justify-center rounded-full bg-primary px-6 text-sm font-semibold text-primary-foreground shadow-sm transition-all duration-200 hover:bg-primary/90 hover:shadow-md active:scale-[0.98]"
-          >
-            Enroll Now
           </Link>
         </div>
       </div>

@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
       },
     );
   } catch (error: unknown) {
-    console.error("POST /api/payments/create-order failed:", error);
+    console.error("POST /api/v1/payments/create-order failed:", error);
 
     if (error instanceof ZodError) {
       return jsonError(

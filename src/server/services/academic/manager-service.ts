@@ -125,6 +125,7 @@ export class ManagerService {
 
     const employeeCode = this.validateEmployeeCode(data.employeeCode);
     const temporaryPassword = this.generateTemporaryPassword();
+    console.log('temporary-pswrd', temporaryPassword);
 
     const createdUser = await dependencies.createAuthUser({
       name: data.name.trim(),

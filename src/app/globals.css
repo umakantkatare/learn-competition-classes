@@ -274,3 +274,40 @@
     transition-duration: 0.01ms !important;
   }
 }
+.exam-marquee-track {
+  animation: exam-scroll 35s linear infinite;
+  will-change: transform;
+}
+
+.exam-marquee-reverse {
+  animation-name: exam-scroll-reverse;
+  animation-duration: 30s;
+}
+
+.exam-marquee:hover .exam-marquee-track {
+  animation-play-state: paused;
+}
+
+@keyframes exam-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes exam-scroll-reverse {
+  from {
+    transform: translateX(-50%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .exam-marquee-track {
+    animation: none;
+  }
+}

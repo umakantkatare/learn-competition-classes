@@ -92,7 +92,7 @@ export function HeroSection() {
           {/* CTA Buttons */}
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link
-              href="/courses"
+              href="/batches"
               className={cn(buttonVariants({ variant: "default", size: "lg" }))}
             >
               Explore Courses
