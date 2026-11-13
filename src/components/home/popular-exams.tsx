@@ -62,7 +62,7 @@ const exams = [
     logo: "/images/exams-logo/mp-tet.avif",
     href: "/exams/mp-tet",
   },
-];
+] as const;
 
 type Exam = (typeof exams)[number];
 
@@ -70,16 +70,30 @@ function ExamCard({ exam }: { exam: Exam }) {
   return (
     <Link
       href={exam.href}
-      className="group flex w-[160px] shrink-0 flex-col items-center rounded-2xl border border-slate-200/70 bg-white px-4 py-5 text-center shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg sm:w-[175px]"
+      className="
+        group flex w-[160px] shrink-0 flex-col items-center
+        rounded-2xl border border-slate-200/70 bg-white
+        px-4 py-5 text-center shadow-sm
+        transition-all duration-300
+        hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg
+        sm:w-[175px]
+        focus-visible:outline-none focus-visible:ring-2
+        focus-visible:ring-primary focus-visible:ring-offset-2
+      "
     >
       {/* Circular Logo */}
-      <div className="relative size-16 overflow-hidden rounded-full transition-transform duration-300 group-hover:scale-110 sm:size-[72px]">
+      <div className="relative size-16 overflow-hidden rounded-full sm:size-[72px]">
         <Image
           src={exam.logo}
           alt={`${exam.name} exam logo`}
           fill
           sizes="72px"
-          className="rounded-full object-contain"
+          loading="lazy"
+          className="
+            rounded-full object-contain
+            transition-transform duration-300
+            group-hover:scale-110
+          "
         />
       </div>
 
@@ -87,7 +101,7 @@ function ExamCard({ exam }: { exam: Exam }) {
       <h3 className="mt-3 text-xs font-extrabold tracking-wide">{exam.name}</h3>
 
       {/* Description */}
-      <p className="mt-1 line-clamp-2 min-h-8 text-[11px] leading-4 text-slate-800">
+      <p className="mt-1 min-h-8 line-clamp-2 text-[11px] leading-4 text-slate-800">
         {exam.description}
       </p>
     </Link>
@@ -98,20 +112,22 @@ function ExamMarquee({
   items,
   reverse = false,
 }: {
-  items: Exam[];
+  items: readonly Exam[];
   reverse?: boolean;
 }) {
   return (
     <div className="exam-marquee group/marquee relative overflow-hidden">
       <div
-        className={`exam-marquee-track flex w-max gap-4 py-3 ${
-          reverse ? "exam-marquee-reverse" : ""
-        }`}
+        className={`
+          exam-marquee-track flex w-max gap-4 py-3
+          ${reverse ? "exam-marquee-reverse" : ""}
+        `}
       >
         {[0, 1].map((copy) => (
           <div
             key={copy}
             aria-hidden={copy === 1}
+            inert={copy === 1}
             className="flex shrink-0 gap-4"
           >
             {items.map((exam) => (
@@ -129,11 +145,17 @@ export function PopularExams() {
   const secondRow = exams.slice(6);
 
   return (
-    <section className="overflow-hidden bg-[#fffdf8] px-4 py-12 sm:px-6 lg:px-8">
+    <section
+      aria-labelledby="popular-exams-heading"
+      className="overflow-hidden bg-[#fffdf8] px-4 py-12 sm:px-6 lg:px-8"
+    >
       <div className="mx-auto max-w-7xl">
         {/* Section Heading */}
         <div className="mb-7 border-b border-orange-100 pb-5">
-          <h2 className="text-2xl font-extrabold tracking-tight text-[#171717] sm:text-3xl">
+          <h2
+            id="popular-exams-heading"
+            className="text-2xl font-extrabold tracking-tight text-[#171717] sm:text-3xl"
+          >
             Popular <span className="text-primary">Exams</span> We Prepare For
           </h2>
 

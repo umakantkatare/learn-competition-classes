@@ -1,3 +1,4 @@
+
 import Image from "next/image";
 import Link from "next/link";
 
@@ -8,6 +9,7 @@ interface LogoProps {
   width?: number;
   height?: number;
   className?: string;
+  priority?: boolean;
 }
 
 export default function Logo({
@@ -17,6 +19,7 @@ export default function Logo({
   width,
   height,
   className = "",
+  priority = false,
 }: LogoProps) {
   const logoWidth = width ?? (compact ? 56 : 100);
   const logoHeight = height ?? (compact ? 56 : 100);
@@ -29,10 +32,12 @@ export default function Logo({
     >
       <Image
         src="/images/LCC-logo.webp"
-        alt="LCC Institute Logo"
+        alt="LCC Institute"
         width={logoWidth}
         height={logoHeight}
-        priority
+        priority={priority}
+        loading={priority ? undefined : "lazy"}
+        sizes={`${logoWidth}px`}
         className="rounded-full object-contain"
       />
 

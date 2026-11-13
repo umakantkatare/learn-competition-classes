@@ -283,6 +283,7 @@
 }
 
 .exam-marquee-track {
+  display: flex;
   width: max-content;
   animation: exam-scroll 35s linear infinite;
   will-change: transform;
@@ -290,30 +291,38 @@
 
 .exam-marquee-reverse {
   animation-name: exam-scroll-reverse;
-  animation-duration: 30s;
+  animation-duration: 35s;
 }
 
+/* Pause on hover */
 .exam-marquee:hover .exam-marquee-track {
   animation-play-state: paused;
 }
 
+/* Pause when keyboard focus enters */
+.exam-marquee:focus-within .exam-marquee-track {
+  animation-play-state: paused;
+}
+
+/* Left to Right */
 @keyframes exam-scroll {
   from {
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0);
   }
 
   to {
-    transform: translateX(-50%);
+    transform: translate3d(-50%, 0, 0);
   }
 }
 
+/* Right to Left */
 @keyframes exam-scroll-reverse {
   from {
-    transform: translateX(-50%);
+    transform: translate3d(-50%, 0, 0);
   }
 
   to {
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0);
   }
 }
 
@@ -333,5 +342,6 @@
   .exam-marquee-track {
     animation: none;
     will-change: auto;
+    transform: none;
   }
 }

@@ -1,26 +1,33 @@
 import "server-only";
 
-const IMAGEKIT_API_BASE_URL = process.env.IMAGEKIT_API_BASE_URL;
+const IMAGEKIT_API_BASE_URL =
+  process.env.IMAGEKIT_API_BASE_URL?.replace(/\/+$/, "");
 
-if (!IMAGEKIT_API_BASE_URL) {
-  throw new Error("ImageKit API base URL is not configured.");
-}
-
-export async function deleteImageKitFile(fileId: string): Promise<void> {
+export async function deleteImageKitFile(
+  fileId: string,
+): Promise<void> {
   const privateKey = process.env.IMAGEKIT_PRIVATE_KEY;
+
+  if (!IMAGEKIT_API_BASE_URL) {
+    throw new Error("ImageKit API base URL is not configured.");
+  }
 
   if (!privateKey) {
     throw new Error("ImageKit private key is not configured.");
   }
 
-  if (!fileId.trim()) {
+  const normalizedFileId = fileId?.trim();
+
+  if (!normalizedFileId) {
     throw new Error("ImageKit file ID is required.");
   }
 
-  const authorization = Buffer.from(`${privateKey}:`).toString("base64");
+  const authorization = Buffer.from(
+    `${privateKey}:`,
+  ).toString("base64");
 
   const response = await fetch(
-    `${IMAGEKIT_API_BASE_URL}/files/${encodeURIComponent(fileId)}`,
+    `${IMAGEKIT_API_BASE_URL}/files/${encodeURIComponent(normalizedFileId)}`,
     {
       method: "DELETE",
       headers: {
@@ -31,13 +38,14 @@ export async function deleteImageKitFile(fileId: string): Promise<void> {
     },
   );
 
+  // Idempotent deletion
   if (response.status === 404) {
     return;
   }
 
   if (!response.ok) {
     throw new Error(
-      `ImageKit file deletion failed with status ${response.status}.`,
+      `ImageKit deletion failed: ${response.status} ${response.statusText}`,
     );
   }
 }

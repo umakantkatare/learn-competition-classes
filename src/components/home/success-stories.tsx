@@ -34,17 +34,21 @@ const testimonials: Testimonial[] = [
 
 export function SuccessStories() {
   return (
-    <section className="bg-background px-4 py-12 sm:px-6 lg:px-8">
+    <section
+      aria-labelledby="success-stories-heading"
+      className="bg-background px-4 py-12 sm:px-6 lg:px-8"
+    >
       <div className="mx-auto max-w-7xl">
         {/* Section Heading */}
-        <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-          <div>
-            <h2 className="mt-2 text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
-              Our Students, <span className="text-primary">Our Pride</span>
-            </h2>
+        <div className="mb-8">
+          <h2
+            id="success-stories-heading"
+            className="text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl"
+          >
+            Our Students, <span className="text-primary">Our Pride</span>
+          </h2>
 
-            <div className="mt-3 h-1 w-12 rounded-full bg-primary" />
-          </div>
+          <div className="mt-3 h-1 w-12 rounded-full bg-primary" />
         </div>
 
         {/* Testimonial Cards */}
@@ -53,7 +57,7 @@ export function SuccessStories() {
             <article
               key={student.name}
               className="
-                group relative flex h-full flex-col
+                group relative flex min-h-[260px] h-full flex-col
                 rounded-2xl border border-border bg-card
                 p-5 shadow-sm
                 transition-all duration-300
@@ -64,7 +68,14 @@ export function SuccessStories() {
               "
             >
               {/* Quote Icon */}
-              <div className="absolute right-5 top-5 flex size-10 items-center justify-center rounded-full bg-primary/10">
+              <div
+                aria-hidden="true"
+                className="
+                  absolute right-5 top-5
+                  flex size-10 items-center justify-center
+                  rounded-full bg-primary/10
+                "
+              >
                 <Quote className="size-5 text-primary" />
               </div>
 
@@ -78,10 +89,15 @@ export function SuccessStories() {
                 <div className="relative size-12 shrink-0 overflow-hidden rounded-full border border-border bg-muted">
                   <Image
                     src={student.image}
-                    alt={`${student.name} testimonial`}
+                    alt={`${student.name} - ${student.selection} student`}
                     fill
                     sizes="48px"
-                    className="object-cover transition-transform duration-300 group-hover:scale-110"
+                    loading="lazy"
+                    className="
+                      object-cover
+                      transition-transform duration-300
+                      group-hover:scale-110
+                    "
                   />
                 </div>
 
