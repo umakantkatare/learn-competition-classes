@@ -20,18 +20,16 @@ export default function Profile({
   createdAt,
 }: ProfileProps) {
   return (
-    <div>
-     <UserProfileDetails
-                user={{
-                  name: userName,
-                  email: userEmail,
-                  phoneNumber: phoneNumber,
-                  image: userImage,
-                  role,
-                  emailVerified,
-                  createdAt,
-                }}
-              />
-    </div>
+    <UserProfileDetails
+      user={{
+        name: userName,
+        email: userEmail,
+        phoneNumber,
+        image: userImage,
+        role,
+        emailVerified,
+        createdAt,
+      }}
+    />
   );
 }

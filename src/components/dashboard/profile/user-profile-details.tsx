@@ -1,14 +1,5 @@
 "use client";
-
-import {
-  useEffect,
-  useRef,
-  useState,
-  type ChangeEvent,
-  type ElementType,
-  type FormEvent,
-} from "react";
-
+import { useState, type ElementType, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -20,9 +11,8 @@ import {
   Pencil,
   Trash2,
   Loader2,
-  ImagePlus,
-  X,
   CheckCircle2,
+  LockKeyhole,
 } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -61,13 +51,8 @@ import {
 
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
-import { uploadFile } from "@/helper/imagekit/upload";
-import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE } from "@/constants/image-size";
 import ChangePasswordForm from "@/components/auth/change-password";
-
-// --------------------------------------------------
-// Types
-// --------------------------------------------------
+import { ProfileImageUpload } from "./profile-image-upload";
 
 type UserProfile = {
   name: string;
@@ -92,9 +77,7 @@ interface ProfileFieldProps {
 }
 
 function formatDate(value?: string | Date | null): string {
-  if (!value) {
-    return "Not available";
-  }
+  if (!value) return "Not available";
 
   const date = new Date(value);
 
@@ -114,16 +97,14 @@ function getInitials(name: string): string {
     name
       .trim()
       .split(/\s+/)
-      .map((part) => part[0])
+      .map((part) => part.charAt(0))
       .join("")
       .slice(0, 2)
       .toUpperCase() || "U"
   );
 }
 
-// --------------------------------------------------
-// Profile Field Component
-// --------------------------------------------------
+// Profile Field
 
 function ProfileField({ icon: Icon, label, value }: ProfileFieldProps) {
   return (
@@ -133,9 +114,10 @@ function ProfileField({ icon: Icon, label, value }: ProfileFieldProps) {
       </div>
 
       <div className="min-w-0 flex-1 space-y-0.5">
-        <p className="text-xs font-medium text-text-secondary dark:text-muted-foreground uppercase tracking-wider">
+        <p className="text-xs font-medium uppercase tracking-wider text-text-secondary dark:text-muted-foreground">
           {label}
         </p>
+
         <p className="break-words text-sm font-semibold text-text-primary dark:text-foreground">
           {value}
         </p>
@@ -144,70 +126,34 @@ function ProfileField({ icon: Icon, label, value }: ProfileFieldProps) {
   );
 }
 
-// --------------------------------------------------
-// Main Component
-// --------------------------------------------------
+// User Profile Details
 
 export function UserProfileDetails({ user }: { user: UserProfile }) {
   const router = useRouter();
 
-  // Dialog states
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
 
-  // Loading states
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
-  // Form error
-  const [formError, setFormError] = useState("");
-
-  // Image upload
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(
-    user.image ?? null,
-  );
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadError, setUploadError] = useState("");
-  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
-
-  // Profile form
+  // Form state
   const [form, setForm] = useState<ProfileForm>({
     name: user.name ?? "",
     phoneNumber: user.phoneNumber ?? "",
     image: user.image ?? "",
   });
 
+  const [formError, setFormError] = useState("");
+
   const initials = getInitials(user.name || "");
   const emailVerified = user.emailVerified ?? false;
 
-  // Cleanup blob URLs
-  useEffect(() => {
-    if (!previewUrl?.startsWith("blob:")) {
-      return;
-    }
-    return () => {
-      URL.revokeObjectURL(previewUrl);
-    };
-  }, [previewUrl]);
+  const isFormDisabled = isSaving || isUploading;
 
-  function openEditDialog() {
-    setForm({
-      name: user.name ?? "",
-      phoneNumber: user.phoneNumber ?? "",
-      image: user.image ?? "",
-    });
-
-    setSelectedImage(null);
-    setPreviewUrl(user.image ?? null);
-    setUploadProgress(0);
-    setUploadError("");
-    setFormError("");
-
-    setIsEditOpen(true);
-  }
+  // Form Helpers
 
   function updateField(field: keyof ProfileForm, value: string) {
     setForm((previous) => ({
@@ -216,76 +162,28 @@ export function UserProfileDetails({ user }: { user: UserProfile }) {
     }));
   }
 
-  async function handleImageSelect(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
+  function openEditDialog() {
+    setForm({
+      name: user.name ?? "",
+      phoneNumber: user.phoneNumber ?? "",
+      image: user.image ?? "",
+    });
 
-    if (!file) return;
-
-    setUploadError("");
     setFormError("");
+    setIsEditOpen(true);
+  }
 
-    if (!ALLOWED_IMAGE_TYPES.some((type) => type === file.type)) {
-      setUploadError("Only JPEG, PNG, WebP, and AVIF images are supported.");
-      return;
-    }
+  function closeEditDialog(open: boolean) {
+    if (isFormDisabled) return;
 
-    if (file.size > MAX_IMAGE_SIZE) {
-      setUploadError("Image size must not exceed 5 MB.");
-      return;
-    }
+    setIsEditOpen(open);
 
-    const localPreview = URL.createObjectURL(file);
-    setSelectedImage(file);
-    setPreviewUrl(localPreview);
-    setUploadProgress(0);
-    setIsUploading(true);
-
-    try {
-      const uploadedFile = await uploadFile({
-        file,
-        fileName: `profile-${Date.now()}-${file.name}`,
-        folder: "profiles",
-        tags: ["profile-image"],
-        onProgress: (progress) => {
-          setUploadProgress(progress);
-        },
-      });
-
-      if (!uploadedFile.url) {
-        throw new Error("Image upload completed without returning a URL.");
-      }
-
-      updateField("image", uploadedFile.url);
-      setPreviewUrl(uploadedFile.url);
-      setSelectedImage(null);
-      setUploadProgress(100);
-      toast.success("Profile image uploaded successfully.");
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Unable to upload profile image.";
-
-      setUploadError(message);
-      setPreviewUrl(form.image || null);
-      setSelectedImage(null);
-      toast.error(message);
-    } finally {
-      setIsUploading(false);
+    if (!open) {
+      setFormError("");
     }
   }
 
-  function handleRemoveImage() {
-    if (isUploading || isSaving) return;
-
-    setSelectedImage(null);
-    setPreviewUrl(null);
-    setUploadProgress(0);
-    setUploadError("");
-    updateField("image", "");
-    toast.success("Profile image removed from the form.");
-  }
+  // Update Profile
 
   async function handleUpdate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -318,6 +216,7 @@ export function UserProfileDetails({ user }: { user: UserProfile }) {
     if (image) {
       try {
         const parsedUrl = new URL(image);
+
         if (parsedUrl.protocol !== "https:" && parsedUrl.protocol !== "http:") {
           setFormError("Profile image must use HTTP or HTTPS.");
           return;
@@ -330,6 +229,7 @@ export function UserProfileDetails({ user }: { user: UserProfile }) {
 
     try {
       setIsSaving(true);
+
       const updateResult = await authClient.updateUser({
         name,
         image: image || null,
@@ -342,10 +242,14 @@ export function UserProfileDetails({ user }: { user: UserProfile }) {
         );
       }
 
-      setForm({ name, phoneNumber, image });
-      setPreviewUrl(image || null);
-      setSelectedImage(null);
+      setForm({
+        name,
+        phoneNumber,
+        image,
+      });
+
       toast.success("Profile updated successfully.");
+
       setIsEditOpen(false);
       router.refresh();
     } catch (error: unknown) {
@@ -361,9 +265,12 @@ export function UserProfileDetails({ user }: { user: UserProfile }) {
     }
   }
 
+  // Delete Account
+
   async function handleDelete() {
     try {
       setIsDeleting(true);
+
       const deleteResult = await authClient.deleteUser();
 
       if (deleteResult.error) {
@@ -373,7 +280,9 @@ export function UserProfileDetails({ user }: { user: UserProfile }) {
       }
 
       toast.success("Account deleted successfully.");
+
       setIsDeleteOpen(false);
+
       router.replace("/");
       router.refresh();
     } catch (error: unknown) {
@@ -388,15 +297,16 @@ export function UserProfileDetails({ user }: { user: UserProfile }) {
     }
   }
 
+  // Render
+
   return (
     <div className="space-y-6">
-      {/* --------------------------------------------- */}
       {/* Profile Overview */}
-      {/* --------------------------------------------- */}
       <Card className="rounded-[var(--radius-card)] border-border bg-surface shadow-xs transition-shadow hover:shadow-sm dark:bg-card">
         <CardContent className="flex flex-col gap-5 p-6 sm:flex-row sm:items-center">
           <Avatar className="size-20 shrink-0 border-2 border-border ring-2 ring-brand-primary/20">
             <AvatarImage src={user.image ?? undefined} alt={user.name} />
+
             <AvatarFallback className="bg-brand-dark font-heading text-xl font-bold text-white dark:bg-secondary dark:text-foreground">
               {initials}
             </AvatarFallback>
@@ -440,30 +350,23 @@ export function UserProfileDetails({ user }: { user: UserProfile }) {
           </div>
 
           <Button
+            type="button"
             onClick={openEditDialog}
             className="w-full shrink-0 rounded-[var(--radius-button)] bg-brand-primary font-medium text-black transition-all hover:bg-brand-primary-hover hover:text-white sm:w-auto"
           >
+            <Pencil className="mr-2 size-4" />
             Edit Profile
-          </Button>
-          <Button
-            onClick={() => setIsChangePasswordOpen(true)}
-            variant="outline"
-            className="w-full shrink-0 rounded-[var(--radius-button)] font-medium sm:w-auto"
-          >
-            <Shield className="mr-2 size-4" />
-            Change Password
           </Button>
         </CardContent>
       </Card>
 
-      {/* --------------------------------------------- */}
       {/* Personal Information */}
-      {/* --------------------------------------------- */}
       <Card className="rounded-[var(--radius-card)] border-border bg-surface shadow-xs dark:bg-card">
         <CardHeader>
           <CardTitle className="text-lg font-bold tracking-tight text-text-primary dark:text-foreground">
             Personal Information
           </CardTitle>
+
           <CardDescription className="text-text-secondary dark:text-muted-foreground">
             Your basic account and contact information.
           </CardDescription>
@@ -492,14 +395,13 @@ export function UserProfileDetails({ user }: { user: UserProfile }) {
         </CardContent>
       </Card>
 
-      {/* --------------------------------------------- */}
       {/* Account Information */}
-      {/* --------------------------------------------- */}
       <Card className="rounded-[var(--radius-card)] border-border bg-surface shadow-xs dark:bg-card">
         <CardHeader>
           <CardTitle className="text-lg font-bold tracking-tight text-text-primary dark:text-foreground">
             Account Information
           </CardTitle>
+
           <CardDescription className="text-text-secondary dark:text-muted-foreground">
             Your account role and registration details.
           </CardDescription>
@@ -525,18 +427,101 @@ export function UserProfileDetails({ user }: { user: UserProfile }) {
               value={formatDate(user.createdAt)}
             />
           </div>
+
+          <Separator className="bg-border" />
+
+          <div className="rounded-[var(--radius-button)] border border-border/80 bg-muted/40 p-4">
+            <div className="flex items-start gap-3">
+              <Shield className="mt-0.5 size-5 shrink-0 text-brand-dark dark:text-muted-foreground" />
+
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-text-primary dark:text-foreground">
+                  Account Permissions
+                </p>
+
+                <p className="text-sm text-text-secondary dark:text-muted-foreground">
+                  Your account has the{" "}
+                  <span className="font-semibold capitalize text-text-primary dark:text-foreground">
+                    {user.role}
+                  </span>{" "}
+                  role. Available features depend on your assigned permissions.
+                </p>
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
-      {/* --------------------------------------------- */}
+      {/* Security Settings */}
+      <Card className="rounded-[var(--radius-card)] border-border bg-surface shadow-xs dark:bg-card">
+        <CardHeader>
+          <CardTitle className="text-lg font-bold tracking-tight text-text-primary dark:text-foreground">
+            Security Settings
+          </CardTitle>
+
+          <CardDescription className="text-text-secondary dark:text-muted-foreground">
+            Manage your password and account security.
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent>
+          <div className="flex flex-col gap-4 rounded-[var(--radius-button)] border border-border/80 bg-muted/40 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="rounded-[var(--radius-button)] border border-border bg-muted p-2.5">
+                <LockKeyhole className="size-4 text-brand-dark dark:text-muted-foreground" />
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-text-primary dark:text-foreground">
+                  Change Password
+                </p>
+
+                <p className="text-xs text-text-secondary dark:text-muted-foreground">
+                  Update your password to keep your account secure.
+                </p>
+              </div>
+            </div>
+
+            <Button
+              type="button"
+              onClick={() => setIsPasswordDialogOpen(true)}
+              className="w-full shrink-0 rounded-[var(--radius-button)] bg-brand-primary font-medium text-black transition-all hover:bg-brand-primary-hover hover:text-white sm:w-auto"
+            >
+              <LockKeyhole className="mr-2 size-4" />
+              Change Password
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Change Password Dialog */}
+      <Dialog
+        open={isPasswordDialogOpen}
+        onOpenChange={setIsPasswordDialogOpen}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto rounded-[var(--radius-section)] border-border bg-surface sm:max-w-lg dark:bg-card">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold tracking-tight text-text-primary dark:text-foreground">
+              Change Password
+            </DialogTitle>
+
+            <DialogDescription className="text-text-secondary dark:text-muted-foreground">
+              Enter your current password and choose a new secure password.
+            </DialogDescription>
+          </DialogHeader>
+
+          <ChangePasswordForm />
+        </DialogContent>
+      </Dialog>
+
       {/* Danger Zone */}
-      {/* --------------------------------------------- */}
       {user.role === "student" && (
         <Card className="rounded-[var(--radius-card)] border-destructive/30 bg-surface shadow-xs dark:bg-card">
           <CardHeader>
             <CardTitle className="text-lg font-bold text-destructive">
               Danger Zone
             </CardTitle>
+
             <CardDescription className="text-text-secondary dark:text-muted-foreground">
               Permanently delete your account and associated data. This action
               may not be reversible.
@@ -549,12 +534,14 @@ export function UserProfileDetails({ user }: { user: UserProfile }) {
                 <p className="text-sm font-semibold text-text-primary dark:text-foreground">
                   Delete Account
                 </p>
+
                 <p className="text-xs text-text-secondary dark:text-muted-foreground">
                   Make sure you have saved any information you need.
                 </p>
               </div>
 
               <Button
+                type="button"
                 variant="destructive"
                 className="w-full shrink-0 rounded-[var(--radius-button)] font-medium sm:w-auto"
                 onClick={() => setIsDeleteOpen(true)}
@@ -567,149 +554,27 @@ export function UserProfileDetails({ user }: { user: UserProfile }) {
         </Card>
       )}
 
-      {/* --------------------------------------------- */}
       {/* Edit Profile Dialog */}
-      {/* --------------------------------------------- */}
-      <Dialog
-        open={isEditOpen}
-        onOpenChange={(open) => {
-          if (isSaving || isUploading) return;
-          setIsEditOpen(open);
-          if (!open) {
-            setFormError("");
-            setUploadError("");
-            setSelectedImage(null);
-            setPreviewUrl(user.image ?? null);
-          }
-        }}
-      >
+      <Dialog open={isEditOpen} onOpenChange={closeEditDialog}>
         <DialogContent className="max-h-[90vh] overflow-y-auto rounded-[var(--radius-section)] border-border bg-surface sm:max-w-lg dark:bg-card">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold tracking-tight text-text-primary dark:text-foreground">
               Edit Profile
             </DialogTitle>
+
             <DialogDescription className="text-text-secondary dark:text-muted-foreground">
               Update your personal information and profile picture.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleUpdate} className="space-y-5">
-            {/* Profile Image Upload */}
-            <div className="space-y-3">
-              <Label
-                htmlFor="profile-image-upload"
-                className="text-sm font-semibold text-text-primary dark:text-foreground"
-              >
-                Profile Picture
-              </Label>
-
-              <div className="flex flex-col gap-4 rounded-[var(--radius-card)] border border-dashed border-border bg-muted/20 p-4 sm:flex-row sm:items-center">
-                <Avatar className="size-20 shrink-0 border-2 border-border ring-1 ring-border">
-                  <AvatarImage
-                    src={previewUrl ?? undefined}
-                    alt={form.name || "Profile preview"}
-                  />
-                  <AvatarFallback className="bg-brand-dark text-lg font-bold text-white dark:bg-secondary dark:text-foreground">
-                    {getInitials(form.name)}
-                  </AvatarFallback>
-                </Avatar>
-
-                <div className="min-w-0 flex-1 space-y-3">
-                  <div className="space-y-0.5">
-                    <p className="text-sm font-medium text-text-primary dark:text-foreground">
-                      Upload your profile picture
-                    </p>
-                    <p className="text-xs text-text-secondary dark:text-muted-foreground">
-                      JPEG, PNG, WebP or AVIF. Maximum size: 5 MB.
-                    </p>
-                  </div>
-
-                  <input
-                    ref={fileInputRef}
-                    id="profile-image-upload"
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/avif"
-                    onChange={handleImageSelect}
-                    disabled={isSaving || isUploading}
-                    className="sr-only"
-                  />
-
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={isSaving || isUploading}
-                      onClick={() => fileInputRef.current?.click()}
-                      className="rounded-[var(--radius-button)] border-border font-medium hover:bg-muted"
-                    >
-                      {isUploading ? (
-                        <Loader2 className="mr-2 size-4 animate-spin text-brand-primary" />
-                      ) : (
-                        <ImagePlus className="mr-2 size-4 text-brand-dark dark:text-foreground" />
-                      )}
-                      {isUploading ? "Uploading..." : "Choose Image"}
-                    </Button>
-
-                    {previewUrl && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        disabled={isSaving || isUploading}
-                        onClick={handleRemoveImage}
-                        className="rounded-[var(--radius-button)] text-destructive hover:bg-destructive/10 hover:text-destructive"
-                      >
-                        <X className="mr-2 size-4" />
-                        Remove
-                      </Button>
-                    )}
-                  </div>
-
-                  {/* Upload Progress */}
-                  {isUploading && (
-                    <div
-                      className="space-y-1.5"
-                      role="status"
-                      aria-live="polite"
-                    >
-                      <div className="flex justify-between text-xs font-medium text-text-secondary dark:text-muted-foreground">
-                        <span>Uploading image...</span>
-                        <span>{uploadProgress}%</span>
-                      </div>
-                      <div
-                        className="h-2 overflow-hidden rounded-[var(--radius-pill)] bg-muted"
-                        role="progressbar"
-                        aria-label="Image upload progress"
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-valuenow={uploadProgress}
-                      >
-                        <div
-                          className="h-full rounded-[var(--radius-pill)] bg-brand-primary transition-all duration-200"
-                          style={{ width: `${uploadProgress}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {previewUrl && !isUploading && !uploadError && (
-                    <p className="text-xs font-medium text-text-secondary dark:text-muted-foreground">
-                      Profile image ready.
-                    </p>
-                  )}
-
-                  {uploadError && (
-                    <p
-                      role="alert"
-                      className="text-xs font-medium text-destructive"
-                    >
-                      {uploadError}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
+            <ProfileImageUpload
+              name={form.name}
+              value={form.image}
+              onChange={(value: string) => updateField("image", value)}
+              onUploadingChange={setIsUploading}
+              disabled={isSaving}
+            />
 
             {/* Full Name */}
             <div className="space-y-1.5">
@@ -719,6 +584,7 @@ export function UserProfileDetails({ user }: { user: UserProfile }) {
               >
                 Full Name <span className="text-destructive">*</span>
               </Label>
+
               <Input
                 id="profile-name"
                 value={form.name}
@@ -727,7 +593,7 @@ export function UserProfileDetails({ user }: { user: UserProfile }) {
                 maxLength={100}
                 autoComplete="name"
                 required
-                disabled={isSaving || isUploading}
+                disabled={isFormDisabled}
                 className="rounded-[var(--radius-input)] border-input focus-visible:ring-brand-primary"
               />
             </div>
@@ -740,6 +606,7 @@ export function UserProfileDetails({ user }: { user: UserProfile }) {
               >
                 Email Address
               </Label>
+
               <Input
                 id="profile-email"
                 type="email"
@@ -748,6 +615,7 @@ export function UserProfileDetails({ user }: { user: UserProfile }) {
                 readOnly
                 className="cursor-not-allowed rounded-[var(--radius-input)] border-input bg-muted/50 text-muted-foreground"
               />
+
               <p className="text-xs text-text-secondary dark:text-muted-foreground">
                 Email changes require a separate verified email-update flow.
               </p>
@@ -761,6 +629,7 @@ export function UserProfileDetails({ user }: { user: UserProfile }) {
               >
                 Phone Number
               </Label>
+
               <Input
                 id="profile-phone"
                 type="tel"
@@ -771,25 +640,23 @@ export function UserProfileDetails({ user }: { user: UserProfile }) {
                 placeholder="Enter your phone number"
                 autoComplete="tel"
                 maxLength={20}
-                disabled={isSaving || isUploading}
+                disabled={isFormDisabled}
                 className="rounded-[var(--radius-input)] border-input focus-visible:ring-brand-primary"
               />
             </div>
 
-            {/* Form Error */}
             {formError && (
               <p role="alert" className="text-sm font-medium text-destructive">
                 {formError}
               </p>
             )}
 
-            {/* Form Actions */}
             <DialogFooter className="gap-2 sm:gap-0">
               <Button
                 type="button"
                 variant="outline"
-                disabled={isSaving || isUploading}
-                onClick={() => setIsEditOpen(false)}
+                disabled={isFormDisabled}
+                onClick={() => closeEditDialog(false)}
                 className="rounded-[var(--radius-button)] border-border hover:bg-muted"
               >
                 Cancel
@@ -797,13 +664,13 @@ export function UserProfileDetails({ user }: { user: UserProfile }) {
 
               <Button
                 type="submit"
-                disabled={isSaving || isUploading}
+                disabled={isFormDisabled}
                 className="rounded-[var(--radius-button)] bg-brand-primary font-medium text-black transition-all hover:bg-brand-primary-hover hover:text-white"
               >
-                {isSaving || isUploading ? (
+                {isSaving ? (
                   <>
                     <Loader2 className="mr-2 size-4 animate-spin" />
-                    {isUploading ? "Uploading Image..." : "Saving..."}
+                    Saving...
                   </>
                 ) : (
                   "Save Changes"
@@ -814,26 +681,7 @@ export function UserProfileDetails({ user }: { user: UserProfile }) {
         </DialogContent>
       </Dialog>
 
-      <Dialog
-        open={isChangePasswordOpen}
-        onOpenChange={setIsChangePasswordOpen}
-      >
-        <DialogContent className="max-h-[90vh] overflow-y-auto rounded-2xl border-border bg-card p-5 sm:max-w-md sm:p-6">
-          <DialogHeader className="space-y-1.5">
-            <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-              Change Password
-            </DialogTitle>
-          </DialogHeader>
-
-          <ChangePasswordForm
-            onSuccess={() => setIsChangePasswordOpen(false)}
-          />
-        </DialogContent>
-      </Dialog>
-
-      {/* --------------------------------------------- */}
       {/* Delete Confirmation Dialog */}
-      {/* --------------------------------------------- */}
       <AlertDialog
         open={isDeleteOpen}
         onOpenChange={(open) => {
@@ -846,6 +694,7 @@ export function UserProfileDetails({ user }: { user: UserProfile }) {
             <AlertDialogTitle className="text-lg font-bold text-text-primary dark:text-foreground">
               Are you absolutely sure?
             </AlertDialogTitle>
+
             <AlertDialogDescription className="text-text-secondary dark:text-muted-foreground">
               This action permanently deletes your account and cannot be undone.
               Your Better Auth configuration and database relations determine
@@ -870,6 +719,7 @@ export function UserProfileDetails({ user }: { user: UserProfile }) {
               className="rounded-[var(--radius-button)] bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {isDeleting && <Loader2 className="mr-2 size-4 animate-spin" />}
+
               {isDeleting ? "Deleting..." : "Delete Account"}
             </AlertDialogAction>
           </AlertDialogFooter>

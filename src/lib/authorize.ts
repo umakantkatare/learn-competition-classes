@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import { unauthorized, forbidden } from "next/navigation";
 
 import { auth } from "@/lib/auth";
 import { ROLES, USER_ROLES, type UserRole } from "@/lib/permissions";
@@ -47,11 +48,15 @@ export class AuthorizationError extends Error {
   }
 }
 
+// Session
+
 export async function getSession() {
   return auth.api.getSession({
     headers: await headers(),
   });
 }
+
+// Role Validation
 
 function isValidRole(role: unknown): role is UserRole {
   return (
@@ -59,6 +64,8 @@ function isValidRole(role: unknown): role is UserRole {
     USER_ROLES.some((validRole) => validRole === role)
   );
 }
+
+// Current User
 
 export async function getCurrentUser(): Promise<AuthorizedUser | null> {
   const session = await getSession();
@@ -73,51 +80,41 @@ export async function getCurrentUser(): Promise<AuthorizedUser | null> {
   };
 }
 
-export async function requireRole({
-  roles,
-}: RequireRoleOptions): Promise<AuthorizedUser> {
+// Require Authentication
+
+export async function requireAuth(): Promise<AuthorizedUser> {
   const user = await getCurrentUser();
 
   if (!user) {
-    throw new AuthorizationError(
-      401,
-      "UNAUTHORIZED",
-      "Authentication is required. Please log in.",
-    );
-  }
-
-  if (!roles.includes(user.role)) {
-    throw new AuthorizationError(
-      403,
-      "FORBIDDEN",
-      "You do not have permission to access this resource.",
-    );
+    unauthorized();
   }
 
   return user;
 }
 
-export async function requireAdmin(): Promise<boolean> {
-  const user = await getCurrentUser();
+// Require Role
 
-  if (!user) {
-    throw new AuthorizationError(
-      401,
-      "UNAUTHORIZED",
-      "Authentication is required. Please log in.",
-    );
+export async function requireRole({
+  roles,
+}: RequireRoleOptions): Promise<AuthorizedUser> {
+  const user = await requireAuth();
+
+  if (!roles.includes(user.role)) {
+    forbidden();
   }
 
-  if (user.role !== ROLES.ADMIN) {
-    throw new AuthorizationError(
-      403,
-      "FORBIDDEN",
-      "Admin access is required to perform this action.",
-    );
-  }
-
-  return true;
+  return user;
 }
+
+// Require Admin
+
+export async function requireAdmin(): Promise<AuthorizedUser> {
+  return requireRole({
+    roles: [ROLES.ADMIN],
+  });
+}
+
+// Require Admin or Manager
 
 export async function requireAdminOrManager(): Promise<AuthorizationResult> {
   const user = await getCurrentUser();
@@ -131,7 +128,10 @@ export async function requireAdminOrManager(): Promise<AuthorizationResult> {
     };
   }
 
-  if (user.role !== ROLES.ADMIN && user.role !== ROLES.MANAGER) {
+  if (
+    user.role !== ROLES.ADMIN &&
+    user.role !== ROLES.MANAGER
+  ) {
     return {
       authorized: false,
       status: 403,

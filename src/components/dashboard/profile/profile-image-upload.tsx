@@ -1,223 +1,294 @@
+
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ChangeEvent,
+} from "react";
+import { ImagePlus, Loader2, X } from "lucide-react";
+import { toast } from "sonner";
 
-import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE } from "@/constants/image-size";
-
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Label } from "@/components/ui/label";
 
-import { ImagePlus, X, UserRound } from "lucide-react";
-import { Image } from "@imagekit/next";
-
+import { uploadFile } from "@/helper/imagekit/upload";
+import {
+  ALLOWED_IMAGE_TYPES,
+  MAX_IMAGE_SIZE,
+} from "@/constants/image-size";
 
 interface ProfileImageUploadProps {
-  profileImageFile: File | null;
-  profileImageUrl?: string | null;
-
-  profileImageRemoved: boolean;
-
-  onProfileImageChange: (file: File | null) => void;
-  onProfileImageRemove: (removed: boolean) => void;
-
+  name: string;
+  value: string;
+  onChange: (value: string) => void;
+  onUploadingChange?: (uploading: boolean) => void;
   disabled?: boolean;
 }
 
+const ACCEPTED_IMAGE_TYPES = ALLOWED_IMAGE_TYPES.join(",");
 
-function formatFileSize(size: number): string {
-  return `${(size / (1024 * 1024)).toFixed(2)} MB`;
+function getInitials(name: string): string {
+  return (
+    name
+      .trim()
+      .split(/\s+/)
+      .map((part) => part.charAt(0))
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "U"
+  );
 }
 
-// Component
-
-export default function ProfileImageUpload({
-  profileImageFile,
-  profileImageUrl,
-  profileImageRemoved,
-  onProfileImageChange,
-  onProfileImageRemove,
+export function ProfileImageUpload({
+  name,
+  value,
+  onChange,
+  onUploadingChange,
   disabled = false,
 }: ProfileImageUploadProps) {
-  const [imageError, setImageError] = useState<string | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const inputId = useId();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Generate local image preview
+  const [previewUrl, setPreviewUrl] = useState<string | null>(
+    value || null
+  );
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadError, setUploadError] = useState("");
 
+  // Keep preview synchronized with the parent form value.
   useEffect(() => {
-    if (!profileImageFile) {
-      setImagePreview(null);
-      return;
-    }
+    setPreviewUrl(value || null);
+  }, [value]);
 
-    const objectUrl = URL.createObjectURL(profileImageFile);
+  // Release temporary object URLs to prevent memory leaks.
+  useEffect(() => {
+    if (!previewUrl?.startsWith("blob:")) return;
 
-    setImagePreview(objectUrl);
+    return () => {
+      URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
 
-    return () => URL.revokeObjectURL(objectUrl);
-  }, [profileImageFile]);
+  async function handleImageSelect(
+    event: ChangeEvent<HTMLInputElement>
+  ) {
+    const file = event.target.files?.[0];
 
-  // Image Handler
-
-  function handleImageChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0] ?? null;
-
-    setImageError(null);
+    // Allow selecting the same file again.
+    event.target.value = "";
 
     if (!file) return;
 
-    if (
-      !ALLOWED_IMAGE_TYPES.includes(
-        file.type as (typeof ALLOWED_IMAGE_TYPES)[number],
-      )
-    ) {
-      setImageError("Please select a JPG, PNG, or WebP image.");
-      event.target.value = "";
+    setUploadError("");
+
+    // Validate MIME type.
+    if (!(ALLOWED_IMAGE_TYPES as readonly string[]).includes(file.type)) {
+      const message =
+        "Only JPEG, PNG, WebP images are supported.";
+
+      setUploadError(message);
+      toast.error(message);
       return;
     }
 
+    // Validate file size.
     if (file.size > MAX_IMAGE_SIZE) {
-      setImageError("Profile image size must not exceed 5 MB.");
-      event.target.value = "";
+      const message = "Image size must not exceed 5 MB.";
+
+      setUploadError(message);
+      toast.error(message);
       return;
     }
 
-    onProfileImageChange(file);
-    onProfileImageRemove(false);
+    const localPreview = URL.createObjectURL(file);
 
-    event.target.value = "";
+    setPreviewUrl(localPreview);
+    setUploadProgress(0);
+    setIsUploading(true);
+    onUploadingChange?.(true);
+
+    try {
+      const uploadedFile = await uploadFile({
+        file,
+        fileName: `profile-${Date.now()}-${file.name}`,
+        folder: "profiles",
+        tags: ["profile-image"],
+        onProgress: (progress) => {
+          setUploadProgress(
+            Math.min(100, Math.max(0, progress))
+          );
+        },
+      });
+
+      if (!uploadedFile.url) {
+        throw new Error(
+          "Image upload completed without returning a URL."
+        );
+      }
+
+      // Update the parent form only after successful upload.
+      onChange(uploadedFile.url);
+      setPreviewUrl(uploadedFile.url);
+      setUploadProgress(100);
+
+      toast.success("Profile image uploaded successfully.");
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to upload profile image.";
+
+      setUploadError(message);
+      setPreviewUrl(value || null);
+
+      toast.error(message);
+    } finally {
+      setIsUploading(false);
+      onUploadingChange?.(false);
+    }
   }
-
-  // Remove Handler
 
   function handleRemoveImage() {
-    setImageError(null);
+    if (disabled || isUploading) return;
 
-    if (profileImageFile) {
-      onProfileImageChange(null);
-      return;
-    }
+    setPreviewUrl(null);
+    setUploadProgress(0);
+    setUploadError("");
 
-    onProfileImageRemove(true);
+    onChange("");
+
+    toast.success("Profile image removed from the form.");
   }
 
-  // Render
+  const isDisabled = disabled || isUploading;
 
   return (
-    <section className="space-y-4">
-      <Field>
-        <FieldLabel>Profile Image</FieldLabel>
+    <div className="space-y-3">
+      <Label
+        htmlFor={inputId}
+        className="text-sm font-semibold text-text-primary dark:text-foreground"
+      >
+        Profile Picture
+      </Label>
 
-        <FieldDescription>JPG, PNG, WebP · Maximum 5 MB</FieldDescription>
+      <div className="flex flex-col gap-4 rounded-[var(--radius-card)] border border-dashed border-border bg-muted/20 p-4 sm:flex-row sm:items-center">
+        <Avatar className="size-20 shrink-0 border-2 border-border ring-1 ring-border">
+          <AvatarImage
+            src={previewUrl ?? undefined}
+            alt={name || "Profile preview"}
+          />
 
-        {!profileImageRemoved && (
-          <>
-            {imagePreview || profileImageUrl ? (
-              <div className="relative flex w-fit items-center justify-center">
-                <div className="relative size-32 overflow-hidden rounded-full border bg-muted">
-                  {imagePreview ? (
-                    <img
-                      src={imagePreview}
-                      alt="Profile image preview"
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <Image
-                      urlEndpoint={
-                        process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT!
-                      }
-                      src={profileImageUrl!}
-                      alt="Profile image"
-                      width={300}
-                      height={300}
-                      className="h-full w-full object-cover"
-                      transformation={[
-                        {
-                          width: 300,
-                          height: 300,
-                          quality: 80,
-                          format: "webp",
-                        },
-                      ]}
-                    />
-                  )}
-                </div>
+          <AvatarFallback className="bg-brand-dark text-lg font-bold text-white dark:bg-secondary dark:text-foreground">
+            {getInitials(name)}
+          </AvatarFallback>
+        </Avatar>
 
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="destructive"
-                  disabled={disabled}
-                  onClick={handleRemoveImage}
-                  className="absolute -right-2 -top-2 rounded-full"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            ) : (
-              <label
-                htmlFor="profile-image"
-                className="flex size-32 cursor-pointer flex-col items-center justify-center gap-2 rounded-full border-2 border-dashed bg-muted/30 transition hover:bg-muted/60"
-              >
-                <ImagePlus className="h-8 w-8 text-muted-foreground" />
+        <div className="min-w-0 flex-1 space-y-3">
+          <div className="space-y-0.5">
+            <p className="text-sm font-medium text-text-primary dark:text-foreground">
+              Upload your profile picture
+            </p>
 
-                <span className="text-xs font-medium">Upload Image</span>
-              </label>
-            )}
-          </>
-        )}
+            <p className="text-xs text-text-secondary dark:text-muted-foreground">
+              JPEG, PNG, WebP or AVIF. Maximum size: 5 MB.
+            </p>
+          </div>
 
-        {profileImageRemoved && (
-          <div className="flex size-32 flex-col items-center justify-center gap-2 rounded-full border border-dashed">
-            <UserRound className="h-8 w-8 text-muted-foreground" />
+          <input
+            id={inputId}
+            ref={fileInputRef}
+            type="file"
+            accept={ACCEPTED_IMAGE_TYPES}
+            onChange={handleImageSelect}
+            disabled={isDisabled}
+            className="sr-only"
+          />
 
-            <p className="text-xs text-muted-foreground">Image removed</p>
-
+          <div className="flex flex-wrap gap-2">
             <Button
               type="button"
-              size="sm"
               variant="outline"
-              disabled={disabled}
-              onClick={() => onProfileImageRemove(false)}
+              size="sm"
+              disabled={isDisabled}
+              onClick={() => fileInputRef.current?.click()}
+              className="rounded-[var(--radius-button)] border-border font-medium hover:bg-muted"
             >
-              Undo
+              {isUploading ? (
+                <Loader2 className="mr-2 size-4 animate-spin" />
+              ) : (
+                <ImagePlus className="mr-2 size-4" />
+              )}
+
+              {isUploading ? "Uploading..." : "Choose Image"}
             </Button>
+
+            {previewUrl && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={isDisabled}
+                onClick={handleRemoveImage}
+                className="rounded-[var(--radius-button)] text-destructive hover:bg-destructive/10 hover:text-destructive"
+              >
+                <X className="mr-2 size-4" />
+                Remove
+              </Button>
+            )}
           </div>
-        )}
 
-        <Input
-          id="profile-image"
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          className="hidden"
-          disabled={disabled}
-          onChange={handleImageChange}
-        />
+          {isUploading && (
+            <div
+              className="space-y-1.5"
+              role="status"
+              aria-live="polite"
+            >
+              <div className="flex justify-between text-xs font-medium text-text-secondary dark:text-muted-foreground">
+                <span>Uploading image...</span>
+                <span>{uploadProgress}%</span>
+              </div>
 
-        {profileImageFile && (
-          <p className="break-all text-xs text-muted-foreground">
-            {profileImageFile.name} · {formatFileSize(profileImageFile.size)}
-          </p>
-        )}
+              <div
+                className="h-2 overflow-hidden rounded-full bg-muted"
+                role="progressbar"
+                aria-label="Image upload progress"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={uploadProgress}
+              >
+                <div
+                  className="h-full rounded-full bg-brand-primary transition-all duration-200"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+            </div>
+          )}
 
-        {imageError && <p className="text-sm text-destructive">{imageError}</p>}
+          {previewUrl && !isUploading && !uploadError && (
+            <p className="text-xs font-medium text-text-secondary dark:text-muted-foreground">
+              Profile image ready.
+            </p>
+          )}
 
-        {profileImageFile && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={disabled}
-            onClick={() => onProfileImageChange(null)}
-          >
-            Remove selected file
-          </Button>
-        )}
-      </Field>
-
-      <p className="text-xs text-muted-foreground">
-        Profile image will be uploaded when you submit the profile form.
-      </p>
-    </section>
+          {uploadError && (
+            <p
+              role="alert"
+              className="text-xs font-medium text-destructive"
+            >
+              {uploadError}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

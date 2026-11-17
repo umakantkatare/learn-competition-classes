@@ -1,3 +1,4 @@
+
 import Image from "next/image";
 import Link from "next/link";
 
@@ -80,8 +81,10 @@ export function HeroSection() {
             "
           >
             Your Success in{" "}
-            <span className="text-brand-primary">Competitive Exams</span> Starts
-            Here
+            <span className="text-brand-primary">
+              Competitive Exams
+            </span>{" "}
+            Starts Here
           </h1>
 
           <p
@@ -90,8 +93,8 @@ export function HeroSection() {
               text-muted-foreground sm:text-base md:text-lg
             "
           >
-            Bilingual Classes (Hindi + English) | Expert Faculty | Structured
-            Study Plan | Regular Tests | Personal Guidance
+            Bilingual Classes (Hindi + English) | Expert Faculty |
+            Structured Study Plan | Regular Tests | Personal Guidance
           </p>
 
           {/* Benefits */}
@@ -131,21 +134,12 @@ export function HeroSection() {
           </div>
 
           {/* CTA Buttons */}
-          <div
-            className="
-              mt-8 flex flex-col gap-3
-              sm:flex-row sm:items-center
-            "
-          >
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
             <Link
               href="/batches"
               className={cn(
                 buttonVariants({ variant: "default", size: "lg" }),
-                `
-                  h-12 w-full gap-2 rounded-button px-6
-                  font-semibold shadow-sm transition-all duration-200
-                  hover:shadow-md sm:w-auto
-                `,
+                "h-12 w-full gap-2 rounded-button px-6 font-semibold shadow-sm transition-all duration-200 hover:shadow-md sm:w-auto",
               )}
             >
               Explore Courses
@@ -156,12 +150,7 @@ export function HeroSection() {
               href="/demo"
               className={cn(
                 buttonVariants({ variant: "outline", size: "lg" }),
-                `
-                  h-12 w-full gap-2 rounded-button border-border
-                  bg-card px-6 font-semibold transition-all duration-200
-                  hover:border-brand-primary hover:text-brand-primary
-                  sm:w-auto
-                `,
+                "h-12 w-full gap-2 rounded-button border-border bg-card px-6 font-semibold transition-all duration-200 hover:border-brand-primary hover:text-brand-primary sm:w-auto",
               )}
             >
               <CirclePlay className="size-5 text-brand-primary" />
@@ -202,11 +191,7 @@ export function HeroSection() {
               fill
               priority
               fetchPriority="high"
-              sizes="
-                (max-width: 640px) 100vw,
-                (max-width: 1024px) 80vw,
-                50vw
-              "
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 80vw, 50vw"
               className="object-contain"
             />
           </div>
