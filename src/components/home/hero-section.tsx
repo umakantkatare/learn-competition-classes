@@ -186,7 +186,8 @@ export function HeroSection() {
             "
           >
             <Image
-              src="/images/home/doctor.webp"
+              // src="/images/home/doctor.webp"
+              src="/images/home/pawan-sirr.avif"
               alt="Director of the institute"
               fill
               priority
