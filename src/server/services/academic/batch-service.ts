@@ -15,9 +15,16 @@ import type {
   UpdateBatchInput,
 } from "@/validations/academic/batch-validation";
 
-/* -------------------------------------------------------------------------- */
-/* Batch Service                                                              */
-/* -------------------------------------------------------------------------- */
+type BatchStatus = "UPCOMING" | "ONGOING" | "COMPLETED";
+
+interface BatchStatusUpdateStats {
+  date: string;
+  totalProcessed: number;
+  upcomingToOngoing: number;
+  ongoingToCompleted: number;
+  upcomingToCompleted: number;
+  unchanged: number;
+}
 
 export class BatchService {
   private readonly batchRepo: BatchRepository;
@@ -32,11 +39,6 @@ export class BatchService {
     this.teacherRepo = new TeacherRepository();
   }
 
-  /* ------------------------------------------------------------------------ */
-  /* Private Helpers                                                          */
-  /* ------------------------------------------------------------------------ */
-
-  // Validate teacher profiles
   private async validateTeachers(teacherIds: string[]): Promise<void> {
     if (teacherIds.length === 0) return;
 
@@ -49,31 +51,34 @@ export class BatchService {
     }
   }
 
-  // Validate start date using Indian timezone
-  private validateStartDate(startDate: Date | string): void {
-    const today = new Intl.DateTimeFormat("en-CA", {
+  private getIndiaDateKey(value: Date | string): string {
+    if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return value;
+    }
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+      throw new Error("Invalid batch date.");
+    }
+
+    return new Intl.DateTimeFormat("en-CA", {
       timeZone: "Asia/Kolkata",
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
-    }).format(new Date());
+    }).format(date);
+  }
 
-    const selectedDate =
-      typeof startDate === "string"
-        ? startDate.slice(0, 10)
-        : new Intl.DateTimeFormat("en-CA", {
-            timeZone: "Asia/Kolkata",
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit",
-          }).format(startDate);
+  private validateStartDate(startDate: Date | string): void {
+    const today = this.getIndiaDateKey(new Date());
+    const selectedDate = this.getIndiaDateKey(startDate);
 
     if (selectedDate < today) {
       throw new Error("Batch start date cannot be earlier than today's date.");
     }
   }
 
-  // Validate pricing
   private validatePricing(
     isFree: boolean,
     originalPrice: number,
@@ -101,7 +106,6 @@ export class BatchService {
     }
   }
 
-  // Validate mutually exclusive schedule fields
   private validateSchedule(
     expiryDate: Date | null,
     validityMonths: number | null,
@@ -123,16 +127,65 @@ export class BatchService {
     }
   }
 
-  // Validate expiry date against start date
   private validateExpiryDate(startDate: Date, expiryDate: Date | null): void {
     if (expiryDate && expiryDate <= startDate) {
       throw new Error("Expiry date must be after the start date.");
     }
   }
 
-  /* ------------------------------------------------------------------------ */
-  /* Enrich Batch With Teacher Details                                        */
-  /* ------------------------------------------------------------------------ */
+  private calculateExpiryDate(
+    startDate: Date | string,
+    validityMonths: number,
+  ): string {
+    const dateKey = this.getIndiaDateKey(startDate);
+
+    const [year, month, day] = dateKey.split("-").map(Number);
+
+    const targetMonth = month - 1 + validityMonths;
+    const targetYear = year + Math.floor(targetMonth / 12);
+    const normalizedMonth = targetMonth % 12;
+
+    const lastDay = new Date(
+      Date.UTC(targetYear, normalizedMonth + 1, 0),
+    ).getUTCDate();
+
+    const expiryDay = Math.min(day, lastDay);
+
+    return [
+      targetYear,
+      String(normalizedMonth + 1).padStart(2, "0"),
+      String(expiryDay).padStart(2, "0"),
+    ].join("-");
+  }
+
+  private calculateBatchStatus(
+    startDate: Date | string,
+    expiryDate: Date | string | null,
+    validityMonths: number | null,
+    today: string,
+  ): BatchStatus {
+    const startDateKey = this.getIndiaDateKey(startDate);
+
+    const expiryDateKey = expiryDate
+      ? this.getIndiaDateKey(expiryDate)
+      : validityMonths !== null
+        ? this.calculateExpiryDate(startDate, validityMonths)
+        : null;
+
+    if (!expiryDateKey) {
+      throw new Error("Batch expiry date or validity months are required.");
+    }
+
+    if (today >= expiryDateKey) {
+      return "COMPLETED";
+    }
+
+    if (today < startDateKey) {
+      return "UPCOMING";
+    }
+
+    return "ONGOING";
+  }
 
   private async enrichBatch(batch: Batch) {
     const assignments = await this.batchTeacherRepo.findByBatchId(batch.id);
@@ -157,17 +210,9 @@ export class BatchService {
     };
   }
 
-  /* ------------------------------------------------------------------------ */
-  /* Enrich Multiple Batches                                                  */
-  /* ------------------------------------------------------------------------ */
-
   private async enrichBatches(batches: Batch[]) {
     return Promise.all(batches.map((batch) => this.enrichBatch(batch)));
   }
-
-  /* ------------------------------------------------------------------------ */
-  /* Create Batch + Assign Teachers                                           */
-  /* ------------------------------------------------------------------------ */
 
   async createBatch(data: CreateBatchInput, userId: string) {
     const { teacherIds = [], ...batchData } = data;
@@ -247,27 +292,15 @@ export class BatchService {
     return this.getBatchById(newBatch.id);
   }
 
-  /* ------------------------------------------------------------------------ */
-  /* Get All Batches (Admin)                                                  */
-  /* ------------------------------------------------------------------------ */
-
   async getAllBatches() {
     const batches = await this.batchRepo.findAll();
     return this.enrichBatches(batches);
   }
 
-  /* ------------------------------------------------------------------------ */
-  /* Get All Published Batches (Public/Student)                               */
-  /* ------------------------------------------------------------------------ */
-
   async getAllPublishedBatches() {
     const batches = await this.batchRepo.findAllPublished();
     return this.enrichBatches(batches);
   }
-
-  /* ------------------------------------------------------------------------ */
-  /* Get Published Batch By ID                                                */
-  /* ------------------------------------------------------------------------ */
 
   async getPublishedBatchById(id: string) {
     const batch = await this.batchRepo.findPublishedById(id);
@@ -279,10 +312,6 @@ export class BatchService {
     return this.enrichBatch(batch);
   }
 
-  /* ------------------------------------------------------------------------ */
-  /* Get Batch By ID (Admin/Internal)                                         */
-  /* ------------------------------------------------------------------------ */
-
   async getBatchById(id: string) {
     const batch = await this.batchRepo.findById(id);
 
@@ -293,10 +322,6 @@ export class BatchService {
     return this.enrichBatch(batch);
   }
 
-  /* ------------------------------------------------------------------------ */
-  /* Get Published Batch By Slug (Public)                                     */
-  /* ------------------------------------------------------------------------ */
-
   async getBatchBySlug(slug: string) {
     const batch = await this.batchRepo.findPublishedBySlug(slug);
 
@@ -306,10 +331,6 @@ export class BatchService {
 
     return this.enrichBatch(batch);
   }
-
-  /* ------------------------------------------------------------------------ */
-  /* Get Batches By Examination                                               */
-  /* ------------------------------------------------------------------------ */
 
   async getBatchesByExamination(examinationId: string) {
     const examination = await this.examinationRepo.findById(examinationId);
@@ -323,10 +344,6 @@ export class BatchService {
     return this.enrichBatches(batches);
   }
 
-  /* ------------------------------------------------------------------------ */
-  /* Update Batch + Optional Teacher Sync                                     */
-  /* ------------------------------------------------------------------------ */
-
   async updateBatch(id: string, data: UpdateBatchInput) {
     const currentBatch = await this.batchRepo.findById(id);
 
@@ -336,7 +353,6 @@ export class BatchService {
 
     const { teacherIds, ...batchData } = data;
 
-    // Validate examination if changed
     if (
       batchData.examinationId &&
       batchData.examinationId !== currentBatch.examinationId
@@ -354,7 +370,6 @@ export class BatchService {
       }
     }
 
-    // Validate slug if changed
     if (batchData.slug && batchData.slug !== currentBatch.slug) {
       const existingBatch = await this.batchRepo.findBySlug(batchData.slug);
 
@@ -363,7 +378,6 @@ export class BatchService {
       }
     }
 
-    // Validate final prices
     const finalOriginalPrice = Number(
       batchData.originalPrice ?? currentBatch.originalPrice,
     );
@@ -385,13 +399,13 @@ export class BatchService {
     let finalExpiryDate: Date | null = currentBatch.expiryDate;
     let finalValidityMonths: number | null = currentBatch.validityMonths;
 
-    // If a new expiry date is provided, clear validity.
+    // If a new expiry date is provided, clear validity
     if (batchData.expiryDate !== undefined && batchData.expiryDate !== null) {
       finalExpiryDate = batchData.expiryDate;
       finalValidityMonths = null;
     }
 
-    // If a new validity is provided, clear expiry date.
+    // If a new validity is provided, clear expiry date
     if (
       batchData.validityMonths !== undefined &&
       batchData.validityMonths !== null
@@ -457,13 +471,74 @@ export class BatchService {
       }
     });
 
-    // Return updated batch with teachers
     return this.getBatchById(id);
   }
 
-  /* ------------------------------------------------------------------------ */
-  /* Publish Batch                                                            */
-  /* ------------------------------------------------------------------------ */
+  // Update Batch Statuses (Cron Job)
+
+  async updateBatchStatuses(): Promise<BatchStatusUpdateStats> {
+    const today = this.getIndiaDateKey(new Date());
+
+    const stats: BatchStatusUpdateStats = {
+      date: today,
+      totalProcessed: 0,
+      upcomingToOngoing: 0,
+      ongoingToCompleted: 0,
+      upcomingToCompleted: 0,
+      unchanged: 0,
+    };
+
+    await db.transaction(async (tx) => {
+      // Fetch all batches within the transaction
+      const batches = await this.batchRepo.findAll(tx);
+
+      stats.totalProcessed = batches.length;
+
+      for (const batch of batches) {
+        const nextStatus = this.calculateBatchStatus(
+          batch.startDate,
+          batch.expiryDate,
+          batch.validityMonths,
+          today,
+        );
+
+        // Skip unchanged records
+        if (batch.status === nextStatus) {
+          stats.unchanged++;
+          continue;
+        }
+
+        const previousStatus = batch.status;
+
+        // Update batch status
+        const updated = await this.batchRepo.update(
+          batch.id,
+          { status: nextStatus },
+          tx,
+        );
+
+        if (!updated) {
+          throw new Error(`Failed to update batch status: ${batch.id}`);
+        }
+
+        // Track status transitions
+        if (previousStatus === "UPCOMING" && nextStatus === "ONGOING") {
+          stats.upcomingToOngoing++;
+        } else if (previousStatus === "ONGOING" && nextStatus === "COMPLETED") {
+          stats.ongoingToCompleted++;
+        } else if (
+          previousStatus === "UPCOMING" &&
+          nextStatus === "COMPLETED"
+        ) {
+          stats.upcomingToCompleted++;
+        }
+      }
+    });
+
+    return stats;
+  }
+
+  // Publish Batch
 
   async publishBatch(id: string) {
     const batch = await this.batchRepo.findById(id);
@@ -489,9 +564,7 @@ export class BatchService {
     return this.enrichBatch(result);
   }
 
-  /* ------------------------------------------------------------------------ */
-  /* Unpublish Batch                                                          */
-  /* ------------------------------------------------------------------------ */
+  // Unpublish Batch
 
   async unpublishBatch(id: string) {
     const batch = await this.batchRepo.findById(id);
