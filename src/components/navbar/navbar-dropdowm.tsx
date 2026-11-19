@@ -9,36 +9,61 @@ import {
   NavigationMenuLink,
 } from "@/components/ui/navigation-menu";
 
-const courseItems = [
-  { title: "All Courses", href: "/batches" },
-  { title: "SSC Courses", href: "/courses/ssc" },
-  { title: "Banking Courses", href: "/courses/banking" },
-  { title: "Railway Courses", href: "/courses/railway" },
-  { title: "MP Police Courses", href: "/courses/mp-police" },
-] as const;
-
-const testSeriesItems = [
-  { title: "All Test Series", href: "/test-series" },
-  { title: "SSC Test Series", href: "/test-series/ssc" },
-  { title: "Banking Test Series", href: "/test-series/banking" },
-  { title: "Railway Test Series", href: "/test-series/railway" },
-  { title: "MP Police Test Series", href: "/test-series/mp-police" },
-] as const;
+import { useGetExamCategories } from "@/hooks/academic/use-exam-categories";
 
 interface NavbarDropdownProps {
   type: "courses" | "test-series";
 }
+
+const dropdownConfig = {
+  courses: {
+    basePath: "/batches",
+    categoryPath: "/batches/category",
+    allTitle: "All Courses",
+    suffix: "Courses",
+  },
+  "test-series": {
+    basePath: "/test-series",
+    categoryPath: "/test-series/category",
+    allTitle: "All Test Series",
+    suffix: "Test Series",
+  },
+} as const;
 
 export default function NavbarDropdown({
   type,
 }: NavbarDropdownProps) {
   const pathname = usePathname();
 
-  const items =
-    type === "courses" ? courseItems : testSeriesItems;
+  const {
+    data: categories = [],
+    isLoading,
+    isError,
+  } = useGetExamCategories(true);
 
-  const isActiveRoute = (href: string) =>
-    pathname === href || pathname.startsWith(`${href}/`);
+  const config = dropdownConfig[type];
+
+  const isActiveRoute = (href: string) => {
+    if (href === config.basePath) {
+      return pathname === href;
+    }
+
+    return (
+      pathname === href ||
+      pathname.startsWith(`${href}/`)
+    );
+  };
+
+  const navigationItems = [
+    {
+      title: config.allTitle,
+      href: config.basePath,
+    },
+    ...categories.map((category) => ({
+      title: `${category.name} ${config.suffix}`,
+      href: `${config.categoryPath}/${category.slug}`,
+    })),
+  ];
 
   return (
     <NavigationMenuContent
@@ -51,10 +76,9 @@ export default function NavbarDropdown({
         shadow-xl shadow-black/10
       "
     >
-
-      {/* Navigation Items */}
       <div className="flex flex-col gap-1">
-        {items.map((item) => {
+        {/* Navigation Items */}
+        {navigationItems.map((item) => {
           const isActive = isActiveRoute(item.href);
 
           return (
@@ -67,34 +91,61 @@ export default function NavbarDropdown({
                 />
               }
               active={isActive}
-              className={`
-                flex w-full items-center
-                rounded-lg px-3 py-3
-                text-sm font-medium
-                !bg-transparent
-                outline-none
-                transition-colors duration-200
-
-                ${
-                  isActive
-                    ? "text-brand-primary"
-                    : "text-foreground/80 hover:text-brand-primary"
-                }
-
-                hover:!bg-transparent
-                focus:!bg-transparent
-                data-[active]:!bg-transparent
-
-                focus-visible:ring-2
-                focus-visible:ring-ring
-                focus-visible:ring-offset-2
-              `}
+              className={getLinkClassName(isActive)}
             >
               {item.title}
             </NavigationMenuLink>
           );
         })}
+
+        {/* Loading State */}
+        {isLoading && (
+          <div className="space-y-2 px-3 py-2">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div
+                key={index}
+                className="h-9 animate-pulse rounded-lg bg-muted"
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Error State */}
+        {isError && (
+          <p className="px-3 py-3 text-sm text-destructive">
+            Failed to load categories.
+          </p>
+        )}
+
+        {/* Empty State */}
+        {!isLoading && !isError && categories.length === 0 && (
+          <p className="px-3 py-3 text-sm text-muted-foreground">
+            No categories available.
+          </p>
+        )}
       </div>
     </NavigationMenuContent>
   );
+}
+
+function getLinkClassName(isActive: boolean) {
+  return `
+    flex w-full items-center
+    rounded-lg px-3 py-3
+    text-sm font-medium
+    !bg-transparent
+    outline-none
+    transition-colors duration-200
+    ${
+      isActive
+        ? "text-brand-primary"
+        : "text-foreground/80 hover:text-brand-primary"
+    }
+    hover:!bg-transparent
+    focus:!bg-transparent
+    data-[active]:!bg-transparent
+    focus-visible:ring-2
+    focus-visible:ring-ring
+    focus-visible:ring-offset-2
+  `;
 }
