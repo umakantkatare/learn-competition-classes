@@ -15,15 +15,41 @@
 
 // export type Database = typeof db;
 
+
 import { Pool } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-serverless";
 
-// import * as schema from "./schema";
+function createDatabase() {
+  const connectionString = process.env.DATABASE_URL;
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL!,
-});
+  if (!connectionString) {
+    throw new Error("DATABASE_URL is not configured");
+  }
 
-export const db = drizzle({
-  client: pool,
-});
+  const pool = new Pool({
+    connectionString,
+    max: 10,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 10_000,
+  });
+
+  const db = drizzle({
+    client: pool,
+    logger: process.env.NODE_ENV === "development",
+  });
+
+  return { db, pool };
+}
+
+const globalForDb = globalThis as typeof globalThis & {
+  dbInstance?: ReturnType<typeof createDatabase>;
+};
+
+const dbInstance = globalForDb.dbInstance ?? createDatabase();
+
+if (process.env.NODE_ENV !== "production") {
+  globalForDb.dbInstance = dbInstance;
+}
+
+export const db = dbInstance.db;
+export const pool = dbInstance.pool;
