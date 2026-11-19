@@ -1,4 +1,3 @@
-
 export default function Loading() {
   return (
     <main className="flex min-h-[80vh] flex-col items-center justify-center gap-5 px-4">
