@@ -169,8 +169,8 @@ export function BatchCard({ batch }: BatchCardProps) {
         {/* Pricing */}
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-baseline gap-2">
-            {batch.isFree ? (
-              <span className="text-2xl font-bold text-secondary">FREE</span>
+            {finalPrice === 0 ? (
+              <span className="text-2xl font-bold text-primary">FREE</span>
             ) : (
               <>
                 <span className="text-2xl font-extrabold tracking-tight text-primary">

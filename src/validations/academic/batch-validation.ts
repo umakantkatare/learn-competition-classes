@@ -28,9 +28,7 @@ export const decimalSchema = z
       String(value).trim() !== "" &&
       Number.isFinite(Number(value)) &&
       Number(value) >= 0,
-    {
-      message: "Must be a valid non-negative amount",
-    },
+    { message: "Must be a valid non-negative amount" },
   )
   .transform((value) => Number(value).toFixed(2));
 
@@ -38,27 +36,27 @@ export const decimalSchema = z
 // DATE HELPERS
 // ============================================
 
-function getTodayInIndia(): string {
-  return new Intl.DateTimeFormat("en-CA", {
+function formatIndiaDate(date: Date): string {
+  const parts = new Intl.DateTimeFormat("en-IN", {
     timeZone: "Asia/Kolkata",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).format(new Date());
+  }).formatToParts(date);
+
+  const values = Object.fromEntries(
+    parts.map(({ type, value }) => [type, value]),
+  );
+
+  return `${values.year}-${values.month}-${values.day}`;
 }
 
-function getDateInIndia(date: Date): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
+export function getTodayInIndia(): string {
+  return formatIndiaDate(new Date());
 }
 
-// Create mode: today or future date only.
 function isValidStartDate(date: Date): boolean {
-  return getDateInIndia(date) >= getTodayInIndia();
+  return formatIndiaDate(date) >= getTodayInIndia();
 }
 
 // ============================================
@@ -183,7 +181,6 @@ function validateBatchPricing(data: {
   return discount <= original;
 }
 
-// Exactly one of expiryDate or validityMonths must be provided.
 function validateBatchSchedule(data: {
   expiryDate?: Date | null;
   validityMonths?: number | null;
@@ -219,7 +216,6 @@ function validateBatchFields(
     validateSchedule: boolean;
   },
 ) {
-  // Pricing validation
   if (!validateBatchPricing(data)) {
     ctx.addIssue({
       code: "custom",
@@ -231,7 +227,6 @@ function validateBatchFields(
     });
   }
 
-  // Schedule validation
   if (options.validateSchedule && !validateBatchSchedule(data)) {
     ctx.addIssue({
       code: "custom",
@@ -240,7 +235,6 @@ function validateBatchFields(
     });
   }
 
-  // Expiry date validation
   if (data.startDate && data.expiryDate && data.expiryDate <= data.startDate) {
     ctx.addIssue({
       code: "custom",
@@ -256,7 +250,6 @@ function validateBatchFields(
 
 export const createBatchSchema = batchFormBaseSchema.superRefine(
   (data, ctx) => {
-    // Start date must be today or future.
     if (!isValidStartDate(data.startDate)) {
       ctx.addIssue({
         code: "custom",
@@ -278,8 +271,6 @@ export const createBatchSchema = batchFormBaseSchema.superRefine(
 export const updateBatchSchema = batchFormBaseSchema
   .partial()
   .superRefine((data, ctx) => {
-    // Past start dates are allowed during updates.
-
     const hasScheduleField =
       data.expiryDate !== undefined || data.validityMonths !== undefined;
 
@@ -292,17 +283,6 @@ export const updateBatchSchema = batchFormBaseSchema
 // FORM SCHEMA FACTORY
 // ============================================
 
-/**
- * Returns a full form schema for both create and update.
- *
- * Create:
- * - Past start dates are rejected.
- *
- * Update:
- * - Past start dates are allowed.
- *
- * All other form validations remain identical.
- */
 export function getBatchFormSchema(isEditing: boolean) {
   return batchFormBaseSchema.superRefine((data, ctx) => {
     if (!isEditing && !isValidStartDate(data.startDate)) {
