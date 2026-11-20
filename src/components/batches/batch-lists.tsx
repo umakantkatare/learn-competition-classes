@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-
 import {
   Search,
   MoreHorizontal,
@@ -10,7 +9,6 @@ import {
   RefreshCw,
   AlertTriangle,
   CalendarDays,
-  GraduationCap,
   CheckCircle2,
 } from "lucide-react";
 
@@ -27,18 +25,10 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 
 import {
   DropdownMenu,
@@ -47,22 +37,34 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-// -----------------------------------------------------------------------------
-// Helpers
-// -----------------------------------------------------------------------------
+/* -------------------------------------------------------------------------- */
+/* Formatters                                                                 */
+/* -------------------------------------------------------------------------- */
+
+const dateFormatter = new Intl.DateTimeFormat("en-IN", {
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+});
+
+const priceFormatter = new Intl.NumberFormat("en-IN", {
+  style: "currency",
+  currency: "INR",
+  maximumFractionDigits: 0,
+});
+
+/* -------------------------------------------------------------------------- */
+/* Helpers                                                                    */
+/* -------------------------------------------------------------------------- */
 
 function formatDate(date?: string | Date | null): string {
   if (!date) return "—";
 
   const parsedDate = new Date(date);
 
-  if (Number.isNaN(parsedDate.getTime())) return "—";
-
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(parsedDate);
+  return Number.isNaN(parsedDate.getTime())
+    ? "—"
+    : dateFormatter.format(parsedDate);
 }
 
 function formatPrice(price?: string | number | null): string {
@@ -72,13 +74,11 @@ function formatPrice(price?: string | number | null): string {
 
   const amount = Number(price);
 
-  if (!Number.isFinite(amount)) return "—";
+  return Number.isFinite(amount) ? priceFormatter.format(amount) : "—";
+}
 
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(amount);
+function hasValue(value: unknown): boolean {
+  return value !== null && value !== undefined && value !== "";
 }
 
 function getTeacherNames(batch: Batch): string[] {
@@ -89,81 +89,60 @@ function getTeacherNames(batch: Batch): string[] {
   );
 }
 
-/**
- * Calculates the display expiry date for validity-based batches.
- *
- * This is only for display. The calculated date is not persisted
- * in the database when validityMonths is used.
- */
-function getBatchExpiryDate(batch: Batch): Date | null {
-  if (batch.expiryDate) {
-    const expiryDate = new Date(batch.expiryDate);
-
-    return Number.isNaN(expiryDate.getTime()) ? null : expiryDate;
-  }
-
-  if (batch.validityMonths === null || batch.validityMonths === undefined) {
-    return null;
-  }
-
-  const startDate = new Date(batch.startDate);
-
-  if (Number.isNaN(startDate.getTime())) return null;
-
-  const day = startDate.getDate();
-
-  const expiryDate = new Date(startDate);
-  expiryDate.setDate(1);
-  expiryDate.setMonth(expiryDate.getMonth() + batch.validityMonths);
-
-  const lastDayOfTargetMonth = new Date(
-    expiryDate.getFullYear(),
-    expiryDate.getMonth() + 1,
-    0,
-  ).getDate();
-
-  expiryDate.setDate(Math.min(day, lastDayOfTargetMonth));
-
-  return expiryDate;
+function getBatchSearchText(batch: Batch): string {
+  return [
+    batch.title,
+    batch.slug,
+    batch.description,
+    batch.status,
+    batch.medium,
+    batch.examinationId,
+    ...getTeacherNames(batch),
+    ...(batch.features ?? []),
+    batch.isPublished ? "published" : "draft",
+    batch.isFree ? "free" : "paid",
+    batch.expiryDate,
+    batch.validityMonths,
+  ]
+    .filter((value) => value !== null && value !== undefined)
+    .map((value) => String(value).toLowerCase())
+    .join(" ");
 }
 
-function getBatchDurationLabel(batch: Batch): string {
-  if (batch.expiryDate) {
-    return "Fixed expiry";
-  }
-
-  if (batch.validityMonths !== null && batch.validityMonths !== undefined) {
-    return `${batch.validityMonths} months validity`;
-  }
-
-  return "Not configured";
-}
-
-// -----------------------------------------------------------------------------
-// Loading Skeleton
-// -----------------------------------------------------------------------------
+/* -------------------------------------------------------------------------- */
+/* Loading State                                                              */
+/* -------------------------------------------------------------------------- */
 
 function BatchListSkeleton() {
   return (
-    <div className="space-y-3" aria-label="Loading batches" aria-busy="true">
-      {Array.from({ length: 5 }).map((_, index) => (
-        <Skeleton key={index} className="h-16 w-full rounded-md" />
+    <div
+      className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+      aria-label="Loading batches"
+      aria-busy="true"
+    >
+      {Array.from({ length: 6 }).map((_, index) => (
+        <div key={index} className="space-y-3 rounded-lg border p-4">
+          <Skeleton className="aspect-video w-full rounded-md" />
+          <Skeleton className="h-5 w-3/4" />
+          <Skeleton className="h-4 w-1/2" />
+          <Skeleton className="h-4 w-full" />
+        </div>
       ))}
     </div>
   );
 }
 
-// -----------------------------------------------------------------------------
-// Empty State
-// -----------------------------------------------------------------------------
+/* -------------------------------------------------------------------------- */
+/* Empty State                                                                */
+/* -------------------------------------------------------------------------- */
 
 function BatchEmptyState({ isSearching }: { isSearching: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
       <div className="space-y-1">
-        <h1 className="font-semibold text-foreground text-2xl">
+        <h2 className="text-2xl font-semibold text-foreground">
           {isSearching ? "No matching batches" : "No batches yet"}
-        </h1>
+        </h2>
 
         <p className="max-w-sm text-sm text-muted-foreground">
           {isSearching
@@ -175,9 +154,9 @@ function BatchEmptyState({ isSearching }: { isSearching: boolean }) {
   );
 }
 
-// -----------------------------------------------------------------------------
-// Error State
-// -----------------------------------------------------------------------------
+/* -------------------------------------------------------------------------- */
+/* Error State                                                                */
+/* -------------------------------------------------------------------------- */
 
 function BatchErrorState({
   onRetry,
@@ -206,38 +185,40 @@ function BatchErrorState({
         <RefreshCw
           className={`mr-2 size-4 ${isFetching ? "animate-spin" : ""}`}
         />
-
         {isFetching ? "Retrying..." : "Try again"}
       </Button>
     </div>
   );
 }
 
-// -----------------------------------------------------------------------------
-// Batch Status Badge
-// -----------------------------------------------------------------------------
+/* -------------------------------------------------------------------------- */
+/* Status Badges                                                              */
+/* -------------------------------------------------------------------------- */
+
+const batchStatusVariants: Record<
+  string,
+  { label: string; className: string }
+> = {
+  UPCOMING: {
+    label: "Upcoming",
+    className: "border-blue-500/30 text-blue-600",
+  },
+  ONGOING: {
+    label: "Ongoing",
+    className: "border-emerald-500/30 text-emerald-600",
+  },
+  COMPLETED: {
+    label: "Completed",
+    className: "border-muted-foreground/30 text-muted-foreground",
+  },
+  EXPIRED: {
+    label: "Expired",
+    className: "border-destructive/30 text-destructive",
+  },
+};
 
 function BatchStatusBadge({ status }: { status: Batch["status"] }) {
-  const variants: Record<string, { label: string; className: string }> = {
-    UPCOMING: {
-      label: "Upcoming",
-      className: "border-blue-500/30 text-blue-600",
-    },
-    ONGOING: {
-      label: "Ongoing",
-      className: "border-emerald-500/30 text-emerald-600",
-    },
-    COMPLETED: {
-      label: "Completed",
-      className: "border-muted-foreground/30 text-muted-foreground",
-    },
-    EXPIRED: {
-      label: "Expired",
-      className: "border-destructive/30 text-destructive",
-    },
-  };
-
-  const config = variants[status] ?? {
+  const config = batchStatusVariants[status] ?? {
     label: status ?? "Unknown",
     className: "border-border text-muted-foreground",
   };
@@ -248,10 +229,6 @@ function BatchStatusBadge({ status }: { status: Batch["status"] }) {
     </Badge>
   );
 }
-
-// -----------------------------------------------------------------------------
-// Publication Badge
-// -----------------------------------------------------------------------------
 
 function PublicationBadge({ isPublished }: { isPublished: boolean }) {
   return isPublished ? (
@@ -266,16 +243,16 @@ function PublicationBadge({ isPublished }: { isPublished: boolean }) {
   );
 }
 
-// -----------------------------------------------------------------------------
-// Batch Features
-// -----------------------------------------------------------------------------
+/* -------------------------------------------------------------------------- */
+/* Features                                                                   */
+/* -------------------------------------------------------------------------- */
 
 function BatchFeatures({ features }: { features?: string[] }) {
   if (!features?.length) {
     return <p className="text-xs text-muted-foreground">No features added</p>;
   }
 
-  const visibleFeatures = features.slice(0, 2);
+  const visibleFeatures = features.slice(0, 3);
   const remainingCount = features.length - visibleFeatures.length;
 
   return (
@@ -284,9 +261,11 @@ function BatchFeatures({ features }: { features?: string[] }) {
         <Badge
           key={`${feature}-${index}`}
           variant="secondary"
-          className="max-w-32 truncate text-xs font-normal"
+          className="min-w-0 max-w-32 text-xs font-normal"
         >
-          {feature}
+          <span className="block min-w-0 max-w-full truncate" title={feature}>
+            {feature}
+          </span>
         </Badge>
       ))}
 
@@ -299,12 +278,240 @@ function BatchFeatures({ features }: { features?: string[] }) {
   );
 }
 
-// -----------------------------------------------------------------------------
-// Batch List Component
-// -----------------------------------------------------------------------------
+/* -------------------------------------------------------------------------- */
+/* Batch Card                                                                 */
+/* -------------------------------------------------------------------------- */
+
+function BatchCard({
+  batch,
+  onEdit,
+}: {
+  batch: Batch;
+  onEdit: (batch: Batch) => void;
+}) {
+  return (
+    <Card className="group flex h-full flex-col overflow-hidden rounded-card border-border/70 bg-card pt-0 shadow-sm transition-shadow hover:shadow-md">
+      {/* Thumbnail */}
+      <div className="relative aspect-video w-full overflow-hidden bg-primary/10">
+        {batch.thumbnail ? (
+          <img
+            src={batch.thumbnail}
+            alt={batch.title}
+            className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
+            loading="lazy"
+          />
+        ) : (
+          <div className="flex size-full items-center justify-center text-primary">
+            <Layers className="size-10" />
+          </div>
+        )}
+
+        {/* Status Badges */}
+        <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
+          <span className="rounded-md bg-background/90 backdrop-blur">
+            <BatchStatusBadge status={batch.status} />
+          </span>
+
+          <span className="rounded-md bg-background/90 backdrop-blur">
+            <PublicationBadge isPublished={batch.isPublished} />
+          </span>
+        </div>
+
+        {/* Single Edit Action */}
+        <div className="absolute right-2 top-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="size-8 bg-background/90 backdrop-blur"
+                  aria-label={`Actions for ${batch.title}`}
+                >
+                  <MoreHorizontal className="size-4" />
+                </Button>
+              }
+            />
+
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onEdit(batch)}>
+                <Pencil className="mr-2 size-4" />
+                Edit
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+
+      {/* Title + Price */}
+      <CardHeader className="gap-3 px-4 pt-4 pb-3">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+          <div className="min-w-0 space-y-1">
+            <CardTitle
+              className="truncate text-base font-semibold"
+              title={batch.title}
+            >
+              {batch.title || "Untitled Batch"}
+            </CardTitle>
+
+            <p
+              className="truncate font-mono text-xs text-muted-foreground"
+              title={batch.slug}
+            >
+              {batch.slug || "—"}
+            </p>
+          </div>
+
+          <div className="min-w-[88px] shrink-0 text-right">
+            {batch.isFree ||
+            (batch.discountPrice !== null &&
+              batch.discountPrice !== undefined &&
+              batch.discountPrice !== "" &&
+              Number(batch.discountPrice) === 0) ? (
+              <Badge
+                variant="secondary"
+                className="bg-emerald-500/10 text-emerald-600"
+              >
+                Free
+              </Badge>
+            ) : (
+              <>
+                <p className="whitespace-nowrap text-sm font-bold leading-5 text-foreground">
+                  {formatPrice(batch.discountPrice)}
+                </p>
+
+                <p className="whitespace-nowrap text-xs leading-5 text-muted-foreground line-through">
+                  {formatPrice(batch.originalPrice)}
+                </p>
+              </>
+            )}
+          </div>
+        </div>
+      </CardHeader>
+
+      {/* Details */}
+      <CardContent className="flex-1 space-y-5 px-4 pb-5">
+        <BatchFeatures features={batch.features} />
+
+        {/* Teachers */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Teachers</span>
+
+            <span className="text-xs text-muted-foreground">
+              {batch.teachers?.length ?? 0} assigned
+            </span>
+          </div>
+
+          {batch.teachers?.length ? (
+            <div className="grid grid-cols-2 gap-2">
+              {batch.teachers.map((item, index) => {
+                const teacher = item.teacher;
+                const name = teacher?.user?.name?.trim() || "Unknown Teacher";
+                const image = teacher?.user?.image;
+
+                const initials = name
+                  .split(/\s+/)
+                  .slice(0, 2)
+                  .map((part) => part.charAt(0).toUpperCase())
+                  .join("");
+
+                return (
+                  <div
+                    key={teacher?.id ?? index}
+                    className="flex min-w-0 items-center gap-2 rounded-md border border-border/60 bg-muted/30 px-2.5 py-2"
+                  >
+                    <div className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                      {image ? (
+                        <img
+                          src={image}
+                          alt={name}
+                          className="size-full object-cover"
+                          loading="lazy"
+                        />
+                      ) : (
+                        initials || "T"
+                      )}
+                    </div>
+
+                    <span
+                      className="truncate text-xs font-medium text-foreground"
+                      title={name}
+                    >
+                      {name}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="rounded-md border border-dashed p-3 text-center text-xs text-muted-foreground">
+              No teachers assigned
+            </p>
+          )}
+        </div>
+
+        {/* Batch Dates & Validity */}
+        {(hasValue(batch.startDate) ||
+          hasValue(batch.expiryDate) ||
+          hasValue(batch.validityMonths)) && (
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {hasValue(batch.startDate) && (
+              <div className="flex items-center gap-2 rounded-md bg-muted/40 px-2.5 py-2">
+                <CalendarDays className="size-4 shrink-0 text-muted-foreground" />
+                <div className="min-w-0">
+                  <p className="text-[10px] text-muted-foreground">
+                    Start Date
+                  </p>
+                  <p className="truncate text-xs font-medium">
+                    {formatDate(batch.startDate)}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {hasValue(batch.expiryDate) && (
+              <div className="flex items-center gap-2 rounded-md bg-muted/40 px-2.5 py-2">
+                <CalendarDays className="size-4 shrink-0 text-muted-foreground" />
+                <div className="min-w-0">
+                  <p className="text-[10px] text-muted-foreground">
+                    Expiry Date
+                  </p>
+                  <p className="truncate text-xs font-medium">
+                    {formatDate(batch.expiryDate)}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {hasValue(batch.validityMonths) && (
+              <div className="flex items-center gap-2 rounded-md bg-muted/40 px-2.5 py-2">
+                <CalendarDays className="size-4 shrink-0 text-muted-foreground" />
+                <div className="min-w-0">
+                  <p className="text-[10px] text-muted-foreground">Validity</p>
+                  <p className="truncate text-xs font-medium">
+                    {batch.validityMonths} Months
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+
+      {/* Footer: Medium only (No duplicate Edit button) */}
+      <CardFooter className="mt-auto border-t px-4 py-3">
+        <Badge variant="secondary">{batch.medium || "—"}</Badge>
+      </CardFooter>
+    </Card>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Batch List                                                                 */
+/* -------------------------------------------------------------------------- */
 
 export default function BatchList() {
-  // Fetch batches
   const {
     data: batches,
     isLoading,
@@ -314,62 +521,38 @@ export default function BatchList() {
     isFetching,
   } = useGetAllBatches();
 
-  // Local states
   const [search, setSearch] = useState("");
   const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
 
-  // ---------------------------------------------------------------------------
-  // Search and Filter
-  // ---------------------------------------------------------------------------
+  const normalizedQuery = search.trim().toLowerCase();
+
+  const searchableBatches = useMemo(
+    () =>
+      (batches ?? []).map((batch) => ({
+        batch,
+        searchText: getBatchSearchText(batch),
+      })),
+    [batches],
+  );
 
   const filteredBatches = useMemo(() => {
-    const list = batches ?? [];
-    const query = search.trim().toLowerCase();
+    if (!normalizedQuery) {
+      return searchableBatches.map(({ batch }) => batch);
+    }
 
-    if (!query) return list;
-
-    return list.filter((batch) => {
-      const teacherNames = getTeacherNames(batch).join(" ");
-
-      const searchableValues = [
-        batch.title,
-        batch.slug,
-        batch.description,
-        batch.status,
-        batch.medium,
-        batch.examinationId,
-        teacherNames,
-        ...(batch.features ?? []),
-        batch.isPublished ? "published" : "draft",
-        batch.isFree ? "free" : "paid",
-        getBatchDurationLabel(batch),
-      ];
-
-      return searchableValues.some((value) =>
-        String(value ?? "")
-          .toLowerCase()
-          .includes(query),
-      );
-    });
-  }, [batches, search]);
-
-  // ---------------------------------------------------------------------------
-  // Refresh
-  // ---------------------------------------------------------------------------
+    return searchableBatches
+      .filter(({ searchText }) => searchText.includes(normalizedQuery))
+      .map(({ batch }) => batch);
+  }, [normalizedQuery, searchableBatches]);
 
   function handleRefresh() {
     void refetch();
   }
 
-  // ---------------------------------------------------------------------------
-  // Render
-  // ---------------------------------------------------------------------------
-
   return (
     <>
       <Card className="rounded-card border-border/70 bg-card shadow-sm">
         {/* Header */}
-
         <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
             <CardTitle className="flex items-center gap-2 text-xl font-semibold">
@@ -386,7 +569,6 @@ export default function BatchList() {
           </div>
 
           {/* Search */}
-
           <div className="relative w-full sm:max-w-xs">
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
 
@@ -416,7 +598,6 @@ export default function BatchList() {
           ) : (
             <>
               {/* Toolbar */}
-
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-2">
                   <Badge variant="secondary" className="rounded-full px-3 py-1">
@@ -452,241 +633,18 @@ export default function BatchList() {
                 </Button>
               </div>
 
-              {/* Empty State / Table */}
-
+              {/* Batch Cards */}
               {filteredBatches.length === 0 ? (
-                <BatchEmptyState isSearching={Boolean(search.trim())} />
+                <BatchEmptyState isSearching={Boolean(normalizedQuery)} />
               ) : (
-                <div className="relative max-h-[600px] w-full max-w-full overflow-auto rounded-section border border-border">
-                  <Table className="min-w-[1350px] w-full">
-                    {/* Table Header */}
-
-                    <TableHeader className="sticky top-0 z-10 bg-muted shadow-sm">
-                      <TableRow className="hover:bg-transparent">
-                        <TableHead className="min-w-64 font-semibold">
-                          Batch
-                        </TableHead>
-
-                        <TableHead className="min-w-40 font-semibold">
-                          Features
-                        </TableHead>
-
-                        <TableHead className="min-w-40 font-semibold">
-                          Teachers
-                        </TableHead>
-
-                        <TableHead className="min-w-32 font-semibold">
-                          Pricing
-                        </TableHead>
-
-                        <TableHead className="min-w-40 font-semibold">
-                          Duration
-                        </TableHead>
-
-                        <TableHead className="min-w-28 font-semibold">
-                          Medium
-                        </TableHead>
-
-                        <TableHead className="min-w-28 font-semibold">
-                          Status
-                        </TableHead>
-
-                        <TableHead className="min-w-28 font-semibold">
-                          Visibility
-                        </TableHead>
-
-                        <TableHead className="w-16 text-right font-semibold">
-                          Actions
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-
-                    {/* Table Body */}
-
-                    <TableBody>
-                      {filteredBatches.map((batch) => {
-                        const teacherNames = getTeacherNames(batch);
-                        const expiryDate = getBatchExpiryDate(batch);
-
-                        return (
-                          <TableRow
-                            key={batch.id}
-                            className="transition-colors hover:bg-accent/40"
-                          >
-                            {/* Batch Information */}
-
-                            <TableCell>
-                              <div className="flex items-center gap-3">
-                                {batch.thumbnail ? (
-                                  <img
-                                    src={batch.thumbnail}
-                                    alt={batch.title}
-                                    className="size-11 shrink-0 rounded-md border object-cover"
-                                    loading="lazy"
-                                  />
-                                ) : (
-                                  <div className="flex size-11 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                                    <Layers className="size-5" />
-                                  </div>
-                                )}
-
-                                <div className="min-w-0 space-y-1">
-                                  <p className="max-w-52 truncate font-medium text-foreground">
-                                    {batch.title || "Untitled Batch"}
-                                  </p>
-
-                                  <p className="max-w-52 truncate font-mono text-xs text-muted-foreground">
-                                    {batch.slug || "—"}
-                                  </p>
-                                </div>
-                              </div>
-                            </TableCell>
-
-                            {/* Features */}
-
-                            <TableCell>
-                              <BatchFeatures features={batch.features} />
-                            </TableCell>
-
-                            {/* Teachers */}
-
-                            <TableCell>
-                              <div className="flex items-start gap-2">
-                                <GraduationCap className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-
-                                <div className="space-y-1">
-                                  {teacherNames.length > 0 ? (
-                                    <>
-                                      {teacherNames
-                                        .slice(0, 2)
-                                        .map((name, index) => (
-                                          <p
-                                            key={`${batch.id}-${index}`}
-                                            className="text-sm font-medium"
-                                          >
-                                            {name}
-                                          </p>
-                                        ))}
-
-                                      {teacherNames.length > 2 && (
-                                        <p className="text-xs text-muted-foreground">
-                                          +{teacherNames.length - 2} more
-                                        </p>
-                                      )}
-                                    </>
-                                  ) : (
-                                    <span className="text-sm text-muted-foreground">
-                                      Not assigned
-                                    </span>
-                                  )}
-
-                                  <p className="text-xs text-muted-foreground">
-                                    {batch.teachers?.length ?? 0} teacher(s)
-                                  </p>
-                                </div>
-                              </div>
-                            </TableCell>
-
-                            {/* Pricing */}
-
-                            <TableCell>
-                              {batch.isFree ? (
-                                <Badge variant="secondary">Free</Badge>
-                              ) : (
-                                <div className="space-y-1">
-                                  <p className="font-semibold text-foreground">
-                                    {formatPrice(batch.discountPrice)}
-                                  </p>
-
-                                  <p className="text-xs text-muted-foreground line-through">
-                                    {formatPrice(batch.originalPrice)}
-                                  </p>
-                                </div>
-                              )}
-                            </TableCell>
-
-                            {/* Duration */}
-
-                            <TableCell>
-                              <div className="flex items-start gap-2">
-                                <CalendarDays className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-
-                                <div className="space-y-1 text-xs">
-                                  <p>
-                                    <span className="text-muted-foreground">
-                                      Start:{" "}
-                                    </span>
-                                    {formatDate(batch.startDate)}
-                                  </p>
-
-                                  <p>
-                                    <span className="text-muted-foreground">
-                                      End:{" "}
-                                    </span>
-                                    {formatDate(expiryDate)}
-                                  </p>
-
-                                  <p className="text-muted-foreground">
-                                    {getBatchDurationLabel(batch)}
-                                  </p>
-                                </div>
-                              </div>
-                            </TableCell>
-
-                            {/* Medium */}
-
-                            <TableCell>
-                              <Badge variant="secondary">
-                                {batch.medium || "—"}
-                              </Badge>
-                            </TableCell>
-
-                            {/* Lifecycle Status */}
-
-                            <TableCell>
-                              <BatchStatusBadge status={batch.status} />
-                            </TableCell>
-
-                            {/* Publication */}
-
-                            <TableCell>
-                              <PublicationBadge
-                                isPublished={batch.isPublished}
-                              />
-                            </TableCell>
-
-                            {/* Actions */}
-
-                            <TableCell className="text-right">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger
-                                  render={
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="size-8"
-                                      aria-label={`Actions for ${batch.title}`}
-                                    >
-                                      <MoreHorizontal className="size-4" />
-                                    </Button>
-                                  }
-                                />
-
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem
-                                    onClick={() => setSelectedBatch(batch)}
-                                  >
-                                    <Pencil className="mr-2 size-4" />
-                                    Edit
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
+                <div className="mb-7 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                  {filteredBatches.map((batch) => (
+                    <BatchCard
+                      key={batch.id}
+                      batch={batch}
+                      onEdit={setSelectedBatch}
+                    />
+                  ))}
                 </div>
               )}
             </>
@@ -694,8 +652,7 @@ export default function BatchList() {
         </CardContent>
       </Card>
 
-      {/* Edit Batch Dialog */}
-
+      {/* Edit Batch Form */}
       {selectedBatch && (
         <BatchForm
           key={selectedBatch.id}

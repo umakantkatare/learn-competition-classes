@@ -222,12 +222,14 @@ export async function updateBatchAction(
   formData: z.input<typeof updateBatchSchema>,
 ): Promise<ActionResult> {
   try {
+    // 1. Authorization
     const authorization = await authorizeBatchAction();
 
     if (!authorization.authorized) {
       return authorization.result;
     }
 
+    // 2. Validate ID
     if (!validateId(id)) {
       return {
         success: false,
@@ -235,39 +237,52 @@ export async function updateBatchAction(
       };
     }
 
-    // Validate input
+    // 3. Fetch existing batch
+    const currentBatch = await batchService.getBatchById(id);
+
+    if (!currentBatch) {
+      return {
+        success: false,
+        error: "Batch not found.",
+      };
+    }
+
+    // 4. Validate update payload
+    // updateBatchSchema does not reject past start dates.
     const parsed = updateBatchSchema.safeParse(formData);
 
     if (!parsed.success) {
       return getValidationError(parsed.error);
     }
 
-    if (Object.keys(parsed.data).length === 0) {
+    const updateData = parsed.data;
+
+    // 5. Check empty payload
+    if (Object.keys(updateData).length === 0) {
       return {
         success: false,
         error: "At least one field is required to update a batch.",
       };
     }
 
-    // Fetch current batch for slug and examination revalidation
-    const currentBatch = await batchService.getBatchById(id);
+    // 6. Update batch
+    // Existing past start dates are allowed.
+    const updatedBatch = await batchService.updateBatch(id, updateData);
 
-    // Update batch and synchronize teachers if supplied.
-    // Media URL and ImageKit fileId fields are forwarded independently.
-    const updatedBatch = await batchService.updateBatch(id, parsed.data);
-
+    // 7. Revalidate batch pages
     revalidateBatchPaths(id, currentBatch.slug);
 
-    // Revalidate new slug if changed
     if (updatedBatch.slug !== currentBatch.slug) {
       revalidatePath(`/batch/${updatedBatch.slug}`);
     }
 
-    // Revalidate examination pages if examination changed
+    // 8. Revalidate examination pages
     revalidatePath(`/admin/examinations/${currentBatch.examinationId}`);
+    revalidatePath(`/manager/examinations/${currentBatch.examinationId}`);
 
     if (updatedBatch.examinationId !== currentBatch.examinationId) {
       revalidatePath(`/admin/examinations/${updatedBatch.examinationId}`);
+      revalidatePath(`/manager/examinations/${updatedBatch.examinationId}`);
     }
 
     return {
