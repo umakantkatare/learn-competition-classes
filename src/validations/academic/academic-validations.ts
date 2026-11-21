@@ -82,10 +82,6 @@ export const updateTeacherProfileSchema = createTeacherProfileSchema
 
 export const createStudentProfileSchema = z.object({
   userId: idSchema,
-  targetExamId: idSchema.optional().nullable(),
-  preferredMedium: batchMediumSchema.default("HINGLISH"),
-  state: z.string().trim().default("Madhya Pradesh").optional().nullable(),
-  city: z.string().trim().optional().nullable(),
 });
 
 export const updateStudentProfileSchema = createStudentProfileSchema

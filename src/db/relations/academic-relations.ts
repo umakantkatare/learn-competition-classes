@@ -96,10 +96,6 @@ export const academicRelations = defineRelations(
         from: r.studentProfiles.userId,
         to: r.user.id,
       }),
-      targetExam: r.one.examination({
-        from: r.studentProfiles.targetExamId,
-        to: r.examination.id,
-      }),
     },
 
     examCategory: {
@@ -117,10 +113,6 @@ export const academicRelations = defineRelations(
       batches: r.many.batch({
         from: r.examination.id,
         to: r.batch.examinationId,
-      }),
-      interestedStudents: r.many.studentProfiles({
-        from: r.examination.id,
-        to: r.studentProfiles.targetExamId,
       }),
     },
 

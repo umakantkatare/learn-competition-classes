@@ -26,7 +26,7 @@ export const examCategory = pgTable("exam_category", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
-  name: text("name").notNull(),
+  name: text("name").notNull().unique(),
   slug: text("slug").notNull().unique(),
   logo: text("logo"),
   logoFileId: text("logo_file_id"),
@@ -57,18 +57,36 @@ export const managerProfiles = pgTable(
     id: text("id")
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
+
     userId: text("user_id")
       .notNull()
       .unique()
-      .references(() => user.id, { onDelete: "cascade" }),
-    employeeCode: text("employee_code").unique().notNull(),
+      .references(() => user.id, {
+        onDelete: "cascade",
+      }),
+
+    employeeCode: text("employee_code").notNull(),
+
     createdAt: timestamp("created_at").defaultNow().notNull(),
+
     updatedAt: timestamp("updated_at")
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
   },
-  (table) => [index("manager_profiles_userId_idx").on(table.userId)],
+  (table) => [
+    uniqueIndex("manager_employee_code_unique").on(
+      sql`lower(${table.employeeCode})`,
+    ),
+
+    check(
+      "manager_employee_code_not_blank",
+      sql`
+        length(btrim(${table.employeeCode})) > 0
+        AND ${table.employeeCode} = btrim(${table.employeeCode})
+      `,
+    ),
+  ],
 );
 
 export const teacherProfiles = pgTable(
@@ -94,35 +112,25 @@ export const teacherProfiles = pgTable(
   (table) => [index("teacher_profiles_userId_idx").on(table.userId)],
 );
 
-export const studentProfiles = pgTable(
-  "student_profiles",
-  {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(() => crypto.randomUUID()),
-    userId: text("user_id")
-      .notNull()
-      .unique()
-      .references(() => user.id, { onDelete: "cascade" }),
-    targetExamId: text("target_exam_id").references(() => examination.id, {
-      onDelete: "set null",
+export const studentProfiles = pgTable("student_profiles", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+
+  userId: text("user_id")
+    .notNull()
+    .unique()
+    .references(() => user.id, {
+      onDelete: "cascade",
     }),
-    preferredMedium: batchMediumEnum("preferred_medium")
-      .default("HINGLISH")
-      .notNull(),
-    state: text("state").default("Madhya Pradesh"),
-    city: text("city"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
-      .defaultNow()
-      .$onUpdate(() => new Date())
-      .notNull(),
-  },
-  (table) => [
-    index("student_profiles_userId_idx").on(table.userId),
-    index("student_profiles_targetExamId_idx").on(table.targetExamId),
-  ],
-);
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => new Date())
+    .notNull(),
+});
 
 export const batch = pgTable(
   "batch",

@@ -1,3 +1,4 @@
+import { USER_ROLES } from "@/lib/permissions";
 import { pgEnum } from "drizzle-orm/pg-core";
 
 export const batchMediumEnum = pgEnum("batch_medium", [
@@ -41,3 +42,8 @@ export const enrollmentStatusEnum = pgEnum("enrollment_status", [
   "EXPIRED",
   "REFUNDED",
 ]);
+
+export const userRoleEnum = pgEnum(
+  "user_role",
+  USER_ROLES
+);
