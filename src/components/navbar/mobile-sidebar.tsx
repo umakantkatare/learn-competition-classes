@@ -5,8 +5,6 @@ import { X } from "lucide-react";
 
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
-import MobileNavLinks from "./mobile-navLinks";
-import MobileNavActions from "./mobile-navActions";
 import NavbarActions from "./navbar-actions";
 import NavbarLinks from "./navbar-links";
 
@@ -93,7 +91,6 @@ export default function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
           px-5 py-6
         "
         >
-          {/* <MobileNavLinks onNavigate={onClose} /> */}
           <NavbarLinks onNavigate={onClose}/>
         </div>
 
@@ -105,7 +102,6 @@ export default function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
           pb-[max(1.25rem,env(safe-area-inset-bottom))]
         "
         >
-          {/* <MobileNavActions onNavigate={onClose} /> */}
           <NavbarActions onNavigate={onClose}/>
         </div>
       </SheetContent>

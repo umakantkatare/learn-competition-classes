@@ -8,9 +8,7 @@ import {
   BookOpen,
   Video,
   ClipboardList,
-  Settings,
   UserRound,
-  BarChart3,
   X,
   Tags,
 } from "lucide-react";
@@ -39,13 +37,15 @@ const navigation: Record<UserRole, NavItem[]> = {
     { label: "My Profile", href: "/admin", icon: UserRound },
     { label: "Managers", href: "/admin/managers", icon: Users },
     { label: "Teachers", href: "/admin/teachers", icon: GraduationCap },
+    { label: "Students", href: "/admin/students", icon: UserRound },
     { label: "Exam-Category", href: "/admin/exam-categories", icon: Tags },
     { label: "Exams", href: "/admin/exams", icon: GraduationCap },
-    { label: "Students", href: "/admin/students", icon: UserRound },
-    { label: "Courses & Batches", href: "/admin/batches", icon: BookOpen },
+    { label: "Batches", href: "/admin/batches", icon: BookOpen },
     { label: "Live Classes", href: "/admin/live-classes", icon: Video },
-    { label: "Reports", href: "/admin/reports", icon: BarChart3 },
-    { label: "Settings", href: "/admin/settings", icon: Settings },
+    { label: "Enrollments", href: "/admin/enrollments", icon: ClipboardList },
+
+    // { label: "Reports", href: "/admin/reports", icon: BarChart3 },
+    // { label: "Settings", href: "/admin/settings", icon: Settings },
   ],
 
   manager: [
@@ -67,10 +67,10 @@ const navigation: Record<UserRole, NavItem[]> = {
 
   student: [
     { label: "My Profile", href: "/student", icon: UserRound },
-    { label: "My Courses", href: "/student/courses", icon: BookOpen },
+    { label: "My Courses", href: "/student/batches", icon: BookOpen },
     { label: "Live Classes", href: "/student/live-classes", icon: Video },
-    { label: "My Tests", href: "/student/tests", icon: ClipboardList },
-    { label: "My Results", href: "/student/results", icon: BarChart3 },
+    // { label: "My Tests", href: "/student/tests", icon: ClipboardList },
+    // { label: "My Results", href: "/student/results", icon: BarChart3 },
   ],
 };
 
