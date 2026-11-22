@@ -41,15 +41,36 @@ function createDatabase() {
   return { db, pool };
 }
 
+type DatabaseInstance = ReturnType<typeof createDatabase>;
+
 const globalForDb = globalThis as typeof globalThis & {
-  dbInstance?: ReturnType<typeof createDatabase>;
+  dbInstance?: DatabaseInstance;
 };
 
-const dbInstance = globalForDb.dbInstance ?? createDatabase();
+function getDatabase(): DatabaseInstance {
+  if (!globalForDb.dbInstance) {
+    globalForDb.dbInstance = createDatabase();
+  }
 
-if (process.env.NODE_ENV !== "production") {
-  globalForDb.dbInstance = dbInstance;
+  return globalForDb.dbInstance;
 }
 
-export const db = dbInstance.db;
-export const pool = dbInstance.pool;
+export const db = new Proxy({} as DatabaseInstance["db"], {
+  get(_target, property) {
+    const database = getDatabase().db;
+
+    return Reflect.get(database, property, database);
+  },
+});
+
+export const pool = new Proxy({} as Pool, {
+  get(_target, property) {
+    const databasePool = getDatabase().pool;
+
+    const value = Reflect.get(databasePool, property, databasePool);
+
+    return typeof value === "function"
+      ? value.bind(databasePool)
+      : value;
+  },
+});
