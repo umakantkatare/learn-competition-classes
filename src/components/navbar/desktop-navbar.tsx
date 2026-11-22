@@ -1,13 +1,12 @@
 "use client";
 
 import Logo from "../common/logo";
-import NavbarLinks from "./navbar-links";
-import NavbarActions from "./navbar-actions";
-import NavbarUserMenu from "./navbar-userMenu";
 
-import { authClient } from "@/lib/auth-client";
+import NavbarLinks from "./navbar-links";
+import NavbarAuth, { type NavbarUser } from "./navbar-auth";
 
 import { Menu } from "lucide-react";
+
 import {
   Sheet,
   SheetContent,
@@ -16,16 +15,20 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 
-export default function Navbar() {
-  const { data: session, isPending } = authClient.useSession();
+interface DesktopNavbarProps {
+  user: NavbarUser | null;
+  isPending: boolean;
+}
 
-  const user = session?.user;
-
+export default function DesktopNavbar({
+  user,
+  isPending,
+}: DesktopNavbarProps) {
   return (
     <header
       className="
-        sticky top-3 z-50 mx-auto w-full
-        rounded-xl border border-border
+        mx-auto w-full rounded-xl
+        border border-border
         bg-card/95 text-card-foreground
         shadow-sm backdrop-blur-md
         transition-colors
@@ -56,29 +59,14 @@ export default function Navbar() {
           <NavbarLinks />
         </nav>
 
-        {/* User Actions + Mobile Menu */}
+        {/* Authentication */}
         <div className="flex shrink-0 items-center justify-end gap-2">
-          {/* User Authentication */}
-          {isPending ? (
-            <div
-              className="
-                size-9 animate-pulse rounded-full
-                bg-muted sm:size-10
-              "
-              role="status"
-              aria-label="Loading user"
-            />
-          ) : user ? (
-            <NavbarUserMenu
-              name={user.name}
-              role={user.role ?? "student"}
-              avatar={user.image ?? undefined}
-            />
-          ) : (
-            <NavbarActions />
-          )}
+          <NavbarAuth
+            user={user}
+            isPending={isPending}
+          />
 
-          {/* Mobile Navigation */}
+          {/* Tablet Navigation */}
           <div className="lg:hidden">
             <Sheet>
               <SheetTrigger
@@ -103,12 +91,18 @@ export default function Navbar() {
                 <SheetHeader>
                   <SheetTitle className="flex items-center">
                     <Logo width={48} height={48} />
+                    <span className="sr-only">
+                      Navigation menu
+                    </span>
                   </SheetTitle>
                 </SheetHeader>
 
                 <nav
                   aria-label="Mobile navigation"
-                  className="mt-6 flex flex-1 flex-col gap-5 overflow-y-auto"
+                  className="
+                    mt-6 flex flex-1 flex-col
+                    gap-5 overflow-y-auto
+                  "
                 >
                   <NavbarLinks />
                 </nav>

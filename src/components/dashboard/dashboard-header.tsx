@@ -1,23 +1,24 @@
 "use client";
 
-import { Bell, ChevronDown, Menu, UserRound } from "lucide-react";
+import { Menu } from "lucide-react";
+// import { Bell, ChevronDown, Menu, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import type { UserRole } from "@/lib/permissions";
 
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+// import {
+//   DropdownMenu,
+//   DropdownMenuContent,
+//   DropdownMenuGroup,
+//   DropdownMenuItem,
+//   DropdownMenuLabel,
+//   DropdownMenuSeparator,
+//   DropdownMenuTrigger,
+// } from "@/components/ui/dropdown-menu";
 
-import { SignOutButton } from "../auth/sign-out-button";
-import { UserAvatar } from "../common/user-avatar";
+// import { SignOutButton } from "../auth/sign-out-button";
+// import { UserAvatar } from "../common/user-avatar";
 
 type DashboardHeaderProps = {
   title: string;
@@ -72,9 +73,9 @@ export function DashboardHeader({
       </div>
 
       {/* Right: Notifications + User Menu */}
-      <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
-        {/* Notifications */}
-        <Button
+      {/* <div className="flex shrink-0 items-center gap-1.5 sm:gap-3"> */}
+      {/* Notifications */}
+      {/* <Button
           type="button"
           variant="ghost"
           size="icon"
@@ -84,10 +85,10 @@ export function DashboardHeader({
           <Bell className="size-5" />
 
           <span className="absolute right-2 top-2 size-2 rounded-full bg-brand-primary ring-2 ring-background" />
-        </Button>
+        </Button> */}
 
-        {/* User Dropdown */}
-        <DropdownMenu>
+      {/* User Dropdown */}
+      {/* <DropdownMenu>
           <DropdownMenuTrigger
             render={
               <Button
@@ -167,8 +168,8 @@ export function DashboardHeader({
               <SignOutButton variant="menu" />
             </DropdownMenuItem>
           </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+        </DropdownMenu> */}
+      {/* </div> */}
     </header>
   );
 }
