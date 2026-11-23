@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-
 import {
   Search,
   MoreHorizontal,
@@ -13,8 +12,8 @@ import {
   Phone,
   Hash,
   AlertTriangle,
+  UserRound,
 } from "lucide-react";
-
 import { toast } from "sonner";
 
 import {
@@ -25,7 +24,6 @@ import {
 import ManagerForm from "./manager-form";
 
 // UI Components
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -66,7 +64,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-type Manager = {
+// --------------------------------------------------
+// Types
+// --------------------------------------------------
+
+interface Manager {
   managerProfileId: string;
   name: string;
   email: string;
@@ -74,8 +76,12 @@ type Manager = {
   phoneNumber?: string | null;
   employeeCode: string;
   image?: string | null;
-  // avatarFileId?: string | null;
-};
+  avatarFileId?: string | null;
+}
+
+// --------------------------------------------------
+// Loading Skeleton
+// --------------------------------------------------
 
 function ManagerListSkeleton() {
   return (
@@ -87,6 +93,10 @@ function ManagerListSkeleton() {
   );
 }
 
+// --------------------------------------------------
+// Empty State
+// --------------------------------------------------
+
 function ManagerEmptyState({ isSearching }: { isSearching: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
@@ -95,7 +105,7 @@ function ManagerEmptyState({ isSearching }: { isSearching: boolean }) {
       </div>
 
       <div className="space-y-1">
-        <h3 className="font-semibold text-foreground">
+        <h3 className="font-semibold">
           {isSearching ? "No matching managers" : "No managers yet"}
         </h3>
 
@@ -108,6 +118,10 @@ function ManagerEmptyState({ isSearching }: { isSearching: boolean }) {
     </div>
   );
 }
+
+// --------------------------------------------------
+// Error State
+// --------------------------------------------------
 
 function ManagerErrorState({
   onRetry,
@@ -125,9 +139,7 @@ function ManagerErrorState({
       </div>
 
       <div className="space-y-1">
-        <h3 className="font-semibold text-foreground">
-          Failed to load managers
-        </h3>
+        <h3 className="font-semibold">Failed to load managers</h3>
 
         <p className="text-sm text-muted-foreground">{message}</p>
       </div>
@@ -136,12 +148,15 @@ function ManagerErrorState({
         <RefreshCw
           className={`mr-2 size-4 ${isFetching ? "animate-spin" : ""}`}
         />
-
         {isFetching ? "Retrying..." : "Try again"}
       </Button>
     </div>
   );
 }
+
+// --------------------------------------------------
+// Delete Confirmation Dialog
+// --------------------------------------------------
 
 function DeleteManagerDialog({
   manager,
@@ -157,7 +172,6 @@ function DeleteManagerDialog({
   return (
     <AlertDialog
       open={Boolean(manager)}
-
       onOpenChange={(open) => {
         if (!open && !isDeleting) {
           onClose();
@@ -182,9 +196,7 @@ function DeleteManagerDialog({
         </AlertDialogHeader>
 
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={isDeleting} onClick={onClose}>
-            Cancel
-          </AlertDialogCancel>
+          <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
 
           <AlertDialogAction
             disabled={isDeleting}
@@ -192,7 +204,6 @@ function DeleteManagerDialog({
               event.preventDefault();
               onConfirm();
             }}
-
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
             {isDeleting ? (
@@ -213,6 +224,10 @@ function DeleteManagerDialog({
   );
 }
 
+// --------------------------------------------------
+// Main Component
+// --------------------------------------------------
+
 export default function ManagerList() {
   const {
     data: managers,
@@ -224,13 +239,23 @@ export default function ManagerList() {
   } = useGetAllManagers();
 
   const deleteManagerMutation = useDeleteManagerProfile();
-  const isDeleting = deleteManagerMutation.isPending;
+
   const [search, setSearch] = useState("");
+
   const [selectedManager, setSelectedManager] = useState<Manager | null>(null);
+
   const [managerToDelete, setManagerToDelete] = useState<Manager | null>(null);
+
+  const isDeleting = deleteManagerMutation.isPending;
+
+  // --------------------------------------------------
+  // Search Managers
+  // --------------------------------------------------
+
   const filteredManagers = useMemo(() => {
     const list = (managers ?? []) as Manager[];
     const query = search.trim().toLowerCase();
+
     if (!query) return list;
 
     return list.filter((manager) =>
@@ -248,17 +273,29 @@ export default function ManagerList() {
     );
   }, [managers, search]);
 
+  // --------------------------------------------------
+  // Refresh
+  // --------------------------------------------------
+
   function handleRefresh() {
     void refetch();
   }
+
+  // --------------------------------------------------
+  // Delete Manager
+  // --------------------------------------------------
 
   async function handleDeleteManager() {
     if (!managerToDelete || isDeleting) return;
 
     try {
       await deleteManagerMutation.mutateAsync(managerToDelete.managerProfileId);
+
       toast.success("Manager deleted successfully.");
+
       setManagerToDelete(null);
+
+      void refetch();
     } catch (error) {
       toast.error(
         error instanceof Error
@@ -268,6 +305,10 @@ export default function ManagerList() {
     }
   }
 
+  // --------------------------------------------------
+  // Render
+  // --------------------------------------------------
+
   return (
     <>
       <Card className="rounded-card border-border/70 bg-card shadow-sm">
@@ -275,7 +316,7 @@ export default function ManagerList() {
 
         <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
-            <CardTitle className="flex items-center gap-2 text-xl font-semibold text-foreground">
+            <CardTitle className="flex items-center gap-2 text-xl font-semibold">
               <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10">
                 <Users className="size-5 text-primary" />
               </div>
@@ -305,8 +346,6 @@ export default function ManagerList() {
         {/* Content */}
 
         <CardContent>
-          {/* Loading */}
-
           {isLoading ? (
             <ManagerListSkeleton />
           ) : isError ? (
@@ -316,7 +355,6 @@ export default function ManagerList() {
                   ? error.message
                   : "Something went wrong while fetching managers."
               }
-
               onRetry={handleRefresh}
               isFetching={isFetching}
             />
@@ -339,7 +377,6 @@ export default function ManagerList() {
                   {isFetching && (
                     <span
                       className="text-xs text-muted-foreground"
-
                       aria-live="polite"
                     >
                       Updating...
@@ -368,127 +405,148 @@ export default function ManagerList() {
               {filteredManagers.length === 0 ? (
                 <ManagerEmptyState isSearching={Boolean(search.trim())} />
               ) : (
+                /* Manager Table */
+
                 <div className="relative w-full max-w-full max-h-[500px] overflow-auto rounded-section border border-border">
                   <Table className="min-w-[800px] w-full">
-                    <TableHeader className="sticky top-0 z-10 border-separate border-spacing-0 bg-muted shadow-sm">
+                    {/* Table Header */}
+
+                    <TableHeader className="sticky top-0 z-10 bg-muted">
                       <TableRow className="hover:bg-transparent">
-                        <TableHead className="min-w-40 whitespace-nowrap font-semibold">
+                        <TableHead className="min-w-48 font-semibold">
                           Manager
                         </TableHead>
 
-                        <TableHead className="min-w-56 whitespace-nowrap font-semibold">
+                        <TableHead className="min-w-56 font-semibold">
                           Email
                         </TableHead>
 
-                        <TableHead className="min-w-36 whitespace-nowrap font-semibold">
+                        <TableHead className="min-w-40 font-semibold">
                           Phone
                         </TableHead>
 
-                        <TableHead className="min-w-36 whitespace-nowrap font-semibold">
+                        <TableHead className="min-w-36 font-semibold">
                           Employee ID
                         </TableHead>
 
-                        <TableHead className="w-16 whitespace-nowrap text-right font-semibold">
+                        <TableHead className="w-16 text-right font-semibold">
                           Actions
                         </TableHead>
                       </TableRow>
                     </TableHeader>
 
+                    {/* Table Body */}
+
                     <TableBody>
-                      {filteredManagers.map((manager) => (
-                        <TableRow
-                          key={manager.managerProfileId}
+                      {filteredManagers.map((manager) => {
+                        const phone = manager.phoneNumber ?? manager.phone;
 
-                          className="transition-colors hover:bg-accent/40"
-                        >
-                          {/* Manager Name */}
+                        return (
+                          <TableRow
+                            key={manager.managerProfileId}
+                            className="transition-colors hover:bg-accent/40"
+                          >
+                            {/* Manager */}
 
-                          <TableCell className="whitespace-nowrap">
-                            <div className="flex items-center gap-3">
-                              <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-secondary/10 text-sm font-semibold text-secondary">
-                                {manager.name?.charAt(0)?.toUpperCase() || "M"}
+                            <TableCell>
+                              <div className="flex items-center gap-3">
+                                <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full border bg-muted">
+                                  {manager.image ? (
+                                    <img
+                                      src={manager.image}
+                                      alt={`${manager.name} profile`}
+                                      className="size-full object-cover"
+                                      loading="lazy"
+                                    />
+                                  ) : (
+                                    <UserRound className="size-5 text-muted-foreground" />
+                                  )}
+                                </div>
+
+                                <div className="min-w-0">
+                                  <p className="truncate font-medium text-foreground">
+                                    {manager.name || "—"}
+                                  </p>
+
+                                  <p className="text-xs text-muted-foreground">
+                                    Manager
+                                  </p>
+                                </div>
                               </div>
+                            </TableCell>
 
-                              <span className="font-medium text-foreground">
-                                {manager.name || "—"}
-                              </span>
-                            </div>
-                          </TableCell>
+                            {/* Email */}
 
-                          {/* Email */}
+                            <TableCell>
+                              <div className="flex items-center gap-2 text-muted-foreground">
+                                <Mail className="size-4 shrink-0" />
 
-                          <TableCell className="whitespace-nowrap">
-                            <div className="flex items-center gap-2 text-muted-foreground">
-                              <Mail className="size-4 shrink-0" />
+                                <span className="truncate">
+                                  {manager.email || "—"}
+                                </span>
+                              </div>
+                            </TableCell>
 
-                              <span>{manager.email || "—"}</span>
-                            </div>
-                          </TableCell>
+                            {/* Phone */}
 
-                          {/* Phone */}
+                            <TableCell>
+                              <div className="flex items-center gap-2 text-muted-foreground">
+                                <Phone className="size-4 shrink-0" />
 
-                          <TableCell className="whitespace-nowrap">
-                            <div className="flex items-center gap-2 text-foreground">
-                              <Phone className="size-4 shrink-0 text-muted-foreground" />
+                                <span>{phone || "—"}</span>
+                              </div>
+                            </TableCell>
 
-                              {manager.phoneNumber ?? manager.phone ?? "—"}
-                            </div>
-                          </TableCell>
+                            {/* Employee Code */}
 
-                          {/* Employee Code */}
+                            <TableCell>
+                              <Badge
+                                variant="secondary"
+                                className="gap-1 border-0 bg-accent text-accent-foreground"
+                              >
+                                <Hash className="size-3" />
+                                {manager.employeeCode || "—"}
+                              </Badge>
+                            </TableCell>
 
-                          <TableCell className="whitespace-nowrap">
-                            <Badge
-                              variant="secondary"
-                              className="gap-1 border-0 bg-accent text-accent-foreground"
-                            >
-                              <Hash className="size-3" />
-                              {manager.employeeCode || "—"}
-                            </Badge>
-                          </TableCell>
+                            {/* Actions */}
 
-                          {/* Actions */}
+                            <TableCell className="text-right">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger
+                                  render={
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="size-8"
+                                      aria-label={`Actions for ${manager.name}`}
+                                    >
+                                      <MoreHorizontal className="size-4" />
+                                    </Button>
+                                  }
+                                />
 
-                          <TableCell className="text-right">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger
-                                render={
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="size-8"
-                                    aria-label={`Actions for ${manager.name}`}
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    onClick={() => setSelectedManager(manager)}
                                   >
-                                    <MoreHorizontal className="size-4" />
-                                  </Button>
-                                }
-                              />
+                                    <Pencil className="mr-2 size-4" />
+                                    Edit
+                                  </DropdownMenuItem>
 
-                              <DropdownMenuContent align="end">
-                                {/* Edit */}
-
-                                <DropdownMenuItem
-                                  onClick={() => setSelectedManager(manager)}
-                                >
-                                  <Pencil className="mr-2 size-4" />
-                                  Edit
-                                </DropdownMenuItem>
-
-                                {/* Delete */}
-
-                                <DropdownMenuItem
-                                  onClick={() => setManagerToDelete(manager)}
-
-                                  className="text-destructive focus:text-destructive"
-                                >
-                                  <Trash2 className="mr-2 size-4" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                                  <DropdownMenuItem
+                                    onClick={() => setManagerToDelete(manager)}
+                                    className="text-destructive focus:text-destructive"
+                                  >
+                                    <Trash2 className="mr-2 size-4" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
@@ -499,6 +557,7 @@ export default function ManagerList() {
       </Card>
 
       {/* Edit Manager Dialog */}
+
       <ManagerForm
         key={selectedManager?.managerProfileId ?? "manager-edit"}
         open={Boolean(selectedManager)}
@@ -509,9 +568,11 @@ export default function ManagerList() {
                 id: selectedManager.managerProfileId,
                 name: selectedManager.name,
                 email: selectedManager.email,
-                phoneNumber: selectedManager.phoneNumber ?? selectedManager.phone ?? "",
+                phoneNumber:
+                  selectedManager.phoneNumber ?? selectedManager.phone ?? "",
                 employeeCode: selectedManager.employeeCode,
-                // image: selectedManager.image ?? null,
+                image: selectedManager.image ?? null,
+                avatarFileId: selectedManager.avatarFileId ?? null,
               }
             : undefined
         }
@@ -522,8 +583,11 @@ export default function ManagerList() {
         }}
         onSuccessCallback={() => {
           setSelectedManager(null);
+          void refetch();
         }}
       />
+
+      {/* Delete Confirmation */}
 
       <DeleteManagerDialog
         manager={managerToDelete}

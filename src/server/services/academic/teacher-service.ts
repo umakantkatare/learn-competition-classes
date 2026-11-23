@@ -1,24 +1,8 @@
-import { randomBytes } from "node:crypto";
-
-import {
-  TeacherRepository,
-  TeacherWithUser,
-  type TeacherProfile,
-  type UpdateTeacherProfileData,
-} from "@/server/repositories/academic/teacher-repository";
-
+import { TeacherRepository } from "@/server/repositories/academic/teacher-repository";
 import {
   createTeacherSchema,
   updateTeacherSchema,
-  type CreateTeacherInput,
-  type UpdateTeacherPayload,
 } from "@/validations/academic/teacher-validations";
-
-type CreatedAuthUser = {
-  id: string;
-  name: string;
-  email: string;
-};
 
 type CreateTeacherDependencies = {
   createAuthUser: (input: {
@@ -28,250 +12,156 @@ type CreateTeacherDependencies = {
     phoneNumber: string;
     image?: string | null;
     avatarFileId?: string | null;
-  }) => Promise<CreatedAuthUser>;
-};
-
-type CreateTeacherResult = {
-  userId: string;
-  teacherProfileId: string;
-  name: string;
-  email: string;
-  password: string;
-  phoneNumber: string;
-  image: string | null;
-  avatarFileId: string | null;
-  subject: string[];
-  experienceYears: number;
-  qualification: string | null;
-  bio: string | null;
+  }) => Promise<{ id: string }>;
 };
 
 export class TeacherService {
-  private readonly teacherRepo: TeacherRepository;
+  constructor(private readonly teacherRepo = new TeacherRepository()) {}
 
-  constructor() {
-    this.teacherRepo = new TeacherRepository();
-  }
-
-  // Normalize email
-  private normalizeEmail(email: string): string {
-    return email.trim().toLowerCase();
-  }
-
-  // Check duplicate email
-  private async assertEmailAvailable(email: string): Promise<void> {
-    const existingUser = await this.teacherRepo.findUserByEmail(email);
-
-    if (existingUser) {
-      throw new Error("An account with this email already exists.");
-    }
-  }
-
-  // Validate experience
-  private validateExperience(experienceYears: number): number {
-    if (
-      !Number.isFinite(experienceYears) ||
-      !Number.isInteger(experienceYears) ||
-      experienceYears < 0 ||
-      experienceYears > 60
-    ) {
-      throw new Error(
-        "Experience years must be a valid integer between 0 and 60.",
-      );
-    }
-
-    return experienceYears;
-  }
-
-  // Generate temporary password
-  private generateTemporaryPassword(): string {
-    return randomBytes(24).toString("base64url");
-  }
-
-  /**
-   * Create Better Auth account and teacher profile.
-   */
-  async createProfile(
-    input: CreateTeacherInput,
-    dependencies: CreateTeacherDependencies,
-  ): Promise<CreateTeacherResult> {
-    // 1. Validate input
+  async createProfile(input: unknown, dependencies: CreateTeacherDependencies) {
     const parsed = createTeacherSchema.safeParse(input);
 
     if (!parsed.success) {
       throw new Error(
-        parsed.error.issues.map((issue) => issue.message).join(", "),
+        parsed.error.issues[0]?.message ?? "Invalid teacher data",
       );
     }
 
     const data = parsed.data;
+    const email = data.email.trim().toLowerCase();
 
-    // 2. Normalize email
-    const email = this.normalizeEmail(data.email);
+    const existingUser = await this.teacherRepo.findUserByEmail(email);
 
-    // 3. Check duplicate email
-    await this.assertEmailAvailable(email);
+    if (existingUser) {
+      throw new Error("A user with this email already exists");
+    }
 
-    // 4. Validate experience
-    const experienceYears = this.validateExperience(data.experienceYears);
+    if (data.experienceYears < 0) {
+      throw new Error("Experience years cannot be negative");
+    }
 
-    // 5. Generate temporary password
     const temporaryPassword = this.generateTemporaryPassword();
 
-    // 6. Create Better Auth user
-    const createdUser = await dependencies.createAuthUser({
-      name: data.name.trim(),
+    const authUser = await dependencies.createAuthUser({
+      name: data.name,
       email,
-      password: temporaryPassword,
-      phoneNumber: data.phoneNumber.trim(),
-      image: data.image ?? null,
-      avatarFileId: data.avatarFileId ?? null,
-    });
-
-    // 7. Create teacher profile
-    const profile = await this.teacherRepo.create({
-      userId: createdUser.id,
-      subject: data.subject,
-      experienceYears,
-      qualification: data.qualification ?? null,
-      bio: data.bio ?? null,
-    });
-
-    // 8. Return safe response
-    return {
-      userId: createdUser.id,
-      teacherProfileId: profile.id,
-      name: createdUser.name,
-      email: createdUser.email,
       password: temporaryPassword,
       phoneNumber: data.phoneNumber,
       image: data.image ?? null,
       avatarFileId: data.avatarFileId ?? null,
-      subject: profile.subject,
-      experienceYears: profile.experienceYears,
-      qualification: profile.qualification,
-      bio: profile.bio,
+    });
+
+    const teacher = await this.teacherRepo.create({
+      userId: authUser.id,
+      subject: data.subject,
+      experienceYears: data.experienceYears,
+      qualification: data.qualification,
+      bio: data.bio,
+    });
+
+    return {
+      ...teacher,
+      userId: authUser.id,
+      name: data.name,
+      email,
+      phone: data.phoneNumber,
+      image: data.image ?? null,
+      avatarFileId: data.avatarFileId ?? null,
+      temporaryPassword,
     };
   }
 
-  // Get all teacher profiles
-  async getAllTeachers(): Promise<TeacherWithUser[]> {
+  async getAllTeachers() {
     return this.teacherRepo.findAll();
   }
 
-  // Get profile by profile ID
-  async getProfileById(id: string): Promise<TeacherProfile> {
-    const profile = await this.teacherRepo.findById(id);
+  async getProfileById(id: string) {
+    const teacher = await this.teacherRepo.findById(id);
 
-    if (!profile) {
-      throw new Error("Teacher profile not found.");
+    if (!teacher) {
+      throw new Error("Teacher profile not found");
     }
 
-    return profile;
+    return teacher;
   }
 
-  // Get profile by authenticated user ID
-  async getProfileByUserId(userId: string): Promise<TeacherProfile> {
-    const profile = await this.teacherRepo.findByUserId(userId);
+  async getProfileByUserId(userId: string) {
+    const teacher = await this.teacherRepo.findByUserId(userId);
 
-    if (!profile) {
-      throw new Error("Teacher profile not found for this user.");
+    if (!teacher) {
+      throw new Error("Teacher profile not found");
     }
 
-    return profile;
+    return teacher;
   }
 
-  // Update teacher profile
-  async updateProfile(
-    id: string,
-    input: UpdateTeacherPayload,
-  ): Promise<TeacherProfile> {
-    // 1. Check existing profile
-    const existingProfile = await this.teacherRepo.findById(id);
+  async updateProfile(id: string, input: unknown) {
+    const existingTeacher = await this.teacherRepo.findById(id);
 
-    if (!existingProfile) {
-      throw new Error("Teacher profile not found.");
+    if (!existingTeacher) {
+      throw new Error("Teacher profile not found");
     }
 
-    // 2. Validate update input
     const parsed = updateTeacherSchema.safeParse(input);
 
     if (!parsed.success) {
       throw new Error(
-        parsed.error.issues.map((issue) => issue.message).join(", "),
+        parsed.error.issues[0]?.message ?? "Invalid teacher data",
       );
     }
 
     const data = parsed.data;
 
-    // 3. Allow only teacher-specific fields
-    const allowedFields = [
-      "subject",
-      "experienceYears",
-      "qualification",
-      "bio",
-    ];
-
-    const invalidFields = Object.keys(data).filter(
-      (key) => !allowedFields.includes(key),
-    );
-
-    if (invalidFields.length > 0) {
-      throw new Error(
-        `These fields cannot be updated through teacher profile: ${invalidFields.join(", ")}`,
-      );
+    if (data.experienceYears !== undefined && data.experienceYears < 0) {
+      throw new Error("Experience years cannot be negative");
     }
 
-    // 4. Prepare update payload
-    const updates: UpdateTeacherProfileData = {};
+    const updateData = {
+      ...(data.subject !== undefined && {
+        subject: data.subject,
+      }),
+      ...(data.experienceYears !== undefined && {
+        experienceYears: data.experienceYears,
+      }),
+      ...(data.qualification !== undefined && {
+        qualification: data.qualification,
+      }),
+      ...(data.bio !== undefined && {
+        bio: data.bio,
+      }),
+    };
 
-    if (data.subject !== undefined) {
-      updates.subject = data.subject;
+    if (Object.keys(updateData).length === 0) {
+      throw new Error("No valid fields provided for update");
     }
 
-    if (data.experienceYears !== undefined) {
-      updates.experienceYears = this.validateExperience(data.experienceYears);
-    }
-
-    if (data.qualification !== undefined) {
-      updates.qualification = data.qualification;
-    }
-
-    if (data.bio !== undefined) {
-      updates.bio = data.bio;
-    }
-
-    // 5. Check empty updates
-    if (Object.keys(updates).length === 0) {
-      throw new Error(
-        "At least one valid field is required to update the teacher profile.",
-      );
-    }
-
-    // 6. Update repository
-    const updatedProfile = await this.teacherRepo.update(id, updates);
-
-    if (!updatedProfile) {
-      throw new Error("Failed to update teacher profile.");
-    }
-
-    return updatedProfile;
+    return this.teacherRepo.update(id, updateData);
   }
 
-  // Delete teacher profile
-  async deleteProfile(id: string): Promise<TeacherProfile> {
-    const existingProfile = await this.teacherRepo.findById(id);
+  async deleteProfile(id: string) {
+    const existingTeacher = await this.teacherRepo.findById(id);
 
-    if (!existingProfile) {
-      throw new Error("Teacher profile not found.");
+    if (!existingTeacher) {
+      throw new Error("Teacher profile not found");
     }
 
-    const deletedProfile = await this.teacherRepo.delete(id);
+    await this.teacherRepo.delete(id);
 
-    if (!deletedProfile) {
-      throw new Error("Failed to delete teacher profile.");
-    }
+    return {
+      id,
+      message: "Teacher profile deleted successfully",
+    };
+  }
 
-    return deletedProfile;
+  private generateTemporaryPassword(length = 12) {
+    const chars =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$!";
+
+    return Array.from(
+      { length },
+      () => chars[Math.floor(Math.random() * chars.length)],
+    ).join("");
   }
 }
+
+export const teacherService = new TeacherService();

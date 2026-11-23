@@ -9,20 +9,30 @@ import type {
   UpdateTeacherPayload,
 } from "@/validations/academic/teacher-validations";
 
+// ============================================
+// TYPES
+// ============================================
+
+export type TeacherProfile = typeof teacherProfiles.$inferSelect;
+
+export type NewTeacherProfile = typeof teacherProfiles.$inferInsert;
+
 export type TeacherWithUser = {
   id: TeacherProfile["id"];
+  userId: TeacherProfile["userId"];
+
   name: typeof user.$inferSelect.name;
   email: typeof user.$inferSelect.email;
   phone: typeof user.$inferSelect.phoneNumber;
+
+  image: typeof user.$inferSelect.image;
+  avatarFileId: typeof user.$inferSelect.avatarFileId;
+
   subject: TeacherProfile["subject"];
   experienceYears: TeacherProfile["experienceYears"];
   qualification: TeacherProfile["qualification"];
   bio: TeacherProfile["bio"];
 };
-
-export type TeacherProfile = typeof teacherProfiles.$inferSelect;
-
-export type NewTeacherProfile = typeof teacherProfiles.$inferInsert;
 
 export type CreateTeacherProfileData = Pick<
   CreateTeacherPayload,
@@ -36,7 +46,15 @@ export type UpdateTeacherProfileData = Pick<
   "subject" | "experienceYears" | "qualification" | "bio"
 >;
 
+// ============================================
+// TEACHER REPOSITORY
+// ============================================
+
 export class TeacherRepository {
+  // ==========================================
+  // CREATE TEACHER PROFILE
+  // ==========================================
+
   async create(data: CreateTeacherProfileData): Promise<TeacherProfile> {
     const [result] = await db.insert(teacherProfiles).values(data).returning();
 
@@ -47,14 +65,26 @@ export class TeacherRepository {
     return result;
   }
 
-  // Get all teacher profiles
+  // ==========================================
+  // GET ALL TEACHERS WITH USER DETAILS
+  // ==========================================
+
   async findAll(): Promise<TeacherWithUser[]> {
     return db
       .select({
         id: teacherProfiles.id,
+        userId: teacherProfiles.userId,
+
+        // User details
         name: user.name,
         email: user.email,
         phone: user.phoneNumber,
+
+        // Profile image
+        image: user.image,
+        avatarFileId: user.avatarFileId,
+
+        // Teacher details
         subject: teacherProfiles.subject,
         experienceYears: teacherProfiles.experienceYears,
         qualification: teacherProfiles.qualification,
@@ -64,7 +94,10 @@ export class TeacherRepository {
       .innerJoin(user, eq(teacherProfiles.userId, user.id));
   }
 
-  // Find teacher by profile ID
+  // ==========================================
+  // FIND TEACHER BY PROFILE ID
+  // ==========================================
+
   async findById(id: string): Promise<TeacherProfile | undefined> {
     const [result] = await db
       .select()
@@ -75,7 +108,10 @@ export class TeacherRepository {
     return result;
   }
 
-  // Find teacher by user ID
+  // ==========================================
+  // FIND TEACHER BY USER ID
+  // ==========================================
+
   async findByUserId(userId: string): Promise<TeacherProfile | undefined> {
     const [result] = await db
       .select()
@@ -86,7 +122,10 @@ export class TeacherRepository {
     return result;
   }
 
-  // Check email in Better Auth user table
+  // ==========================================
+  // CHECK USER EMAIL
+  // ==========================================
+
   async findUserByEmail(
     email: string,
   ): Promise<{ id: string; email: string } | undefined> {
@@ -104,7 +143,10 @@ export class TeacherRepository {
     return result;
   }
 
-  // Update teacher profile
+  // ==========================================
+  // UPDATE TEACHER PROFILE
+  // ==========================================
+
   async update(
     id: string,
     data: UpdateTeacherProfileData,
@@ -124,7 +166,10 @@ export class TeacherRepository {
     return result;
   }
 
-  // Delete teacher profile
+  // ==========================================
+  // DELETE TEACHER PROFILE
+  // ==========================================
+
   async delete(id: string): Promise<TeacherProfile | undefined> {
     const [result] = await db
       .delete(teacherProfiles)
@@ -134,7 +179,10 @@ export class TeacherRepository {
     return result;
   }
 
-  // Find teacher by ID with user details
+  // ==========================================
+  // FIND TEACHER BY ID WITH USER DETAILS
+  // ==========================================
+
   async findByIdWithUser(id: string) {
     const [result] = await db
       .select({
@@ -143,7 +191,9 @@ export class TeacherRepository {
           id: user.id,
           name: user.name,
           email: user.email,
+          phone: user.phoneNumber,
           image: user.image,
+          avatarFileId: user.avatarFileId,
         },
       })
       .from(teacherProfiles)

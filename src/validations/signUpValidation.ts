@@ -9,7 +9,10 @@ export const signUpSchema = z
     phoneNumber: z
       .string()
       .trim()
-      .regex(/^[0-9]{10}$/, "Please enter a valid 10-digit mobile number."),
+      .regex(
+        /^(?:\+91[\-\s]?)?[6-9]\d{9}$/,
+        "Please enter a valid mobile number.",
+      ),
 
     password: z.string().min(6, "Password must be at least 6 characters."),
 

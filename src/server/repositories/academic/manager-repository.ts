@@ -3,6 +3,10 @@ import { managerProfiles } from "@/db/schema/academic-schema";
 import { user } from "@/db/schema/auth-schema";
 import { eq } from "drizzle-orm";
 
+// ============================================
+// TYPES
+// ============================================
+
 export type ManagerProfile = typeof managerProfiles.$inferSelect;
 export type NewManagerProfile = typeof managerProfiles.$inferInsert;
 
@@ -15,6 +19,8 @@ export type ManagerListItem = {
   name: string;
   email: string;
   phone: string | null;
+  image: string | null;
+  avatarFileId: string | null;
   employeeCode: string;
   userId: string;
 };
@@ -39,11 +45,13 @@ export type UpdatedManagerUser = Pick<
   "id" | "name" | "email" | "phoneNumber" | "image" | "avatarFileId"
 >;
 
+// ============================================
+// MANAGER REPOSITORY
+// ============================================
+
 export class ManagerRepository {
-  /**
-   * Create a manager profile.
-   * The corresponding Better Auth user must already exist.
-   */
+  // CREATE MANAGER PROFILE
+
   async create(data: NewManagerProfile): Promise<ManagerProfile> {
     const [result] = await db.insert(managerProfiles).values(data).returning();
 
@@ -54,26 +62,30 @@ export class ManagerRepository {
     return result;
   }
 
-  /**
-   * Get all manager profiles with basic user information.
-   */
+  // GET ALL MANAGERS WITH USER INFORMATION
+
   async findAll(): Promise<ManagerListItem[]> {
     return db
       .select({
         managerProfileId: managerProfiles.id,
+        userId: managerProfiles.userId,
+
         name: user.name,
         email: user.email,
         phone: user.phoneNumber,
+
+        // Profile image fields
+        image: user.image,
+        avatarFileId: user.avatarFileId,
+
         employeeCode: managerProfiles.employeeCode,
-        userId: managerProfiles.userId,
       })
       .from(managerProfiles)
       .innerJoin(user, eq(managerProfiles.userId, user.id));
   }
 
-  /**
-   * Find a manager profile by its profile ID.
-   */
+  // GET MANAGER BY PROFILE ID
+
   async findById(id: string): Promise<ManagerProfile | undefined> {
     const [result] = await db
       .select()
@@ -84,9 +96,8 @@ export class ManagerRepository {
     return result;
   }
 
-  /**
-   * Find a manager profile by its associated user ID.
-   */
+  // GET MANAGER BY USER ID
+
   async findByUserId(userId: string): Promise<ManagerProfile | undefined> {
     const [result] = await db
       .select()
@@ -97,9 +108,8 @@ export class ManagerRepository {
     return result;
   }
 
-  /**
-   * Find a manager profile by email.
-   */
+  // GET MANAGER BY EMAIL
+
   async findByEmail(
     email: string,
   ): Promise<ManagerProfileWithUser | undefined> {
@@ -121,10 +131,12 @@ export class ManagerRepository {
     return result;
   }
 
+  // CHECK EXISTING USER EMAIL
+
   async findUserByEmail(
     email: string,
   ): Promise<{ id: string; email: string } | undefined> {
-    const existingEmail = email.trim().toLowerCase();
+    const normalizedEmail = email.trim().toLowerCase();
 
     const [result] = await db
       .select({
@@ -132,15 +144,14 @@ export class ManagerRepository {
         email: user.email,
       })
       .from(user)
-      .where(eq(user.email, existingEmail))
+      .where(eq(user.email, normalizedEmail))
       .limit(1);
 
     return result;
   }
 
-  /**
-   * Update manager profile fields.
-   */
+  // UPDATE MANAGER PROFILE
+
   async update(
     id: string,
     data: UpdateManagerProfile,
@@ -160,7 +171,8 @@ export class ManagerRepository {
     return result;
   }
 
-  // Update the associated Better Auth user profile fields.
+  // UPDATE ASSOCIATED USER PROFILE
+
   async updateUserProfile(
     userId: string,
     data: UpdateOwnManagerProfile,
@@ -185,10 +197,8 @@ export class ManagerRepository {
     return result;
   }
 
-  /**
-   * Delete only the manager profile.
-   * This does not delete the associated Better Auth user.
-   */
+  // DELETE MANAGER PROFILE
+
   async delete(id: string): Promise<ManagerProfile | undefined> {
     const [result] = await db
       .delete(managerProfiles)

@@ -29,6 +29,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
 import {
   Card,
   CardContent,
@@ -64,9 +66,20 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+// --------------------------------------------------
+// Types
+// --------------------------------------------------
+
 type Teacher = {
   id: string;
   name: string;
+
+  // Profile image fields
+  image?: string | null;
+  teacherProfile?: string | null;
+  profile?: string | null;
+  avatarFileId?: string | null;
+
   email: string;
   phone: string;
   subject: string | string[];
@@ -74,16 +87,34 @@ type Teacher = {
   qualification: string;
 };
 
-function TeacherListSkeleton() {
+// --------------------------------------------------
+// Teacher Helpers
+// --------------------------------------------------
+
+function getTeacherInitials(name?: string): string {
+  if (!name?.trim()) return "T";
+
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("");
+}
+
+/**
+ * Returns teacher profile image URL.
+ * Supports different API field names.
+ */
+function getTeacherProfile(teacher: Teacher): string | undefined {
   return (
-    <div className="space-y-3" aria-label="Loading teachers" aria-busy="true">
-      {Array.from({ length: 5 }).map((_, index) => (
-        <Skeleton key={index} className="h-14 w-full rounded-md" />
-      ))}
-    </div>
+    teacher.image || teacher.teacherProfile || teacher.profile || undefined
   );
 }
 
+/**
+ * Normalize subjects returned from database.
+ */
 function normalizeSubjects(subject: string | string[]): string[] {
   if (Array.isArray(subject)) return subject;
 
@@ -101,6 +132,24 @@ function normalizeSubjects(subject: string | string[]): string[] {
 
   return [value];
 }
+
+// --------------------------------------------------
+// Teacher List Skeleton
+// --------------------------------------------------
+
+function TeacherListSkeleton() {
+  return (
+    <div className="space-y-3" aria-label="Loading teachers" aria-busy="true">
+      {Array.from({ length: 5 }).map((_, index) => (
+        <Skeleton key={index} className="h-14 w-full rounded-md" />
+      ))}
+    </div>
+  );
+}
+
+// --------------------------------------------------
+// Empty State
+// --------------------------------------------------
 
 function TeacherEmptyState({ isSearching }: { isSearching: boolean }) {
   return (
@@ -124,9 +173,9 @@ function TeacherEmptyState({ isSearching }: { isSearching: boolean }) {
   );
 }
 
-// ---------------------------------------------
+// --------------------------------------------------
 // Error State
-// ---------------------------------------------
+// --------------------------------------------------
 
 function TeacherErrorState({
   onRetry,
@@ -161,9 +210,9 @@ function TeacherErrorState({
   );
 }
 
-// ---------------------------------------------
+// --------------------------------------------------
 // Delete Confirmation Dialog
-// ---------------------------------------------
+// --------------------------------------------------
 
 function DeleteTeacherDialog({
   teacher,
@@ -231,9 +280,33 @@ function DeleteTeacherDialog({
   );
 }
 
-// ---------------------------------------------
+// --------------------------------------------------
+// Teacher Avatar
+// --------------------------------------------------
+
+function TeacherAvatar({ teacher }: { teacher: Teacher }) {
+  const profileUrl = getTeacherProfile(teacher);
+
+  return (
+    <Avatar className="size-9 shrink-0 border border-border">
+      {profileUrl && (
+        <AvatarImage
+          src={profileUrl}
+          alt={teacher.name || "Teacher"}
+          className="object-cover"
+        />
+      )}
+
+      <AvatarFallback className="bg-primary/10 text-sm font-semibold text-primary">
+        {getTeacherInitials(teacher.name)}
+      </AvatarFallback>
+    </Avatar>
+  );
+}
+
+// --------------------------------------------------
 // Teacher List
-// ---------------------------------------------
+// --------------------------------------------------
 
 export default function TeacherList() {
   const {
@@ -250,13 +323,14 @@ export default function TeacherList() {
   const isDeleting = deleteTeacherMutation.isPending;
 
   const [search, setSearch] = useState("");
+
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
 
   const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null);
 
-  // -------------------------------------------
+  // --------------------------------------------------
   // Search and Filter
-  // -------------------------------------------
+  // --------------------------------------------------
 
   const filteredTeachers = useMemo(() => {
     const list = (teachers ?? []) as Teacher[];
@@ -280,19 +354,17 @@ export default function TeacherList() {
     );
   }, [teachers, search]);
 
-  console.log("filtered-list", filteredTeachers);
-
-  // -------------------------------------------
+  // --------------------------------------------------
   // Refresh
-  // -------------------------------------------
+  // --------------------------------------------------
 
   function handleRefresh() {
     void refetch();
   }
 
-  // -------------------------------------------
+  // --------------------------------------------------
   // Delete Teacher
-  // -------------------------------------------
+  // --------------------------------------------------
 
   async function handleDeleteTeacher() {
     if (!teacherToDelete || isDeleting) return;
@@ -311,9 +383,9 @@ export default function TeacherList() {
     }
   }
 
-  // -------------------------------------------
+  // --------------------------------------------------
   // Render
-  // -------------------------------------------
+  // --------------------------------------------------
 
   return (
     <>
@@ -406,7 +478,7 @@ export default function TeacherList() {
               {filteredTeachers.length === 0 ? (
                 <TeacherEmptyState isSearching={Boolean(search.trim())} />
               ) : (
-                <div className="relative w-full max-w-full max-h-[500px] overflow-auto rounded-section border border-border">
+                <div className="relative max-h-[500px] w-full max-w-full overflow-auto rounded-section border border-border">
                   <Table className="min-w-[1000px] w-full">
                     <TableHeader className="sticky top-0 z-10 bg-muted shadow-sm">
                       <TableRow className="hover:bg-transparent">
@@ -446,13 +518,11 @@ export default function TeacherList() {
                           key={teacher.id}
                           className="transition-colors hover:bg-accent/40"
                         >
-                          {/* Name */}
+                          {/* Teacher Name and Avatar */}
 
-                          <TableCell className="font-medium whitespace-nowrap">
+                          <TableCell className="whitespace-nowrap font-medium">
                             <div className="flex items-center gap-3">
-                              <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-                                {teacher.name?.charAt(0)?.toUpperCase() || "T"}
-                              </div>
+                              <TeacherAvatar teacher={teacher} />
 
                               <span>{teacher.name || "—"}</span>
                             </div>
@@ -463,6 +533,7 @@ export default function TeacherList() {
                           <TableCell>
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                               <Mail className="size-3.5 shrink-0" />
+
                               <span className="truncate">
                                 {teacher.email || "—"}
                               </span>
@@ -568,6 +639,11 @@ export default function TeacherList() {
             name: selectedTeacher.name,
             email: selectedTeacher.email,
             phoneNumber: selectedTeacher.phone,
+
+            // Profile image mapping
+            image: getTeacherProfile(selectedTeacher) ?? null,
+            avatarFileId: selectedTeacher.avatarFileId ?? null,
+
             subject: normalizeSubjects(selectedTeacher.subject),
             experienceYears: selectedTeacher.experienceYears,
             qualification: selectedTeacher.qualification,

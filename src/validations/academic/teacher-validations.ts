@@ -9,7 +9,7 @@ const emailSchema = z
 const phoneNumberSchema = z
   .string()
   .trim()
-  .regex(/^[0-9]{10}$/, "Please enter a valid 10-digit mobile number.");
+  .regex(/^(?:\+91[\-\s]?)?[6-9]\d{9}$/, "Please enter a valid mobile number.");
 
 const subjectSchema = z
   .array(

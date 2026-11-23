@@ -1,10 +1,6 @@
 import { z } from "zod";
 import { batchMediumEnum, batchStatusEnum } from "@/db/schema/academic-enums";
 
-// ============================================
-// ENUM & COMMON SCHEMAS
-// ============================================
-
 export const batchMediumSchema = z.enum(batchMediumEnum.enumValues);
 export const batchStatusSchema = z.enum(batchStatusEnum.enumValues);
 
@@ -32,10 +28,6 @@ export const decimalSchema = z
   )
   .transform((value) => Number(value).toFixed(2));
 
-// ============================================
-// DATE HELPERS
-// ============================================
-
 function formatIndiaDate(date: Date): string {
   const parts = new Intl.DateTimeFormat("en-IN", {
     timeZone: "Asia/Kolkata",
@@ -59,10 +51,6 @@ function isValidStartDate(date: Date): boolean {
   return formatIndiaDate(date) >= getTodayInIndia();
 }
 
-// ============================================
-// OPTIONAL FIELD SCHEMAS
-// ============================================
-
 const optionalUrlSchema = z.preprocess(
   (value) => (value === "" ? null : value),
   z.string().trim().url("Must be a valid URL").nullable().optional(),
@@ -85,10 +73,6 @@ const optionalValiditySchema = z.preprocess(
   z.coerce.number().int().positive().nullable().optional(),
 );
 
-// ============================================
-// BATCH FEATURES
-// ============================================
-
 export const batchFeaturesSchema = z
   .array(
     z
@@ -102,10 +86,6 @@ export const batchFeaturesSchema = z
     (features) => new Set(features).size === features.length,
     "Duplicate features are not allowed",
   );
-
-// ============================================
-// BASE BATCH SCHEMA
-// ============================================
 
 const baseBatchSchema = z.object({
   examinationId: idSchema,
@@ -156,10 +136,6 @@ const baseBatchSchema = z.object({
   isPublished: z.boolean().default(false),
 });
 
-// ============================================
-// SHARED VALIDATION HELPERS
-// ============================================
-
 function validateBatchPricing(data: {
   isFree?: boolean;
   originalPrice?: string;
@@ -193,10 +169,6 @@ function validateBatchSchedule(data: {
 
   return hasExpiryDate !== hasValidityMonths;
 }
-
-// ============================================
-// SHARED BATCH VALIDATION
-// ============================================
 
 const batchFormBaseSchema = baseBatchSchema.omit({
   createdBy: true,
@@ -244,10 +216,6 @@ function validateBatchFields(
   }
 }
 
-// ============================================
-// CREATE BATCH SCHEMA
-// ============================================
-
 export const createBatchSchema = batchFormBaseSchema.superRefine(
   (data, ctx) => {
     if (!isValidStartDate(data.startDate)) {
@@ -264,10 +232,6 @@ export const createBatchSchema = batchFormBaseSchema.superRefine(
   },
 );
 
-// ============================================
-// UPDATE BATCH SCHEMA
-// ============================================
-
 export const updateBatchSchema = batchFormBaseSchema
   .partial()
   .superRefine((data, ctx) => {
@@ -278,10 +242,6 @@ export const updateBatchSchema = batchFormBaseSchema
       validateSchedule: hasScheduleField,
     });
   });
-
-// ============================================
-// FORM SCHEMA FACTORY
-// ============================================
 
 export function getBatchFormSchema(isEditing: boolean) {
   return batchFormBaseSchema.superRefine((data, ctx) => {
@@ -299,18 +259,9 @@ export function getBatchFormSchema(isEditing: boolean) {
   });
 }
 
-// ============================================
-// TYPES
-// ============================================
-
 export type CreateBatchInput = z.infer<typeof createBatchSchema>;
-
 export type UpdateBatchInput = z.infer<typeof updateBatchSchema>;
-
 export type CreateBatchFormInput = z.input<typeof createBatchSchema>;
-
 export type BatchFormSchema = ReturnType<typeof getBatchFormSchema>;
-
 export type BatchFormValues = z.input<BatchFormSchema>;
-
 export type BatchFormOutput = z.output<BatchFormSchema>;

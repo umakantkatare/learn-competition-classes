@@ -2,16 +2,14 @@
 
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
 
 import { TeacherService } from "@/server/services/academic/teacher-service";
 
-import {
-  createTeacherSchema,
-  updateTeacherSchema,
-  type CreateTeacherInput,
-  type UpdateTeacherInput,
+import type {
+  CreateTeacherInput,
+  UpdateTeacherInput,
 } from "@/validations/academic/teacher-validations";
+
 import { createTeacherAuthUser } from "@/helper/createTeacherAuthUser";
 import { requireAdminOrManager } from "@/lib/authorize";
 
@@ -26,10 +24,6 @@ type ActionResult<T = unknown> = {
 
 // Error handler
 function getErrorMessage(error: unknown): string {
-  if (error instanceof z.ZodError) {
-    return error.issues[0]?.message ?? "Invalid input.";
-  }
-
   if (error instanceof Error) {
     return error.message;
   }
@@ -37,13 +31,17 @@ function getErrorMessage(error: unknown): string {
   return "An unexpected error occurred.";
 }
 
-
 // Unauthorized response
 function unauthorized<T = unknown>(): ActionResult<T> {
   return {
     success: false,
     error: "You are not authorized to perform this action.",
   };
+}
+
+// Validate ID
+function isValidId(id: string): boolean {
+  return typeof id === "string" && id.trim().length > 0;
 }
 
 // Revalidate teacher pages
@@ -57,29 +55,20 @@ function revalidateTeacherPaths(id?: string): void {
   }
 }
 
-
+// 1. CREATE TEACHER
 export async function createTeacherProfileAction(
   formData: CreateTeacherInput,
 ): Promise<ActionResult> {
   try {
-    const requestHeaders = await headers();
     const session = await requireAdminOrManager();
 
     if (!session) {
       return unauthorized();
     }
 
-    // Validate input
-    const parsed = createTeacherSchema.safeParse(formData);
+    const requestHeaders = await headers();
 
-    if (!parsed.success) {
-      return {
-        success: false,
-        error: parsed.error.issues[0]?.message ?? "Invalid input.",
-      };
-    }
-
-    const profile = await teacherService.createProfile(parsed.data, {
+    const profile = await teacherService.createProfile(formData, {
       createAuthUser: (input) =>
         createTeacherAuthUser({
           ...input,
@@ -102,8 +91,7 @@ export async function createTeacherProfileAction(
   }
 }
 
-// 2. GET ALL TEACHERS — ADMIN / MANAGER
-
+// 2. GET ALL TEACHERS
 export async function getAllTeachersAction(): Promise<ActionResult> {
   try {
     const session = await requireAdminOrManager();
@@ -127,19 +115,18 @@ export async function getAllTeachersAction(): Promise<ActionResult> {
   }
 }
 
-// 3. GET TEACHER PROFILE BY ID — ADMIN / MANAGER
-
+// 3. GET TEACHER PROFILE BY ID
 export async function getTeacherProfileByIdAction(
   id: string,
 ): Promise<ActionResult> {
   try {
-    const session = await requireAdminOrManager ();
+    const session = await requireAdminOrManager();
 
     if (!session) {
       return unauthorized();
     }
 
-    if (!id?.trim()) {
+    if (!isValidId(id)) {
       return {
         success: false,
         error: "Teacher profile ID is required.",
@@ -161,8 +148,7 @@ export async function getTeacherProfileByIdAction(
   }
 }
 
-// 4. GET TEACHER PROFILE BY USER ID — ADMIN / MANAGER
-
+// 4. GET TEACHER PROFILE BY USER ID
 export async function getTeacherProfileByUserIdAction(
   userId: string,
 ): Promise<ActionResult> {
@@ -173,7 +159,7 @@ export async function getTeacherProfileByUserIdAction(
       return unauthorized();
     }
 
-    if (!userId?.trim()) {
+    if (!isValidId(userId)) {
       return {
         success: false,
         error: "User ID is required.",
@@ -195,8 +181,7 @@ export async function getTeacherProfileByUserIdAction(
   }
 }
 
-// 5. UPDATE TEACHER PROFILE — ADMIN / MANAGER
-
+// 5. UPDATE TEACHER PROFILE
 export async function updateTeacherProfileAction(
   id: string,
   formData: UpdateTeacherInput,
@@ -208,23 +193,14 @@ export async function updateTeacherProfileAction(
       return unauthorized();
     }
 
-    if (!id?.trim()) {
+    if (!isValidId(id)) {
       return {
         success: false,
         error: "Teacher profile ID is required.",
       };
     }
 
-    const parsed = updateTeacherSchema.safeParse(formData);
-
-    if (!parsed.success) {
-      return {
-        success: false,
-        error: parsed.error.issues[0]?.message ?? "Invalid input.",
-      };
-    }
-
-    const updatedProfile = await teacherService.updateProfile(id, parsed.data);
+    const updatedProfile = await teacherService.updateProfile(id, formData);
 
     revalidateTeacherPaths(id);
 
@@ -241,19 +217,18 @@ export async function updateTeacherProfileAction(
   }
 }
 
-// 6. DELETE TEACHER PROFILE — ADMIN / MANAGER
-
+// 6. DELETE TEACHER PROFILE
 export async function deleteTeacherProfileAction(
   id: string,
 ): Promise<ActionResult> {
   try {
-    const session = await requireAdminOrManager ();
+    const session = await requireAdminOrManager();
 
     if (!session) {
       return unauthorized();
     }
 
-    if (!id?.trim()) {
+    if (!isValidId(id)) {
       return {
         success: false,
         error: "Teacher profile ID is required.",
@@ -262,7 +237,7 @@ export async function deleteTeacherProfileAction(
 
     const deletedProfile = await teacherService.deleteProfile(id);
 
-    revalidateTeacherPaths();
+    revalidateTeacherPaths(id);
 
     return {
       success: true,

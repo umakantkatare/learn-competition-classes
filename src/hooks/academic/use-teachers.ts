@@ -16,10 +16,6 @@ import type {
   UpdateTeacherInput,
 } from "@/validations/academic/teacher-validations";
 
-// ============================================
-// QUERY KEYS
-// ============================================
-
 export const teacherKeys = {
   all: ["teachers"] as const,
 
@@ -32,74 +28,117 @@ export const teacherKeys = {
   byUserId: (userId: string) => [...teacherKeys.all, "user", userId] as const,
 };
 
-// ============================================
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Something went wrong.";
+}
+
 // 1. GET ALL TEACHERS
-// ============================================
 
 export function useGetAllTeachers() {
   return useQuery({
     queryKey: teacherKeys.lists(),
 
     queryFn: async () => {
-      const response = await getAllTeachersAction();
+      try {
+        const response = await getAllTeachersAction();
 
-      if (!response.success) {
-        throw new Error(response.message || "Failed to fetch teachers");
+        if (!response.success) {
+          throw new Error(
+            response.error || response.message || "Failed to fetch teachers.",
+          );
+        }
+
+        return response.data;
+      } catch (error) {
+        throw new Error(getErrorMessage(error));
       }
-
-      return response.data;
     },
 
     staleTime: 5 * 60 * 1000,
   });
 }
 
-// ============================================
 // 2. GET TEACHER BY PROFILE ID
-// ============================================
 
 export function useGetTeacherById(id: string) {
   return useQuery({
     queryKey: teacherKeys.detail(id),
 
-    queryFn: () => getTeacherProfileByIdAction(id),
+    queryFn: async () => {
+      try {
+        const response = await getTeacherProfileByIdAction(id);
 
-    enabled: Boolean(id),
+        if (!response.success) {
+          throw new Error(
+            response.error || response.message || "Failed to fetch teacher.",
+          );
+        }
+
+        return response.data;
+      } catch (error) {
+        throw new Error(getErrorMessage(error));
+      }
+    },
+
+    enabled: Boolean(id?.trim()),
 
     staleTime: 5 * 60 * 1000,
   });
 }
 
-// ============================================
 // 3. GET TEACHER BY USER ID
-// ============================================
 
 export function useGetTeacherByUserId(userId: string) {
   return useQuery({
     queryKey: teacherKeys.byUserId(userId),
 
-    queryFn: () => getTeacherProfileByUserIdAction(userId),
+    queryFn: async () => {
+      try {
+        const response = await getTeacherProfileByUserIdAction(userId);
 
-    enabled: Boolean(userId),
+        if (!response.success) {
+          throw new Error(
+            response.error ||
+              response.message ||
+              "Failed to fetch teacher profile.",
+          );
+        }
+
+        return response.data;
+      } catch (error) {
+        throw new Error(getErrorMessage(error));
+      }
+    },
+
+    enabled: Boolean(userId?.trim()),
 
     staleTime: 5 * 60 * 1000,
   });
 }
 
-// ============================================
 // 4. CREATE TEACHER
-// ============================================
 
 export function useCreateTeacher() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (payload: CreateTeacherInput) =>
-      createTeacherProfileAction(payload),
+    mutationFn: async (payload: CreateTeacherInput) => {
+      try {
+        const response = await createTeacherProfileAction(payload);
 
-    onSuccess: async (result) => {
-      if (!result.success) return;
+        if (!response.success) {
+          throw new Error(
+            response.error || response.message || "Failed to create teacher.",
+          );
+        }
 
+        return response;
+      } catch (error) {
+        throw new Error(getErrorMessage(error));
+      }
+    },
+
+    onSuccess: async () => {
       await queryClient.invalidateQueries({
         queryKey: teacherKeys.all,
       });
@@ -107,9 +146,7 @@ export function useCreateTeacher() {
   });
 }
 
-// ============================================
 // 5. UPDATE TEACHER
-// ============================================
 
 interface UpdateTeacherVariables {
   id: string;
@@ -120,12 +157,23 @@ export function useUpdateTeacher() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, payload }: UpdateTeacherVariables) =>
-      updateTeacherProfileAction(id, payload),
+    mutationFn: async ({ id, payload }: UpdateTeacherVariables) => {
+      try {
+        const response = await updateTeacherProfileAction(id, payload);
 
-    onSuccess: async (result, variables) => {
-      if (!result.success) return;
+        if (!response.success) {
+          throw new Error(
+            response.error || response.message || "Failed to update teacher.",
+          );
+        }
 
+        return response;
+      } catch (error) {
+        throw new Error(getErrorMessage(error));
+      }
+    },
+
+    onSuccess: async (_result, variables) => {
       await Promise.all([
         queryClient.invalidateQueries({
           queryKey: teacherKeys.all,
@@ -139,19 +187,29 @@ export function useUpdateTeacher() {
   });
 }
 
-// ============================================
 // 6. DELETE TEACHER
-// ============================================
 
 export function useDeleteTeacher() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => deleteTeacherProfileAction(id),
+    mutationFn: async (id: string) => {
+      try {
+        const response = await deleteTeacherProfileAction(id);
 
-    onSuccess: async (result, id) => {
-      if (!result.success) return;
+        if (!response.success) {
+          throw new Error(
+            response.error || response.message || "Failed to delete teacher.",
+          );
+        }
 
+        return response;
+      } catch (error) {
+        throw new Error(getErrorMessage(error));
+      }
+    },
+
+    onSuccess: async (_result, id) => {
       await Promise.all([
         queryClient.invalidateQueries({
           queryKey: teacherKeys.all,
