@@ -19,7 +19,7 @@ export async function sendVerificationEmail({
       userName,
     }),
   );
-
+  console.log("verification-code",`${userName} & ${verificationCode}`);
   const { data, error } = await resend.emails.send({
     from: `LCC Institute <${process.env.RESEND_FROM_EMAIL}>`,
     to,

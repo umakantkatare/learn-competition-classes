@@ -2,14 +2,28 @@ import "server-only";
 
 import { db } from "@/db";
 import { enrollment } from "@/db/schema/academic-schema";
+
 import { and, desc, eq } from "drizzle-orm";
 
+// ---------------------------------------------
+// Types
+// ---------------------------------------------
+
 export type Enrollment = typeof enrollment.$inferSelect;
+
 export type NewEnrollment = typeof enrollment.$inferInsert;
 
 export type UpdateEnrollment = Partial<Omit<NewEnrollment, "id">>;
 
+// ---------------------------------------------
+// Enrollment Repository
+// ---------------------------------------------
+
 export class EnrollmentRepository {
+  // ---------------------------------------------
+  // Create Enrollment
+  // ---------------------------------------------
+
   async create(data: NewEnrollment): Promise<Enrollment> {
     const [result] = await db.insert(enrollment).values(data).returning();
 
@@ -19,6 +33,10 @@ export class EnrollmentRepository {
 
     return result;
   }
+
+  // ---------------------------------------------
+  // Find Enrollment By ID
+  // ---------------------------------------------
 
   async findById(id: string): Promise<Enrollment | undefined> {
     const [result] = await db
@@ -30,6 +48,10 @@ export class EnrollmentRepository {
     return result;
   }
 
+  // ---------------------------------------------
+  // Get All User Enrollments
+  // ---------------------------------------------
+
   async findUserEnrollments(userId: string): Promise<Enrollment[]> {
     return db
       .select()
@@ -37,6 +59,10 @@ export class EnrollmentRepository {
       .where(eq(enrollment.userId, userId))
       .orderBy(desc(enrollment.createdAt));
   }
+
+  // ---------------------------------------------
+  // Check Enrollment By User And Batch
+  // ---------------------------------------------
 
   async checkEnrollment(
     userId: string,
@@ -48,10 +74,15 @@ export class EnrollmentRepository {
       .where(
         and(eq(enrollment.userId, userId), eq(enrollment.batchId, batchId)),
       )
+      .orderBy(desc(enrollment.createdAt))
       .limit(1);
 
     return result;
   }
+
+  // ---------------------------------------------
+  // Find Active Enrollment
+  // ---------------------------------------------
 
   async findActiveEnrollment(
     userId: string,
@@ -67,10 +98,15 @@ export class EnrollmentRepository {
           eq(enrollment.status, "ACTIVE"),
         ),
       )
+      .orderBy(desc(enrollment.createdAt))
       .limit(1);
 
     return result;
   }
+
+  // ---------------------------------------------
+  // Update Enrollment
+  // ---------------------------------------------
 
   async update(
     id: string,
@@ -87,8 +123,12 @@ export class EnrollmentRepository {
     return result;
   }
 
+  // ---------------------------------------------
+  // Update Validation
+  // ---------------------------------------------
+
   private validateUpdateData(data: UpdateEnrollment): void {
-    if (Object.keys(data).length === 0) {
+    if (!data || typeof data !== "object" || Object.keys(data).length === 0) {
       throw new Error(
         "At least one field is required to update an enrollment.",
       );

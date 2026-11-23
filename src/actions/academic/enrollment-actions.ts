@@ -74,7 +74,7 @@ export async function createEnrollmentAction(
     );
 
     revalidatePath("/admin/enrollments");
-    revalidatePath("/dashboard/my-courses");
+    revalidatePath("/dashboard/my-batches");
 
     return {
       success: true,
@@ -120,7 +120,7 @@ export async function updateEnrollmentAction(
     );
 
     revalidatePath("/admin/enrollments");
-    revalidatePath("/dashboard/my-courses");
+    revalidatePath("/student/my-batches");
 
     return {
       success: true,
@@ -141,20 +141,20 @@ export async function checkValidAccessAction(
   batchId: string,
 ): Promise<ActionResult> {
   try {
+    if (!batchId?.trim()) {
+      return {
+        success: false,
+        hasAccess: false,
+        error: "Batch ID is required.",
+      };
+    }
+
     const session = await getSession();
 
     if (!session?.user?.id) {
       return {
         success: true,
         hasAccess: false,
-      };
-    }
-
-    if (!batchId?.trim()) {
-      return {
-        success: false,
-        hasAccess: false,
-        error: "Batch ID is required.",
       };
     }
 
@@ -228,7 +228,7 @@ export async function revokeEnrollmentAction(
     await enrollmentService.revokeEnrollment(enrollmentId);
 
     revalidatePath("/admin/enrollments");
-    revalidatePath("/dashboard/my-courses");
+    revalidatePath("/student/my-batches");
 
     return {
       success: true,
@@ -275,7 +275,7 @@ export async function extendValidityAction(
     );
 
     revalidatePath("/admin/enrollments");
-    revalidatePath("/dashboard/my-courses");
+    revalidatePath("/student/my-batches");
 
     return {
       success: true,

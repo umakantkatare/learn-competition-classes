@@ -86,7 +86,7 @@ interface TeacherOption {
   name: string;
   email: string;
   phone: string | null;
-  subject: string;
+  subject: string | string[] | Record<string, unknown> | null;
   experienceYears: number;
   qualification: string;
   bio: string | null;
@@ -118,6 +118,26 @@ function extractList<T>(response: unknown): T[] {
   }
 
   return [];
+}
+
+function formatTeacherSubject(subject: unknown): string {
+  if (!subject) return "No subject assigned";
+
+  if (Array.isArray(subject)) {
+    return subject.map((item) => String(item)).join(", ");
+  }
+
+  if (typeof subject === "object") {
+    return Object.values(subject)
+      .map((item) => String(item))
+      .join(", ");
+  }
+
+  if (typeof subject === "string") {
+    return subject.replace(/[{}"]/g, " ").trim();
+  }
+
+  return String(subject);
 }
 
 function getTodayInIndia(): string {
@@ -1198,7 +1218,7 @@ export default function BatchForm({
                                 </p>
 
                                 <p className="text-xs text-muted-foreground">
-                                  {teacher.subject.replace(/[{}"]/g, " ")}
+                                  {formatTeacherSubject(teacher.subject)}
                                 </p>
                               </div>
                             </label>

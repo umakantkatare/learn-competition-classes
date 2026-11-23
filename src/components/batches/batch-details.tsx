@@ -1,6 +1,8 @@
 "use client";
 
-import type { ElementType, ReactNode } from "react";
+import { useState, type ElementType, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+
 import {
   CalendarDays,
   CalendarCheck,
@@ -12,23 +14,35 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
+import Image from "next/image";
+
 import { useGetBatchBySlug } from "@/hooks/academic/use-batches";
+import { useCheckValidAccess } from "@/hooks/academic/use-enrollment";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 import { statusLabels, statusStyles } from "@/components/batches/batch-card";
-import Image from "next/image";
+
 import RazorpayCheckoutButton from "../payments/checkout-button";
+
+// ---------------------------------------------
+// Types
+// ---------------------------------------------
 
 type Batch = NonNullable<ReturnType<typeof useGetBatchBySlug>["data"]>;
 
 interface BatchDetailsProps {
   batch: Batch;
-  onEnroll?: () => void;
+  onEnroll?: () => void | Promise<void>;
 }
+
+// ---------------------------------------------
+// Formatters
+// ---------------------------------------------
 
 const dateFormatter = new Intl.DateTimeFormat("en-IN", {
   day: "2-digit",
@@ -41,6 +55,10 @@ const currencyFormatter = new Intl.NumberFormat("en-IN", {
   currency: "INR",
   maximumFractionDigits: 0,
 });
+
+// ---------------------------------------------
+// Helper Functions
+// ---------------------------------------------
 
 function formatDate(date?: string | Date | null): string {
   if (!date) return "—";
@@ -135,6 +153,10 @@ function getInitials(name?: string | null): string {
     .toUpperCase();
 }
 
+// ---------------------------------------------
+// Section Title
+// ---------------------------------------------
+
 function SectionTitle({
   title,
   description,
@@ -154,6 +176,10 @@ function SectionTitle({
     </div>
   );
 }
+
+// ---------------------------------------------
+// Information Item
+// ---------------------------------------------
 
 function InfoItem({
   icon: Icon,
@@ -177,6 +203,10 @@ function InfoItem({
   );
 }
 
+// ---------------------------------------------
+// Teacher Card
+// ---------------------------------------------
+
 function TeacherCard({
   teacher,
 }: {
@@ -197,10 +227,6 @@ function TeacherCard({
       <div className="min-w-0 flex-1 space-y-2">
         <div>
           <h3 className="truncate text-sm font-semibold">{name}</h3>
-
-          <p className="truncate text-xs text-muted-foreground">
-            {teacher.user?.email || "—"}
-          </p>
         </div>
 
         <Badge variant="secondary" className="max-w-full whitespace-normal">
@@ -218,6 +244,10 @@ function TeacherCard({
     </div>
   );
 }
+
+// ---------------------------------------------
+// Batch Thumbnail
+// ---------------------------------------------
 
 function BatchThumbnail({ batch }: { batch: Batch }) {
   const statusLabel = statusLabels[batch.status] ?? batch.status;
@@ -259,6 +289,10 @@ function BatchThumbnail({ batch }: { batch: Batch }) {
   );
 }
 
+// ---------------------------------------------
+// Batch Features
+// ---------------------------------------------
+
 function BatchFeatures({ features }: { features: string[] }) {
   return (
     <section className="space-y-4">
@@ -288,6 +322,10 @@ function BatchFeatures({ features }: { features: string[] }) {
     </section>
   );
 }
+
+// ---------------------------------------------
+// Batch Schedule
+// ---------------------------------------------
 
 function BatchSchedule({ batch }: { batch: Batch }) {
   const hasExpiryDate = Boolean(batch.expiryDate);
@@ -337,6 +375,10 @@ function BatchSchedule({ batch }: { batch: Batch }) {
   );
 }
 
+// ---------------------------------------------
+// Batch Teachers
+// ---------------------------------------------
+
 function BatchTeachers({ batch }: { batch: Batch }) {
   const teachers = batch.teachers ?? [];
 
@@ -381,13 +423,29 @@ function BatchTeachers({ batch }: { batch: Batch }) {
   );
 }
 
+// ---------------------------------------------
+// Batch Enrollment Card
+// ---------------------------------------------
+
 function BatchEnrollmentCard({
   batch,
   onEnroll,
 }: {
   batch: Batch;
-  onEnroll?: () => void;
+  onEnroll?: () => void | Promise<void>;
 }) {
+  const router = useRouter();
+
+  const [isEnrollingFree, setIsEnrollingFree] = useState(false);
+
+  // Check logged-in user's enrollment access
+  const {
+    data: hasAccess,
+    isPending: isCheckingAccess,
+    isError: accessError,
+    refetch: refetchAccess,
+  } = useCheckValidAccess(batch.id);
+
   const originalPrice = getNumericPrice(batch.originalPrice);
   const discountPrice = getNumericPrice(batch.discountPrice);
 
@@ -408,6 +466,108 @@ function BatchEnrollmentCard({
     "border-border bg-muted text-muted-foreground";
 
   const isCompleted = batch.status === "COMPLETED";
+
+  // ---------------------------------------------
+  // Free Enrollment Handler
+  // ---------------------------------------------
+
+  const handleFreeEnrollment = async () => {
+    if (!onEnroll || isEnrollingFree) return;
+
+    try {
+      setIsEnrollingFree(true);
+
+      await onEnroll();
+
+      // Recheck enrollment after successful enrollment
+      await refetchAccess();
+    } finally {
+      setIsEnrollingFree(false);
+    }
+  };
+
+  // ---------------------------------------------
+  // Render Enrollment CTA
+  // ---------------------------------------------
+
+  const renderEnrollmentButton = () => {
+    // Loading state
+    if (isCheckingAccess) {
+      return (
+        <Button className="w-full" size="lg" disabled>
+          Checking Enrollment...
+        </Button>
+      );
+    }
+
+    // Access check failed
+    if (accessError) {
+      return (
+        <Button
+          className="w-full"
+          size="lg"
+          variant="outline"
+          onClick={() => refetchAccess()}
+        >
+          Retry Enrollment Check
+        </Button>
+      );
+    }
+
+    // Already enrolled
+    if (hasAccess) {
+      return (
+        <div className="space-y-3">
+          <div className="flex items-center justify-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm font-medium text-emerald-600">
+            <CheckCircle2 className="size-5" />
+            Already Enrolled
+          </div>
+
+          <Button
+            className="w-full"
+            size="lg"
+            onClick={() => router.push("/my-learning")}
+          >
+            Go to My Learning
+          </Button>
+        </div>
+      );
+    }
+
+    // Batch completed
+    if (isCompleted) {
+      return (
+        <Button className="w-full" size="lg" disabled>
+          Enrollment Closed
+        </Button>
+      );
+    }
+
+    // Free enrollment
+    if (batch.isFree) {
+      return (
+        <Button
+          className="w-full"
+          size="lg"
+          onClick={handleFreeEnrollment}
+          disabled={isEnrollingFree || !onEnroll}
+        >
+          {isEnrollingFree ? "Enrolling..." : "Enroll for Free"}
+        </Button>
+      );
+    }
+
+    // Paid enrollment
+    return (
+      <RazorpayCheckoutButton
+        batchId={batch.id}
+        batchTitle={batch.title}
+        className="w-full"
+      >
+        Enroll Now
+      </RazorpayCheckoutButton>
+    );
+  };
 
   return (
     <div className="space-y-5 rounded-xl border bg-card p-5 lg:sticky lg:top-6">
@@ -497,30 +657,20 @@ function BatchEnrollmentCard({
       <Separator />
 
       {/* Enrollment */}
-      {isCompleted ? (
-        <Button className="w-full" size="lg" disabled>
-          Enrollment Closed
-        </Button>
-      ) : batch.isFree ? (
-        <Button className="w-full" size="lg" onClick={onEnroll}>
-          Enroll for Free
-        </Button>
-      ) : (
-        <RazorpayCheckoutButton
-          batchId={batch.id}
-          batchTitle={batch.title}
-          className="w-full"
-        >
-          Enroll Now
-        </RazorpayCheckoutButton>
-      )}
+      {renderEnrollmentButton()}
 
       <p className="text-center text-xs text-muted-foreground">
-        Secure enrollment and payment.
+        {hasAccess
+          ? "Your enrollment is active. Start learning now."
+          : "Secure enrollment and payment."}
       </p>
     </div>
   );
 }
+
+// ---------------------------------------------
+// Batch Details
+// ---------------------------------------------
 
 export function BatchDetails({ batch, onEnroll }: BatchDetailsProps) {
   const features = batch.features ?? [];
@@ -541,6 +691,7 @@ export function BatchDetails({ batch, onEnroll }: BatchDetailsProps) {
 
               <Badge variant="outline">
                 <ShieldCheck className="mr-1 size-3" />
+
                 {batch.isPublished ? "Published" : "Draft"}
               </Badge>
             </div>

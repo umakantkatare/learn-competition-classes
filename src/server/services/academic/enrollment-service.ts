@@ -8,6 +8,10 @@ import {
 
 import { BatchRepository } from "@/server/repositories/academic/batch-repository";
 
+// ---------------------------------------------
+// Errors
+// ---------------------------------------------
+
 export class EnrollmentError extends Error {
   constructor(
     message: string,
@@ -20,6 +24,10 @@ export class EnrollmentError extends Error {
 
 type EnrollmentExpiryUpdate = Pick<Partial<NewEnrollment>, "expiresAt">;
 
+// ---------------------------------------------
+// Enrollment Service
+// ---------------------------------------------
+
 export class EnrollmentService {
   private static readonly MAX_EXTENSION_MONTHS = 24;
   private static readonly MAX_ID_LENGTH = 128;
@@ -29,9 +37,9 @@ export class EnrollmentService {
     private readonly batchRepo = new BatchRepository(),
   ) {}
 
-  // ─────────────────────────────────────────────
-  // Validation helpers
-  // ─────────────────────────────────────────────
+  // ---------------------------------------------
+  // Validation Helpers
+  // ---------------------------------------------
 
   private validateId(value: string, fieldName: string): void {
     if (
@@ -74,14 +82,12 @@ export class EnrollmentService {
     }
   }
 
-  // ─────────────────────────────────────────────
-  // Expiry helpers
-  // ─────────────────────────────────────────────
+  // ---------------------------------------------
+  // Expiry Helpers
+  // ---------------------------------------------
 
   /**
-   * Add calendar months without allowing JavaScript's
-   * date overflow to move into an unexpected month.
-   *
+   * Add calendar months without JavaScript date overflow.
    * Example: January 31 + 1 month = February 28/29.
    */
   private addMonths(date: Date, months: number): Date {
@@ -102,10 +108,48 @@ export class EnrollmentService {
     return result;
   }
 
+  /**
+   * Exactly one batch expiry configuration must exist:
+   *
+   * 1. expiryDate -> Fixed batch expiry.
+   * 2. validityMonths -> Enrollment-based expiry.
+   */
   private calculateExpiryDate(
     startDate: Date,
-    validityMonths: number,
+    validityMonths: number | null,
+    batchExpiryDate: Date | null,
   ): Date | null {
+    this.validateDate(startDate, "Enrollment start date");
+    this.validateDate(batchExpiryDate, "Batch expiry date");
+
+    const hasValidity = validityMonths !== null;
+    const hasFixedExpiry = batchExpiryDate !== null;
+
+    // Both configured or both missing
+    if (hasValidity === hasFixedExpiry) {
+      throw new EnrollmentError(
+        "Batch must have either validity months or a fixed expiry date.",
+        400,
+      );
+    }
+
+    // Fixed batch expiry date
+    if (batchExpiryDate) {
+      const expiryDate = new Date(batchExpiryDate);
+
+      if (expiryDate.getTime() <= startDate.getTime()) {
+        throw new EnrollmentError("This batch has already expired.", 400);
+      }
+
+      return expiryDate;
+    }
+
+    // Validity-based expiry
+    if (validityMonths === null) {
+      throw new EnrollmentError("Batch expiry configuration is missing.", 400);
+    }
+
+    // Zero means unlimited validity
     if (validityMonths === 0) {
       return null;
     }
@@ -143,9 +187,9 @@ export class EnrollmentService {
     return record;
   }
 
-  // ─────────────────────────────────────────────
-  // Create / Reactivate enrollment
-  // ─────────────────────────────────────────────
+  // ---------------------------------------------
+  // Create / Reactivate Enrollment
+  // ---------------------------------------------
 
   async enrollStudent(
     userId: string,
@@ -165,11 +209,19 @@ export class EnrollmentService {
       throw new EnrollmentError("Batch not found.", 404);
     }
 
+    const now = new Date();
+
+    // Calculate expiry using either batch expiryDate
+    // or validityMonths.
+    const expiresAt = this.calculateExpiryDate(
+      now,
+      batch.validityMonths ?? null,
+      batch.expiryDate ?? null,
+    );
+
     const existing = await this.enrollmentRepo.checkEnrollment(userId, batchId);
 
-    const now = new Date();
-    const expiresAt = this.calculateExpiryDate(now, batch.validityMonths!);
-
+    // Existing enrollment
     if (existing) {
       this.assertEnrollmentCanBeModified(existing);
 
@@ -209,6 +261,7 @@ export class EnrollmentService {
       return updated;
     }
 
+    // New enrollment
     const enrollmentData: NewEnrollment = {
       userId,
       batchId,
@@ -220,9 +273,9 @@ export class EnrollmentService {
     return this.enrollmentRepo.create(enrollmentData);
   }
 
-  // ─────────────────────────────────────────────
-  // Access validation
-  // ─────────────────────────────────────────────
+  // ---------------------------------------------
+  // Access Validation
+  // ---------------------------------------------
 
   async hasValidAccess(userId: string, batchId: string): Promise<boolean> {
     this.validateId(userId, "user ID");
@@ -237,9 +290,9 @@ export class EnrollmentService {
     return !this.isExpired(record.expiresAt);
   }
 
-  // ─────────────────────────────────────────────
-  // Read operations
-  // ─────────────────────────────────────────────
+  // ---------------------------------------------
+  // Read Operations
+  // ---------------------------------------------
 
   async getUserEnrollments(userId: string): Promise<Enrollment[]> {
     this.validateId(userId, "user ID");
@@ -247,9 +300,9 @@ export class EnrollmentService {
     return this.enrollmentRepo.findUserEnrollments(userId);
   }
 
-  // ─────────────────────────────────────────────
-  // Revoke enrollment
-  // ─────────────────────────────────────────────
+  // ---------------------------------------------
+  // Revoke Enrollment
+  // ---------------------------------------------
 
   async revokeEnrollment(enrollmentId: string): Promise<Enrollment> {
     const record = await this.requireEnrollment(enrollmentId);
@@ -271,9 +324,9 @@ export class EnrollmentService {
     return updated;
   }
 
-  // ─────────────────────────────────────────────
-  // Extend enrollment validity
-  // ─────────────────────────────────────────────
+  // ---------------------------------------------
+  // Extend Enrollment Validity
+  // ---------------------------------------------
 
   async extendValidity(
     enrollmentId: string,
@@ -317,9 +370,9 @@ export class EnrollmentService {
     return updated;
   }
 
-  // ─────────────────────────────────────────────
-  // Restricted enrollment update
-  // ─────────────────────────────────────────────
+  // ---------------------------------------------
+  // Restricted Enrollment Update
+  // ---------------------------------------------
 
   async updateEnrollment(
     enrollmentId: string,
