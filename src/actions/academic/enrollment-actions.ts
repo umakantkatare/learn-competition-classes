@@ -1,11 +1,12 @@
 "use server";
 
-import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { auth } from "@/lib/auth";
+import { requireAuth, requireAdmin } from "@/lib/authorize";
+
 import { EnrollmentService } from "@/server/services/academic/enrollment-service";
+
 import {
   createEnrollmentSchema,
   updateEnrollmentSchema,
@@ -21,6 +22,26 @@ type ActionResult<T = unknown> = {
   error?: string;
 };
 
+// ---------------------------------------------
+// Validation
+// ---------------------------------------------
+
+const idSchema = z
+  .string()
+  .trim()
+  .min(1, "ID is required.")
+  .max(128, "Invalid ID.");
+
+const enrollmentExpiryUpdateSchema = z
+  .object({
+    expiresAt: z.coerce.date().nullable(),
+  })
+  .strict();
+
+// ---------------------------------------------
+// Helpers
+// ---------------------------------------------
+
 function getErrorMessage(error: unknown): string {
   if (error instanceof z.ZodError) {
     return error.issues[0]?.message ?? "Invalid input.";
@@ -33,48 +54,31 @@ function getErrorMessage(error: unknown): string {
   return "An unexpected error occurred.";
 }
 
-async function getSession() {
-  return auth.api.getSession({
-    headers: await headers(),
-  });
+function revalidateEnrollmentPaths(): void {
+  revalidatePath("/admin/enrollments");
+  revalidatePath("/dashboard/my-batches");
+  revalidatePath("/student/my-batches");
 }
 
-async function requireAdmin(): Promise<boolean> {
-  const session = await getSession();
-  return session?.user?.role === "admin";
-}
+// ---------------------------------------------
+// 1. Create Enrollment - ADMIN ONLY
+// ---------------------------------------------
 
-// 1. Manual enrollment: ADMIN only.
 export async function createEnrollmentAction(
   input: z.infer<typeof createEnrollmentSchema>,
 ): Promise<ActionResult> {
   try {
-    const session = await getSession();
-
-    if (!session?.user?.id) {
-      return {
-        success: false,
-        error: "You must be logged in.",
-      };
-    }
-
-    if (session.user.role !== "admin") {
-      return {
-        success: false,
-        error: "Only admins can manually enroll students.",
-      };
-    }
+    await requireAdmin();
 
     const validatedData = createEnrollmentSchema.parse(input);
 
     const enrollment = await enrollmentService.enrollStudent(
       validatedData.userId,
       validatedData.batchId,
-      validatedData.orderId || undefined,
+      validatedData.orderId ?? undefined,
     );
 
-    revalidatePath("/admin/enrollments");
-    revalidatePath("/dashboard/my-batches");
+    revalidateEnrollmentPaths();
 
     return {
       success: true,
@@ -89,38 +93,26 @@ export async function createEnrollmentAction(
   }
 }
 
-// 2. Update enrollment: ADMIN only.
-// Requires EnrollmentService.updateEnrollment() to be implemented
-// with field-level validation and allowed status transitions.
+// ---------------------------------------------
+// 2. Update Enrollment - ADMIN ONLY
+// ---------------------------------------------
+
 export async function updateEnrollmentAction(
   id: string,
   input: z.infer<typeof updateEnrollmentSchema>,
 ): Promise<ActionResult> {
   try {
-    if (!(await requireAdmin())) {
-      return {
-        success: false,
-        error: "Unauthorized. Admin access is required.",
-      };
-    }
+    await requireAdmin();
 
-    if (!id?.trim()) {
-      return {
-        success: false,
-        error: "Enrollment ID is required.",
-      };
-    }
+    const enrollmentId = idSchema.parse(id);
+    const validatedData = enrollmentExpiryUpdateSchema.parse(input);
 
-    const validatedData = updateEnrollmentSchema.parse(input);
-
-    // Implement this service method before enabling this action.
     const updatedEnrollment = await enrollmentService.updateEnrollment(
-      id,
+      enrollmentId,
       validatedData,
     );
 
-    revalidatePath("/admin/enrollments");
-    revalidatePath("/student/my-batches");
+    revalidateEnrollmentPaths();
 
     return {
       success: true,
@@ -135,32 +127,21 @@ export async function updateEnrollmentAction(
   }
 }
 
-// 3. Check access for the currently authenticated user.
-// Never accept userId from the client for this check.
+// ---------------------------------------------
+// 3. Check Access - AUTHENTICATED USER
+// ---------------------------------------------
+
 export async function checkValidAccessAction(
   batchId: string,
 ): Promise<ActionResult> {
   try {
-    if (!batchId?.trim()) {
-      return {
-        success: false,
-        hasAccess: false,
-        error: "Batch ID is required.",
-      };
-    }
+    const validatedBatchId = idSchema.parse(batchId);
 
-    const session = await getSession();
-
-    if (!session?.user?.id) {
-      return {
-        success: true,
-        hasAccess: false,
-      };
-    }
+    const user = await requireAuth();
 
     const hasAccess = await enrollmentService.hasValidAccess(
-      session.user.id,
-      batchId,
+      user.id,
+      validatedBatchId,
     );
 
     return {
@@ -176,21 +157,15 @@ export async function checkValidAccessAction(
   }
 }
 
-// 4. Fetch enrollments for the currently authenticated student.
+// ---------------------------------------------
+// 4. Get User Enrollment History
+// ---------------------------------------------
+
 export async function getUserEnrollmentsAction(): Promise<ActionResult> {
   try {
-    const session = await getSession();
+    const user = await requireAuth();
 
-    if (!session?.user?.id) {
-      return {
-        success: false,
-        error: "You must be logged in.",
-      };
-    }
-
-    const enrollments = await enrollmentService.getUserEnrollments(
-      session.user.id,
-    );
+    const enrollments = await enrollmentService.getUserEnrollments(user.id);
 
     return {
       success: true,
@@ -204,34 +179,49 @@ export async function getUserEnrollmentsAction(): Promise<ActionResult> {
   }
 }
 
-// 5. Revoke access: ADMIN only.
-// Service must implement revocation using your existing schema;
-// do not assume a REVOKED enum value exists.
+// ---------------------------------------------
+// 5. Get My Batches - AUTHENTICATED USER
+// ---------------------------------------------
+
+export async function getMyBatchesAction(): Promise<ActionResult> {
+  try {
+    const user = await requireAuth();
+
+    const batches = await enrollmentService.getUserEnrollmentsWithBatch(
+      user.id,
+    );
+
+    return {
+      success: true,
+      data: batches,
+    };
+  } catch (error: unknown) {
+    return {
+      success: false,
+      error: getErrorMessage(error),
+    };
+  }
+}
+
+// ---------------------------------------------
+// 6. Revoke Enrollment - ADMIN ONLY
+// ---------------------------------------------
+
 export async function revokeEnrollmentAction(
   enrollmentId: string,
 ): Promise<ActionResult> {
   try {
-    if (!(await requireAdmin())) {
-      return {
-        success: false,
-        error: "Unauthorized. Admin access is required.",
-      };
-    }
+    await requireAdmin();
 
-    if (!enrollmentId?.trim()) {
-      return {
-        success: false,
-        error: "Enrollment ID is required.",
-      };
-    }
+    const validatedId = idSchema.parse(enrollmentId);
 
-    await enrollmentService.revokeEnrollment(enrollmentId);
+    const enrollment = await enrollmentService.revokeEnrollment(validatedId);
 
-    revalidatePath("/admin/enrollments");
-    revalidatePath("/student/my-batches");
+    revalidateEnrollmentPaths();
 
     return {
       success: true,
+      data: enrollment,
       message: "Enrollment access has been revoked.",
     };
   } catch (error: unknown) {
@@ -242,25 +232,18 @@ export async function revokeEnrollmentAction(
   }
 }
 
-// 6. Extend enrollment validity: ADMIN only.
+// ---------------------------------------------
+// 7. Extend Enrollment Validity - ADMIN ONLY
+// ---------------------------------------------
+
 export async function extendValidityAction(
   enrollmentId: string,
   extraMonths: number,
 ): Promise<ActionResult> {
   try {
-    if (!(await requireAdmin())) {
-      return {
-        success: false,
-        error: "Unauthorized. Admin access is required.",
-      };
-    }
+    await requireAdmin();
 
-    if (!enrollmentId?.trim()) {
-      return {
-        success: false,
-        error: "Enrollment ID is required.",
-      };
-    }
+    const validatedId = idSchema.parse(enrollmentId);
 
     const validatedMonths = z
       .number()
@@ -270,12 +253,11 @@ export async function extendValidityAction(
       .parse(extraMonths);
 
     const updatedEnrollment = await enrollmentService.extendValidity(
-      enrollmentId,
+      validatedId,
       validatedMonths,
     );
 
-    revalidatePath("/admin/enrollments");
-    revalidatePath("/student/my-batches");
+    revalidateEnrollmentPaths();
 
     return {
       success: true,

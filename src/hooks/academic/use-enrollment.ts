@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   checkValidAccessAction,
   getUserEnrollmentsAction,
+  getMyBatchesAction,
   createEnrollmentAction,
   updateEnrollmentAction,
   revokeEnrollmentAction,
@@ -38,6 +39,8 @@ export const enrollmentKeys = {
 
   userEnrollments: () => [...enrollmentKeys.lists(), "me"] as const,
 
+  myBatches: () => [...enrollmentKeys.lists(), "my-batches"] as const,
+
   details: () => [...enrollmentKeys.all, "detail"] as const,
 
   access: (batchId: string) =>
@@ -66,6 +69,7 @@ export function useCheckValidAccess(batchId: string) {
 
     queryFn: async () => {
       const result = await checkValidAccessAction(batchId);
+
       return ensureSuccess(result);
     },
 
@@ -79,7 +83,7 @@ export function useCheckValidAccess(batchId: string) {
 }
 
 // ---------------------------------------------
-// 2. Get Current User Enrollments
+// 2. Get Current User Enrollment History
 // ---------------------------------------------
 
 export function useGetUserEnrollments() {
@@ -88,6 +92,7 @@ export function useGetUserEnrollments() {
 
     queryFn: async () => {
       const result = await getUserEnrollmentsAction();
+
       return ensureSuccess(result);
     },
 
@@ -98,7 +103,27 @@ export function useGetUserEnrollments() {
 }
 
 // ---------------------------------------------
-// 3. Admin: Create Enrollment
+// 3. Get Current User My Batches
+// ---------------------------------------------
+
+export function useGetMyBatches() {
+  return useQuery({
+    queryKey: enrollmentKeys.myBatches(),
+
+    queryFn: async () => {
+      const result = await getMyBatchesAction();
+
+      return ensureSuccess(result);
+    },
+
+    staleTime: 1000 * 60 * 2,
+
+    select: (result) => result.data ?? [],
+  });
+}
+
+// ---------------------------------------------
+// 4. Admin: Create Enrollment
 // ---------------------------------------------
 
 export function useCreateEnrollment() {
@@ -107,6 +132,7 @@ export function useCreateEnrollment() {
   return useMutation({
     mutationFn: async (input: CreateEnrollmentInput) => {
       const result = await createEnrollmentAction(input);
+
       return ensureSuccess(result);
     },
 
@@ -119,7 +145,7 @@ export function useCreateEnrollment() {
 }
 
 // ---------------------------------------------
-// 4. Admin: Update Enrollment
+// 5. Admin: Update Enrollment
 // ---------------------------------------------
 
 export function useUpdateEnrollment() {
@@ -134,6 +160,7 @@ export function useUpdateEnrollment() {
       data: UpdateEnrollmentInput;
     }) => {
       const result = await updateEnrollmentAction(id, data);
+
       return ensureSuccess(result);
     },
 
@@ -146,7 +173,7 @@ export function useUpdateEnrollment() {
 }
 
 // ---------------------------------------------
-// 5. Admin: Revoke Enrollment
+// 6. Admin: Revoke Enrollment
 // ---------------------------------------------
 
 export function useRevokeEnrollment() {
@@ -155,6 +182,7 @@ export function useRevokeEnrollment() {
   return useMutation({
     mutationFn: async (enrollmentId: string) => {
       const result = await revokeEnrollmentAction(enrollmentId);
+
       return ensureSuccess(result);
     },
 
@@ -167,7 +195,7 @@ export function useRevokeEnrollment() {
 }
 
 // ---------------------------------------------
-// 6. Admin: Extend Enrollment Validity
+// 7. Admin: Extend Enrollment Validity
 // ---------------------------------------------
 
 export function useExtendEnrollmentValidity() {

@@ -67,7 +67,7 @@ const navigation: Record<UserRole, NavItem[]> = {
 
   student: [
     { label: "My Profile", href: "/student", icon: UserRound },
-    { label: "My Courses", href: "/student/batches", icon: BookOpen },
+    { label: "My Courses", href: "/student/my-batches", icon: BookOpen },
     { label: "Live Classes", href: "/student/live-classes", icon: Video },
     // { label: "My Tests", href: "/student/tests", icon: ClipboardList },
     // { label: "My Results", href: "/student/results", icon: BarChart3 },

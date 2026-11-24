@@ -377,8 +377,16 @@ export const enrollment = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [
-    uniqueIndex("user_batch_unique_idx").on(t.userId, t.batchId),
-    index("enrollment_userId_idx").on(t.userId),
-    index("enrollment_batchId_idx").on(t.batchId),
-  ],
+  index("enrollment_user_batch_idx").on(
+    t.userId,
+    t.batchId,
+  ),
+
+  uniqueIndex("enrollment_user_batch_active_unique_idx")
+    .on(t.userId, t.batchId)
+    .where(sql`${t.status} = 'ACTIVE'`),
+
+  index("enrollment_userId_idx").on(t.userId),
+  index("enrollment_batchId_idx").on(t.batchId),
+],
 );
