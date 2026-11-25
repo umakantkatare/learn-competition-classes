@@ -26,7 +26,7 @@ export default function ResetPasswordTemplate({
       <Head />
 
       <Preview>
-        Reset your password for Learn Competition Classes (LCC).
+        Reset your password for Learn Competition Classes.
       </Preview>
 
       <Tailwind>
@@ -50,7 +50,7 @@ export default function ResetPasswordTemplate({
                 <Section className="mx-auto mt-5 h-[2px] w-[60px] bg-[#D4AF37]" />
               </Section>
 
-              {/* Main content */}
+              {/* Main Content */}
               <Section className="px-[24px] py-[32px] sm:px-[40px]">
                 <Heading className="m-0 text-[24px] font-bold leading-[32px] text-[#171717]">
                   Reset your password
@@ -61,49 +61,41 @@ export default function ResetPasswordTemplate({
                 </Text>
 
                 <Text className="mt-3 text-[15px] leading-[26px] text-[#4B5563]">
-                  We received a request to reset the password for your Learn
-                  Competition Classes (LCC) account. Click the button below to
-                  choose a new password.
+                  We received a request to reset the password associated with
+                  your Learn Competition Classes account. Click the button
+                  below to create a new password.
                 </Text>
 
-                {/* Reset button */}
-                <Section className="my-[28px] rounded-[10px] border border-solid border-[#E8D49A] bg-[#FFF9E8] px-[16px] py-[28px] text-center">
-                  <Text className="m-0 text-[13px] font-semibold uppercase tracking-[1px] text-[#786329]">
-                    Password reset request
-                  </Text>
+                {/* Reset Password Card */}
+                <Section className="my-[28px] rounded-[10px] border border-solid border-[#E8D49A] bg-[#FFF9E8] px-[16px] py-[24px] text-center">
 
                   <Section className="my-[20px]">
                     <Button
                       href={resetUrl}
-                      className="rounded-[8px] bg-[#171717] px-[28px] py-[14px] text-[14px] font-semibold text-[#D4AF37] no-underline"
+                      className="rounded-[8px] bg-[#D4AF37] px-[28px] py-[14px] text-[14px] font-bold text-[#171717] no-underline"
                     >
                       Reset Password
                     </Button>
                   </Section>
 
                   <Text className="m-0 text-[13px] leading-[22px] text-[#786329]">
-                    This link expires according to the password reset expiration
-                    configured by LCC.
+                    This password reset link is valid for 10 minutes.
                   </Text>
                 </Section>
 
                 <Text className="text-[14px] leading-[24px] text-[#4B5563]">
-                  If the button does not work, copy and paste the following link
-                  into your browser:
-                </Text>
-
-                <Text className="break-all text-[13px] leading-[22px] text-[#A78015]">
-                  {resetUrl}
+                  Click the button above to securely set a new password for your
+                  account.
                 </Text>
 
                 <Text className="mt-4 text-[14px] leading-[24px] text-[#4B5563]">
                   If you did not request a password reset, you can safely ignore
-                  this email. Your existing password will remain unchanged
-                  unless you complete the reset.
+                  this email. Your existing password will remain unchanged.
                 </Text>
 
                 <Hr className="my-[28px] border-[#E8DFC8]" />
 
+                {/* Security Notice */}
                 <Text className="m-0 text-[13px] font-semibold text-[#292929]">
                   Security notice
                 </Text>
