@@ -21,6 +21,7 @@ export default function ResetPasswordTemplate({
   resetUrl,
   userName,
 }: ResetPasswordTemplateProps) {
+  console.log(`name ${userName} link ${resetUrl}`);
   return (
     <Html lang="en">
       <Head />

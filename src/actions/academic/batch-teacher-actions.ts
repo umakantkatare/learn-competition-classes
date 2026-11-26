@@ -1,10 +1,14 @@
+
 "use server";
 
-import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { auth } from "@/lib/auth";
+import { ROLES } from "@/lib/permissions";
+import {
+  requireAuth,
+  requireAdminOrManager,
+} from "@/lib/authorize";
 
 import { BatchTeacherService } from "@/server/services/academic/batch-teacher-service";
 import { TeacherService } from "@/server/services/academic/teacher-service";
@@ -14,6 +18,10 @@ import {
   assignBatchTeachersSchema,
   removeBatchTeacherSchema,
 } from "@/validations/academic/batch-teacher-validations";
+
+// ---------------------------------------------
+// Instances
+// ---------------------------------------------
 
 const batchTeacherService = new BatchTeacherService();
 const teacherService = new TeacherService();
@@ -27,33 +35,15 @@ type ActionResult<T = unknown> = {
   data?: T;
   message?: string;
   error?: string;
+  issues?: {
+    field: string;
+    message: string;
+  }[];
 };
-
-type Session = NonNullable<Awaited<ReturnType<typeof auth.api.getSession>>>;
 
 // ---------------------------------------------
 // Helpers
 // ---------------------------------------------
-
-async function getSession(): Promise<Session | null> {
-  return await auth.api.getSession({
-    headers: await headers(),
-  });
-}
-
-async function requireAdminOrManager(): Promise<Session | null> {
-  const session = await getSession();
-
-  if (!session) return null;
-
-  const allowedRoles = ["ADMIN", "MANAGER"];
-
-  if (!allowedRoles.includes(session.user.role ?? "")) {
-    return null;
-  }
-
-  return session;
-}
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof z.ZodError) {
@@ -69,6 +59,7 @@ function getErrorMessage(error: unknown): string {
 
 function getValidationError(error: z.ZodError) {
   return {
+    success: false,
     error: error.issues[0]?.message ?? "Invalid input.",
     issues: error.issues.map((issue) => ({
       field: issue.path.join("."),
@@ -77,9 +68,15 @@ function getValidationError(error: z.ZodError) {
   };
 }
 
+// ---------------------------------------------
+// Cache Revalidation
+// ---------------------------------------------
+
 function revalidateBatch(batchId: string) {
   revalidatePath("/admin/batches");
   revalidatePath(`/admin/batches/${batchId}`);
+  revalidatePath("/teacher/batches");
+  revalidatePath("/teacher/dashboard");
 }
 
 // ---------------------------------------------
@@ -103,22 +100,12 @@ export async function assignTeacherToBatchAction(
   formData: z.input<typeof assignBatchTeacherSchema>,
 ): Promise<ActionResult> {
   try {
-    const session = await requireAdminOrManager();
-
-    if (!session) {
-      return {
-        success: false,
-        error: "Unauthorized access.",
-      };
-    }
+    await requireAdminOrManager();
 
     const parsed = assignBatchTeacherSchema.safeParse(formData);
 
     if (!parsed.success) {
-      return {
-        success: false,
-        ...getValidationError(parsed.error),
-      };
+      return getValidationError(parsed.error);
     }
 
     const assignment = await batchTeacherService.assignTeacherToBatch(
@@ -152,14 +139,7 @@ export async function assignMultipleTeachersAction(
   teacherIds: string[],
 ): Promise<ActionResult> {
   try {
-    const session = await requireAdminOrManager();
-
-    if (!session) {
-      return {
-        success: false,
-        error: "Unauthorized access.",
-      };
-    }
+    await requireAdminOrManager();
 
     const parsed = bulkAssignmentSchema.safeParse({
       batchId,
@@ -167,17 +147,14 @@ export async function assignMultipleTeachersAction(
     });
 
     if (!parsed.success) {
-      return {
-        success: false,
-        ...getValidationError(parsed.error),
-      };
+      return getValidationError(parsed.error);
     }
 
-    // Duplicate IDs are rejected by validation.
-    const assignments = await batchTeacherService.assignMultipleTeachers(
-      parsed.data.batchId,
-      parsed.data.teacherIds,
-    );
+    const assignments =
+      await batchTeacherService.assignMultipleTeachers(
+        parsed.data.batchId,
+        parsed.data.teacherIds,
+      );
 
     revalidateBatch(parsed.data.batchId);
 
@@ -204,28 +181,19 @@ export async function removeTeacherFromBatchAction(
   formData: z.input<typeof removeBatchTeacherSchema>,
 ): Promise<ActionResult> {
   try {
-    const session = await requireAdminOrManager();
-
-    if (!session) {
-      return {
-        success: false,
-        error: "Unauthorized access.",
-      };
-    }
+    await requireAdminOrManager();
 
     const parsed = removeBatchTeacherSchema.safeParse(formData);
 
     if (!parsed.success) {
-      return {
-        success: false,
-        ...getValidationError(parsed.error),
-      };
+      return getValidationError(parsed.error);
     }
 
-    const deletedAssignment = await batchTeacherService.removeTeacherFromBatch(
-      parsed.data.batchId,
-      parsed.data.teacherId,
-    );
+    const deletedAssignment =
+      await batchTeacherService.removeTeacherFromBatch(
+        parsed.data.batchId,
+        parsed.data.teacherId,
+      );
 
     revalidateBatch(parsed.data.batchId);
 
@@ -252,14 +220,7 @@ export async function getTeachersForBatchAction(
   batchId: string,
 ): Promise<ActionResult> {
   try {
-    const session = await requireAdminOrManager();
-
-    if (!session) {
-      return {
-        success: false,
-        error: "Unauthorized access.",
-      };
-    }
+    await requireAdminOrManager();
 
     if (!batchId?.trim()) {
       return {
@@ -268,7 +229,9 @@ export async function getTeachersForBatchAction(
       };
     }
 
-    const teachers = await batchTeacherService.getTeachersForBatch(batchId);
+    const teachers = await batchTeacherService.getTeachersForBatch(
+      batchId.trim(),
+    );
 
     return {
       success: true,
@@ -290,24 +253,17 @@ export async function getTeachersForBatchAction(
 
 export async function getBatchesForTeacherAction(): Promise<ActionResult> {
   try {
-    const session = await getSession();
+    const user = await requireAuth();
 
-    if (!session) {
-      return {
-        success: false,
-        error: "Unauthorized access.",
-      };
-    }
-
-    // Only authenticated teachers can access their assigned batches.
-    if (session.user.role !== "TEACHER") {
+    if (user.role !== ROLES.TEACHER) {
       return {
         success: false,
         error: "Only teachers can access their assigned batches.",
       };
     }
 
-    const profile = await teacherService.getProfileByUserId(session.user.id);
+    // Get authenticated teacher profile.
+    const profile = await teacherService.getProfileByUserId(user.id);
 
     if (!profile) {
       return {
@@ -316,11 +272,15 @@ export async function getBatchesForTeacherAction(): Promise<ActionResult> {
       };
     }
 
-    const batches = await batchTeacherService.getBatchesForTeacher(profile.id);
+    // Fetch batches assigned to this teacher profile.
+    const batches = await batchTeacherService.getBatchesForTeacher(
+      profile.id,
+    );
 
     return {
       success: true,
       data: batches,
+      message: "Assigned batches fetched successfully.",
     };
   } catch (error: unknown) {
     console.error("getBatchesForTeacherAction error:", error);

@@ -1,6 +1,7 @@
+
 import { db } from "@/db";
-import { batchTeachers } from "@/db/schema/academic-schema";
-import { and, eq } from "drizzle-orm";
+import { batch, batchTeachers } from "@/db/schema/academic-schema";
+import { and, eq, getTableColumns } from "drizzle-orm";
 
 import type { DbExecutor } from "./batch-repository";
 
@@ -16,7 +17,7 @@ export type NewBatchTeacher = typeof batchTeachers.$inferInsert;
 // ---------------------------------------------
 
 export class BatchTeacherRepository {
-  // Assign one teacher
+  // Assign one teacher to a batch
   async create(
     data: NewBatchTeacher,
     executor: DbExecutor = db,
@@ -33,7 +34,7 @@ export class BatchTeacherRepository {
     return result;
   }
 
-  // Assign multiple teachers
+  // Assign multiple teachers to batches
   async createMany(
     data: NewBatchTeacher[],
     executor: DbExecutor = db,
@@ -42,7 +43,10 @@ export class BatchTeacherRepository {
       return [];
     }
 
-    return executor.insert(batchTeachers).values(data).returning();
+    return executor
+      .insert(batchTeachers)
+      .values(data)
+      .returning();
   }
 
   // Get teachers assigned to a batch
@@ -56,7 +60,7 @@ export class BatchTeacherRepository {
       .where(eq(batchTeachers.batchId, batchId));
   }
 
-  // Get batches assigned to a teacher
+  // Get batch assignments of a teacher
   async findByTeacherId(
     teacherId: string,
     executor: DbExecutor = db,
@@ -67,7 +71,24 @@ export class BatchTeacherRepository {
       .where(eq(batchTeachers.teacherId, teacherId));
   }
 
-  // Find a specific assignment
+  // Get all batches assigned to a teacher
+ async findBatchesByTeacherId(
+  teacherId: string,
+  executor: DbExecutor = db,
+) {
+  return executor
+    .select({
+      ...getTableColumns(batch),
+    })
+    .from(batchTeachers)
+    .innerJoin(
+      batch,
+      eq(batchTeachers.batchId, batch.id),
+    )
+    .where(eq(batchTeachers.teacherId, teacherId));
+}
+
+  // Find a specific teacher assignment
   async findAssignment(
     batchId: string,
     teacherId: string,
@@ -87,7 +108,7 @@ export class BatchTeacherRepository {
     return result;
   }
 
-  // Remove one teacher from batch
+  // Remove one teacher from a batch
   async delete(
     batchId: string,
     teacherId: string,
@@ -106,7 +127,7 @@ export class BatchTeacherRepository {
     return result;
   }
 
-  // Remove all teachers from batch
+  // Remove all teachers from a batch
   async deleteByBatchId(
     batchId: string,
     executor: DbExecutor = db,

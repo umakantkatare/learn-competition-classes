@@ -44,9 +44,9 @@ export class BatchTeacherService {
   // ---------------------------------------------
 
   async assignTeacherToBatch(batchId: string, teacherId: string) {
-    const batch = await this.batchRepo.findById(batchId);
+    const existingBatch = await this.batchRepo.findById(batchId);
 
-    if (!batch) {
+    if (!existingBatch) {
       throw new Error("Batch not found.");
     }
 
@@ -71,59 +71,7 @@ export class BatchTeacherService {
   // Assign Multiple Teachers To Batch
   // ---------------------------------------------
 
-  // async assignMultipleTeachers(batchId: string, teacherIds: string[]) {
-  //   // Prevent duplicate IDs
-  //   const uniqueTeacherIds = [...new Set(teacherIds)];
-
-  //   if (uniqueTeacherIds.length !== teacherIds.length) {
-  //     throw new Error("Duplicate teachers are not allowed.");
-  //   }
-
-  //   if (uniqueTeacherIds.length === 0) {
-  //     return [];
-  //   }
-
-  //   const batch = await this.batchRepo.findById(batchId);
-
-  //   if (!batch) {
-  //     throw new Error("Batch not found.");
-  //   }
-
-  //   // Verify all teacher profiles
-  //   await this.validateTeachers(uniqueTeacherIds);
-
-  //   // Find existing assignments
-  //   const existingAssignments =
-  //     await this.batchTeacherRepo.findByBatchId(batchId);
-
-  //   const existingTeacherIds = new Set(
-  //     existingAssignments.map((item) => item.teacherId),
-  //   );
-
-  //   // Only assign new teachers
-  //   const newTeacherIds = uniqueTeacherIds.filter(
-  //     (id) => !existingTeacherIds.has(id),
-  //   );
-
-  //   if (newTeacherIds.length === 0) {
-  //     return [];
-  //   }
-
-  //   // YAHAN CHANGE KIYA GAYA HAI
-  //   // db.transaction hata diya gaya hai kyunki single createMany apne aap mein atomic hai
-  //   return this.batchTeacherRepo.createMany(
-  //     newTeacherIds.map((teacherId) => ({
-  //       batchId,
-  //       teacherId,
-  //     })),
-  //     // 'tx' argument pass karne ki ab zarurat nahi
-  //   );
-  // }
-
-// any one
-
   async assignMultipleTeachers(batchId: string, teacherIds: string[]) {
-    // Prevent duplicate IDs
     const uniqueTeacherIds = [...new Set(teacherIds)];
 
     if (uniqueTeacherIds.length !== teacherIds.length) {
@@ -134,16 +82,14 @@ export class BatchTeacherService {
       return [];
     }
 
-    const batch = await this.batchRepo.findById(batchId);
+    const existingBatch = await this.batchRepo.findById(batchId);
 
-    if (!batch) {
+    if (!existingBatch) {
       throw new Error("Batch not found.");
     }
 
-    // Verify all teacher profiles
     await this.validateTeachers(uniqueTeacherIds);
 
-    // Find existing assignments
     const existingAssignments =
       await this.batchTeacherRepo.findByBatchId(batchId);
 
@@ -151,7 +97,6 @@ export class BatchTeacherService {
       existingAssignments.map((item) => item.teacherId),
     );
 
-    // Only assign new teachers
     const newTeacherIds = uniqueTeacherIds.filter(
       (id) => !existingTeacherIds.has(id),
     );
@@ -176,9 +121,9 @@ export class BatchTeacherService {
   // ---------------------------------------------
 
   async getTeachersForBatch(batchId: string) {
-    const batch = await this.batchRepo.findById(batchId);
+    const existingBatch = await this.batchRepo.findById(batchId);
 
-    if (!batch) {
+    if (!existingBatch) {
       throw new Error("Batch not found.");
     }
 
@@ -192,7 +137,7 @@ export class BatchTeacherService {
   async getBatchesForTeacher(teacherId: string) {
     await this.validateTeacher(teacherId);
 
-    return this.batchTeacherRepo.findByTeacherId(teacherId);
+    return this.batchTeacherRepo.findBatchesByTeacherId(teacherId);
   }
 
   // ---------------------------------------------
@@ -200,9 +145,9 @@ export class BatchTeacherService {
   // ---------------------------------------------
 
   async removeTeacherFromBatch(batchId: string, teacherId: string) {
-    const batch = await this.batchRepo.findById(batchId);
+    const existingBatch = await this.batchRepo.findById(batchId);
 
-    if (!batch) {
+    if (!existingBatch) {
       throw new Error("Batch not found.");
     }
 
