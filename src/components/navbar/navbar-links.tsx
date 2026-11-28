@@ -19,7 +19,7 @@ import NavbarDropdown from "./navbar-dropdowm";
 const navLinks = [
   { label: "Home", href: "/" },
   { label: "Courses", href: "/batches", dropdown: true },
-  { label: "Live Classes", href: "/live-classes" },
+  // { label: "Live Classes", href: "/live-classes" },
   { label: "About", href: "/about" },
   { label: "Contact", href: "/contact" },
 ] as const;

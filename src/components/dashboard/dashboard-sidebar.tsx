@@ -41,7 +41,7 @@ const navigation: Record<UserRole, NavItem[]> = {
     { label: "Exam-Category", href: "/admin/exam-categories", icon: Tags },
     { label: "Exams", href: "/admin/exams", icon: GraduationCap },
     { label: "Batches", href: "/admin/batches", icon: BookOpen },
-    { label: "Live Classes", href: "/admin/live-classes", icon: Video },
+    // { label: "Live Classes", href: "/admin/live-classes", icon: Video },
     { label: "Enrollments", href: "/admin/enrollments", icon: ClipboardList },
 
     // { label: "Reports", href: "/admin/reports", icon: BarChart3 },
@@ -54,7 +54,7 @@ const navigation: Record<UserRole, NavItem[]> = {
     { label: "Exam-Category", href: "/manager/exam-categories", icon: Tags },
     { label: "Exams", href: "/manager/exams", icon: GraduationCap },
     { label: "Batches", href: "/manager/batches", icon: BookOpen },
-    { label: "Live Classes", href: "/manager/live-classes", icon: Video },
+    // { label: "Live Classes", href: "/manager/live-classes", icon: Video },
     { label: "Enrollments", href: "/manager/enrollments", icon: ClipboardList },
   ],
 
